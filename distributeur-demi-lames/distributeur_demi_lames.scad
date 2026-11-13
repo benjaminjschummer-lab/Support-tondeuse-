@@ -5,24 +5,27 @@
 //  Fichier paramétrique OpenSCAD – cotes en mm
 // =====================================================================
 
-/* [Demi-lame] */
-blade_l = 43.0;   // longueur d'une demi-lame (lame DE 43 x 22,2 coupée en deux)
-blade_w = 11.1;   // largeur d'une demi-lame
+/* [Demi-lame emballée dans son papier] */
+// Mesure facile : longueur et largeur du papier à la règle,
+// épaisseur = hauteur d'une pile de 10 lames emballées / 10.
+blade_l = 47.0;   // longueur de la lame emballée (papier compris)
+blade_w = 14.0;   // largeur de la lame emballée (papier compris)
+blade_t = 0.35;   // épaisseur d'une lame emballée (0,1 lame + 2 x papier)
 clr_l   = 0.6;    // jeu aux extrémités (par côté)
 clr_w   = 0.45;   // jeu avant/arrière (par côté)
 
 /* [Sortie] */
-gap     = 0.18;   // hauteur de la fente de sortie : > 1 lame (0,1) et < 2 lames
+gap     = 1.5 * blade_t;  // fente de sortie : 1,5 épaisseur -> une seule lame passe
 
 /* [Corps] */
-capacity_h = 40;  // hauteur de la réserve (≈ 400 demi-lames)
+capacity_h = 50;  // hauteur de la réserve (≈ 140 lames emballées, une boîte de 100)
 wall    = 2.4;
 floor_t = 1.4;    // fond sous la pile (le doigt passe par la fenêtre)
 floor_z = 18;      // hauteur du fond : place pour le doigt dessous (14 mm)
 base_d  = 0;       // profondeur du socle (0 = aussi étroit que la tour, à coller au double face)
 base_t  = 4;
-win_l   = 26;     // fenêtre doigt sous la lame (longueur)
-fc_w    = 32;     // largeur de la niche pour le doigt
+win_l   = 28;     // fenêtre doigt sous la lame (longueur)
+fc_w    = 34;     // largeur de la niche pour le doigt
 view_w  = 4;      // fente latérale pour voir le stock
 
 /* [Couvercle] */

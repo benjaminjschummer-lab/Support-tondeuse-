@@ -1,6 +1,6 @@
 # Distributeur de demi-lames à gravité (barbershop)
 
-Distributeur de comptoir pour **demi-lames** (lames double tranchant coupées en deux, pour shavette / coupe-chou à lame interchangeable).
+Distributeur de comptoir pour **demi-lames emballées individuellement dans leur papier** (lames double tranchant coupées en deux, pour shavette / coupe-chou à lame interchangeable).
 On charge les lames par le haut, on ferme le couvercle, et en bas on tire **une seule lame à la fois** vers soi.
 
 ![Vue d'ensemble](images/vue_avant.png)
@@ -19,30 +19,37 @@ Le corps est **couché sur le côté** sur le plateau : c'est voulu, la fente de
 
 ## Utilisation
 
-1. Retire le couvercle et dépose les demi-lames **à plat**, **tranchant vers l'arrière** (le dos non coupant vers toi).
+1. Retire le couvercle et dépose les demi-lames **dans leur papier**, **à plat**, **tranchant vers l'arrière** (le dos non coupant vers toi).
 2. Remets le couvercle.
 3. Glisse un doigt dans la niche sous le distributeur, pose-le sur la lame du bas à travers la fenêtre, et tire vers toi : la lame sort par la fente avant, par son dos.
 4. Attrape-la par le dos et mets-la dans ta shavette.
 
-La fente latérale permet de voir le stock restant. Capacité : environ 400 demi-lames.
+La fente latérale permet de voir le stock restant. Capacité : environ 140 lames emballées (une boîte de 100 rentre en entier).
 
-Pas de pied : la base est aussi étroite que la tour (49 × 17 mm). **Colle-le au plan de travail avec de l'adhésif double face** (une bande de 45 × 15 mm suffit). Pour une version autoportante, mets `base_d = 36` dans le `.scad`.
+Pas de pied : la base est aussi étroite que la tour (53 × 20 mm). **Colle-le au plan de travail avec de l'adhésif double face** (une bande de 50 × 18 mm suffit). Pour une version autoportante, mets `base_d = 36` dans le `.scad`.
 
 ## Dimensions
 
 | | |
 |---|---|
-| Demi-lame prévue | 43 × 11,1 × 0,1 mm (lame DE standard 43 × 22,2 mm coupée en deux) |
-| Réserve intérieure | 44,2 × 12,0 mm, 40 mm de haut |
-| Fente de sortie | 0,18 mm de haut (plus d'une lame de 0,1 mm, moins de deux) |
-| Encombrement | 49 × 17 mm au sol (pas de pied qui dépasse), 59 mm de haut + couvercle |
+| Lame emballée prévue | **47 × 14 × 0,35 mm** (estimation : demi-lame 43 × 11,1 × 0,1 mm + papier) |
+| Réserve intérieure | 48,2 × 14,9 mm, 50 mm de haut |
+| Fente de sortie | 0,52 mm (1,5 × l'épaisseur d'une lame emballée : une seule passe) |
+| Encombrement | 53 × 20 mm au sol (pas de pied), 69 mm de haut + couvercle |
+
+### Vérifier avec tes lames (30 secondes, une règle suffit)
+
+- **Longueur et largeur** : mesure le papier d'une lame emballée.
+- **Épaisseur** : empile **10 lames emballées**, mesure la hauteur de la pile, divise par 10.
+
+Si tes mesures diffèrent de plus d'1 mm (longueur/largeur) ou de 0,05 mm (épaisseur), mets-les dans `blade_l`, `blade_w`, `blade_t` du `.scad` : la réserve, la fenêtre et la fente se recalculent toutes seules.
 
 ## Si ça ne sort pas parfaitement
 
-La fente est très fine (0,18 mm), elle dépend donc un peu de l'imprimante :
+La fente est fine (0,52 mm), elle dépend donc un peu de l'imprimante :
 - **Deux lames sortent ensemble** : colle un morceau de ruban adhésif fin (scotch d'électricien ou aluminium) sur le bas de la paroi avant, à l'intérieur, pour réduire la fente.
-- **La lame bloque** : passe une ancienne lame dans la fente d'avant en arrière, une ou deux fois, pour l'ébavurer.
-- Pour une autre taille de lame, ou pour régler la fente, modifie `blade_l`, `blade_w` ou `gap` dans `distributeur_demi_lames.scad`, puis relance `../outils/generer_projet_bambu.py`.
+- **La lame bloque** : passe une lame emballée dans la fente d'avant en arrière, une ou deux fois, pour l'ébavurer.
+- Pour une autre taille de lame, ou pour régler la fente, modifie `blade_l`, `blade_w`, `blade_t` ou `gap` dans `distributeur_demi_lames.scad`, puis relance `../outils/generer_projet_bambu.py`.
 
 ## Fichiers
 
