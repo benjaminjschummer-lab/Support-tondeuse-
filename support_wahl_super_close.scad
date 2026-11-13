@@ -15,8 +15,8 @@ clearance  = 0.8;   // jeu autour de l'appareil (par côté)
 wall        = 3.2;  // épaisseur des parois du berceau
 pocket_back = 40;   // hauteur de la paroi arrière au-dessus du fond
 pocket_side = 32;   // hauteur des parois latérales
-pocket_front= 18;   // hauteur de la paroi avant (échancrure)
-front_cut_w = 34;   // largeur de l'échancrure avant
+pocket_front= 7;    // hauteur de la paroi avant (bas pour voir le témoin de charge F)
+front_cut_w = 36;   // largeur de l'échancrure avant
 
 /* [Socle] */
 base_w   = 96;      // largeur du socle
@@ -28,11 +28,13 @@ floor_t  = 4;       // épaisseur du fond de la poche (tient la fiche)
 cradle_y = 4;       // décalage du berceau vers l'arrière (+) / avant (-)
 
 /* [Charge] */
-// "bottom" : port USB-C sous l'appareil, fiche intégrée verticale dans le fond
-// "cable"  : port ailleurs -> simple fente arrière pour passer le câble
+// La prise de l'appareil (G) est au centre du dessous (notice Wahl type 3616).
+// "bottom" : la fiche d'origine (I) est encastrée verticalement dans le fond
+// "cable"  : simple fente arrière, la fiche reste libre
 charge_mode = "bottom"; // [bottom, cable]
-plug_w   = 12.6;    // largeur du surmoulage de la fiche USB-C (mesurer !)
-plug_t   = 7.2;     // épaisseur du surmoulage de la fiche USB-C (mesurer !)
+plug_w   = 12.0;    // largeur du corps plastique de la fiche (I) - MESURER
+plug_t   = 7.0;     // épaisseur du corps plastique de la fiche (I) - MESURER
+plug_clr = 0.3;     // jeu autour de la fiche (elle est ensuite collée)
 port_dx  = 0;       // décalage du port par rapport au centre (largeur)
 port_dy  = 0;       // décalage du port par rapport au centre (épaisseur)
 cable_d  = 5;       // diamètre du passage de câble
@@ -125,10 +127,10 @@ module charge_cuts() {
     px = port_dx;
     py = cradle_y + port_dy;
     if (charge_mode == "bottom") {
-        // logement de la fiche USB-C traversant le fond (serrage)
+        // logement de la fiche d'origine traversant le fond
         translate([px, py, z_floor - floor_t - 1])
             linear_extrude(floor_t + 2)
-                offset(r = 1) square([plug_w - 2, plug_t - 2], center = true);
+                offset(r = 1) square([plug_w + 2*plug_clr - 2, plug_t + 2*plug_clr - 2], center = true);
         // chambre sous le fond : laisse le câble se courber vers l'arrière
         hull() {
             translate([px, py, -eps])
