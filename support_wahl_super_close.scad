@@ -32,9 +32,11 @@ cradle_y = 4;       // décalage du berceau vers l'arrière (+) / avant (-)
 // "bottom" : la fiche d'origine (I) est encastrée verticalement dans le fond
 // "cable"  : simple fente arrière, la fiche reste libre
 charge_mode = "bottom"; // [bottom, cable]
-plug_w   = 12.0;    // largeur du corps plastique de la fiche (I) - MESURER
-plug_t   = 7.0;     // épaisseur du corps plastique de la fiche (I) - MESURER
-plug_clr = 0.3;     // jeu autour de la fiche (elle est ensuite collée)
+// Logement volontairement large : la fiche est alignée en la branchant
+// dans le rasoir posé dans le support, puis bloquée à la colle chaude.
+// Aucune mesure nécessaire (accepte toute fiche jusqu'à 14 x 9 mm).
+slot_w   = 15;      // largeur du logement de fiche
+slot_t   = 10;      // épaisseur du logement de fiche
 port_dx  = 0;       // décalage du port par rapport au centre (largeur)
 port_dy  = 0;       // décalage du port par rapport au centre (épaisseur)
 cable_d  = 5;       // diamètre du passage de câble
@@ -130,15 +132,15 @@ module charge_cuts() {
         // logement de la fiche d'origine traversant le fond
         translate([px, py, z_floor - floor_t - 1])
             linear_extrude(floor_t + 2)
-                offset(r = 1) square([plug_w + 2*plug_clr - 2, plug_t + 2*plug_clr - 2], center = true);
+                offset(r = 1.5) square([slot_w - 3, slot_t - 3], center = true);
         // chambre sous le fond : laisse le câble se courber vers l'arrière
         hull() {
             translate([px, py, -eps])
                 linear_extrude(z_floor - floor_t)
-                    offset(r = 1.5) square([plug_w - 1, plug_t - 1], center = true);
+                    offset(r = 2) square([slot_w - 1, slot_t - 1], center = true);
             translate([px, py + 16, -eps])
                 linear_extrude(cable_d + 2)
-                    offset(r = 1.5) square([plug_w - 1, plug_t - 1], center = true);
+                    offset(r = 2) square([slot_w - 1, slot_t - 1], center = true);
         }
         // rainure sous le socle jusqu'à l'arrière
         cable_groove(px, py);

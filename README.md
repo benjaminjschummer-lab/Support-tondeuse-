@@ -7,45 +7,51 @@ Appareil : 58 × 108 × 26 mm (l × H × P).
 ![Avec l'appareil](images/vue_avec_tondeuse.png)
 ![Dessous](images/vue_dessous.png)
 
-## Ce que dit la notice Wahl (type 3616)
+## Imprimer sur Bambu Lab A1 (+ AMS lite) – prêt à l'emploi
 
-- Prise de charge **G au centre du dessous** de l'appareil → la fiche d'origine (**I**, fiche 2 broches plates propriétaire, *pas* de l'USB‑C) se branche verticalement par le bas.
-- Témoin de charge **F en bas de la face avant** → la paroi avant n'a que 7 mm, avec une large échancrure, pour qu'il reste visible.
-- Interrupteur **E sur le côté droit, en haut** → hors de la poche.
-- Adaptateur 5 V / 1 A, charge ≈ 90 min, appareil 58 × 108 × 26 mm, 120 g.
+Fichier : **`bambu/Support_Wahl_A1_PLA_noir.3mf`** (projet Bambu Studio, tout est déjà réglé).
+
+1. Double-clique sur le fichier → il s'ouvre dans Bambu Studio (accepte de charger les réglages du projet si on te le demande).
+2. Clique sur **Découper le plateau**, puis sur **Imprimer**.
+3. Dans la fenêtre d'impression, vérifie que le filament du projet (noir) pointe bien vers l'emplacement AMS qui contient ton **PLA noir** (Bambu Studio le choisit automatiquement si la couleur correspond).
+
+Réglages inclus : imprimante *Bambu Lab A1 0.4 nozzle*, qualité *0.20mm Standard @BBL A1*, filament *Bambu PLA Basic* noir, plateau PEI texturé,
+3 parois, remplissage gyroïde 20 %, **sans supports**, sans bordure. Pièce posée à plat au centre du plateau.
+Bambu Studio affiche la durée et la quantité de filament exactes après la découpe.
 
 ## Fichiers
 
 | Fichier | Usage |
 |---|---|
-| `stl/support_wahl_super_close_fiche_integree.stl` | **Recommandé.** La fiche d'origine est collée dans le fond : on pose le rasoir, il se branche tout seul. |
-| `stl/support_wahl_super_close_cable_arriere.stl` | Sans fiche intégrée : une fente arrière laisse passer le câble, on branche à la main. |
+| `bambu/Support_Wahl_A1_PLA_noir.3mf` | **Projet Bambu Studio prêt à imprimer** (version fiche intégrée). |
+| `stl/support_wahl_super_close_fiche_integree.stl` | Même modèle en STL, pour un autre slicer. |
+| `stl/support_wahl_super_close_cable_arriere.stl` | Variante sans fiche intégrée : une fente arrière laisse passer le câble. |
 | `support_wahl_super_close.scad` | Source paramétrique OpenSCAD. |
+| `outils/generer_projet_bambu.py` | Régénère le `.3mf` à partir des profils officiels Bambu. |
+
+## Ce que dit la notice Wahl (type 3616)
+
+- Prise de charge **G au centre du dessous** de l'appareil → la fiche d'origine (**I**, 2 broches plates, *pas* de l'USB‑C) se branche verticalement par le bas.
+- Témoin de charge **F en bas de la face avant** → la paroi avant n'a que 7 mm, avec une large échancrure, pour qu'il reste visible.
+- Interrupteur **E sur le côté droit, en haut** → hors de la poche.
+- Appareil 58 × 108 × 26 mm, 120 g. Adaptateur 5 V / 1 A, charge ≈ 90 min.
 
 ## Caractéristiques
 
 - Poche de 59,6 × 27,6 mm (jeu de 0,8 mm/côté), parois de 40 mm à l'arrière, 32 mm sur les côtés et 7 mm à l'avant.
 - Socle 96 × 72 × 24 mm : stable, centre de gravité bas.
+- **Logement de fiche de 15 × 10 mm : aucune mesure nécessaire.** Il accepte la fiche Wahl quelle que soit sa taille exacte ; c'est le rasoir lui-même qui la positionne, puis on la colle.
 - Chambre sous le fond pour que le câble se courbe sans forcer, rainure de sortie à l'arrière (câble Ø 5 mm).
-- 4 logements pour patins caoutchouc Ø 10 mm.
+- 4 logements pour patins caoutchouc Ø 10 mm (facultatifs).
 
-## Avant d'imprimer : mesurer la fiche
+## Montage de la fiche (alignement automatique, 5 min)
 
-Mesure le **corps plastique de la fiche I** au pied à coulisse et règle `plug_w` (largeur) et `plug_t` (épaisseur).
-Les valeurs par défaut (12 × 7 mm) sont estimées. Le logement prend 0,3 mm de jeu par côté (`plug_clr`), car la fiche est collée ensuite.
+Il te faut un pistolet à colle chaude.
 
-## Montage de la fiche (alignement automatique)
-
-1. Fais passer la fiche par la rainure arrière sous le socle, puis dans la fente du fond.
+1. Fais passer la fiche par la rainure arrière sous le socle, puis remonte-la dans le logement du fond.
 2. **Branche la fiche dans le rasoir**, puis descends le rasoir dans la poche jusqu'à ce qu'il repose bien à plat au fond.
-3. Retourne doucement l'ensemble et fixe la fiche par-dessous avec de la colle chaude (ou de la colle époxy).
-4. Une fois la colle prise, retire le rasoir : la fiche reste à la bonne hauteur et parfaitement alignée.
-
-## Impression
-
-- PLA ou PETG, buse 0,4, couches 0,2 mm, 3 parois, remplissage 15–20 %.
-- À plat sur le socle, **sans supports** (la chambre du câble est ouverte vers le bas).
-- Environ 170 cm³ de volume extérieur → ~60–80 g de filament selon le remplissage.
+3. Couche délicatement l'ensemble sur le côté (rasoir toujours en place) et remplis de colle chaude l'espace autour de la fiche, par-dessous.
+4. Laisse refroidir 5 min, puis retire le rasoir : la fiche reste à la bonne hauteur, parfaitement centrée.
 
 ## Personnaliser
 
@@ -53,5 +59,5 @@ Ouvre le `.scad` dans OpenSCAD (onglet *Customizer*), modifie les paramètres, p
 En ligne de commande :
 
 ```sh
-openscad -D 'charge_mode="cable"' -D plug_w=11.5 -o support.stl support_wahl_super_close.scad
+openscad -D 'charge_mode="cable"' -o support.stl support_wahl_super_close.scad
 ```
