@@ -27,7 +27,8 @@ Bambu Studio affiche la durée et la quantité de filament exactes après la dé
 | `stl/support_wahl_super_close_fiche_integree.stl` | Même modèle en STL, pour un autre slicer. |
 | `stl/support_wahl_super_close_cable_arriere.stl` | Variante sans fiche intégrée : une fente arrière laisse passer le câble. |
 | `support_wahl_super_close.scad` | Source paramétrique OpenSCAD. |
-| `outils/generer_projet_bambu.py` | Régénère le `.3mf` à partir des profils officiels Bambu. |
+| `outils/generer_projet_bambu.py` | Régénère les `.3mf` à partir des profils officiels Bambu. |
+| `distributeur-demi-lames/` | **Autre projet** : distributeur de demi-lames à gravité (voir son README). |
 
 ## Ce que dit la notice Wahl (type 3616)
 
