@@ -3,8 +3,8 @@
 Distributeur de comptoir pour **demi-lames emballées individuellement dans leur papier** (lames double tranchant coupées en deux, pour shavette / coupe-chou à lame interchangeable).
 On charge les lames par le haut, on ferme le couvercle, et en bas on tire **une seule lame à la fois** vers soi.
 
-![Vue d'ensemble](images/vue_avant.png)
-![Dessous / sortie](images/vue_dessous_avant.png)
+![Rendu](images/rendu_ferme.png)
+![Schéma en coupe](images/schema_coupe.png)
 
 ## Imprimer sur Bambu Lab A1 – prêt à l'emploi
 
