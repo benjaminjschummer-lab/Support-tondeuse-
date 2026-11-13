@@ -26,7 +26,7 @@ Le corps est **couché sur le côté** sur le plateau : c'est voulu, la fente de
 
 La fente latérale permet de voir le stock restant. Capacité : environ 400 demi-lames.
 
-Le socle est compact (36 mm de profondeur) : tiens le haut du distributeur de l'autre main en tirant, ou colle-le au comptoir avec un carré d'adhésif double face ou des patins antidérapants.
+Pas de pied : la base est aussi étroite que la tour (49 × 17 mm). **Colle-le au plan de travail avec de l'adhésif double face** (une bande de 45 × 15 mm suffit). Pour une version autoportante, mets `base_d = 36` dans le `.scad`.
 
 ## Dimensions
 
@@ -35,7 +35,7 @@ Le socle est compact (36 mm de profondeur) : tiens le haut du distributeur de l'
 | Demi-lame prévue | 43 × 11,1 × 0,1 mm (lame DE standard 43 × 22,2 mm coupée en deux) |
 | Réserve intérieure | 44,2 × 12,0 mm, 40 mm de haut |
 | Fente de sortie | 0,18 mm de haut (plus d'une lame de 0,1 mm, moins de deux) |
-| Encombrement | 49 × 36 mm au sol, 59 mm de haut + couvercle |
+| Encombrement | 49 × 17 mm au sol (pas de pied qui dépasse), 59 mm de haut + couvercle |
 
 ## Si ça ne sort pas parfaitement
 

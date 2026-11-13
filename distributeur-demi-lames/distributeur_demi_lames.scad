@@ -19,7 +19,7 @@ capacity_h = 40;  // hauteur de la réserve (≈ 400 demi-lames)
 wall    = 2.4;
 floor_t = 1.4;    // fond sous la pile (le doigt passe par la fenêtre)
 floor_z = 18;      // hauteur du fond : place pour le doigt dessous (14 mm)
-base_d  = 36;      // profondeur du socle (compact)
+base_d  = 0;       // profondeur du socle (0 = aussi étroit que la tour, à coller au double face)
 base_t  = 4;
 win_l   = 26;     // fenêtre doigt sous la lame (longueur)
 fc_w    = 32;     // largeur de la niche pour le doigt
@@ -44,6 +44,7 @@ module body() {
     difference() {
         union() {
             translate([-out_l/2, -out_w/2, 0]) cube([out_l, out_w, top_z]);
+            if (base_d > out_w) {
             translate([-out_l/2, -base_d/2, 0]) cube([out_l, base_d, base_t]);
             // goussets avant / arrière (profil constant selon X)
             for (s = [-1, 1])
@@ -51,16 +52,17 @@ module body() {
                     linear_extrude(out_l)
                         polygon([[s*out_w/2, base_t - eps], [s*base_d/2, base_t - eps],
                                  [s*out_w/2, base_t + (base_d - out_w)/2 * 0.9]]);
+            }
         }
         // réserve de lames
         translate([-ch_l/2, -ch_w/2, fl_top]) cube([ch_l, ch_w, capacity_h + 1]);
         // fente de sortie à l'avant (une seule lame)
         translate([-ch_l/2, -out_w/2 - 1, fl_top]) cube([ch_l, wall + 2, gap]);
         // dégagement devant la fente pour attraper la lame (avant du fond abaissé)
-        translate([-ch_l/2, -base_d/2 - 1, fl_top]) cube([ch_l, base_d/2 - out_w/2 + 1 - eps, 50]);
+        translate([-ch_l/2, -max(base_d, out_w)/2 - 1, fl_top]) cube([ch_l, max(base_d, out_w)/2 - out_w/2 + 1 - eps, 50]);
         // niche pour le doigt sous le fond, ouverte vers l'avant
-        translate([-fc_w/2, -base_d/2 - 1, base_t])
-            cube([fc_w, base_d/2 + ch_w/2 - 1.2 + 1, floor_z - base_t]);
+        translate([-fc_w/2, -max(base_d, out_w)/2 - 1, base_t])
+            cube([fc_w, max(base_d, out_w)/2 + ch_w/2 - 1.2 + 1, floor_z - base_t]);
         // fenêtre dans le fond : le doigt touche la lame du bas
         translate([-win_l/2, -ch_w/2 - eps, floor_z - 1]) cube([win_l, ch_w - 1.6, floor_t + 1 + eps]);
         // fente latérale de visualisation du stock (côté gauche)
@@ -88,7 +90,7 @@ else if (part == "body_print") {
 else if (part == "print") {
     // corps couché sur le côté : la fente de sortie est dans le plan XY (précision max)
     translate([0, 0, out_l/2]) rotate([0, 90, 0]) body();
-    translate([0, base_d/2 + 20, 0]) lid();
+    translate([0, max(base_d, out_w)/2 + 20, 0]) lid();
 }
 else if (part == "section") {
     intersection() { body(); translate([-1, -50, 0]) cube([2, 100, 100]); }
