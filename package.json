@@ -1,0 +1,12 @@
+{
+  "name": "la-paire-widget",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Widget iPhone (Scriptable) des prochains rendez-vous du calendrier « La Paire »",
+  "type": "module",
+  "scripts": {
+    "apercu": "node dev/simulateur.mjs",
+    "verifier": "node dev/simulateur.mjs && node dev/verifier.mjs",
+    "captures": "node dev/simulateur.mjs && node dev/verifier.mjs --captures"
+  }
+}
