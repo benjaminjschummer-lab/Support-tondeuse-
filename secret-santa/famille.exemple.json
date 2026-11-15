@@ -1,0 +1,26 @@
+{
+  "smtp": {
+    "hote": "smtp.gmail.com",
+    "port": 587,
+    "utilisateur": "votre.adresse@gmail.com",
+    "expediteur": "votre.adresse@gmail.com"
+  },
+  "sujet": "🎅 Ton Secret Santa de Noël 2026 !",
+  "budget": "30 €",
+  "message": "Rendez-vous le 24 décembre chez Mamie pour l'échange des cadeaux !",
+  "participants": [
+    {"nom": "Benjamin", "email": "benjamin@example.com"},
+    {"nom": "Julie",    "email": "julie@example.com"},
+    {"nom": "Paul",     "email": "paul@example.com"},
+    {"nom": "Sophie",   "email": "sophie@example.com"},
+    {"nom": "Marc",     "email": "marc@example.com"},
+    {"nom": "Claire",   "email": "claire@example.com"},
+    {"nom": "Léa",      "email": "lea@example.com"}
+  ],
+  "couples": [
+    ["Benjamin", "Julie"],
+    ["Paul", "Sophie"],
+    ["Marc", "Claire"]
+  ],
+  "exclusions": []
+}
