@@ -1,0 +1,90 @@
+{
+ "echelle_mm_par_px": 0.45839210155148097,
+ "pieces": [
+  {
+   "fichier": "stl/01_lettre_L.stl",
+   "troncons_neon": 1,
+   "rayon_min_mm": 11,
+   "neon_mm": 289,
+   "plateau_mm": [
+    162,
+    163
+   ],
+   "etanche": true,
+   "ok_plateau": true
+  },
+  {
+   "fichier": "stl/02_lettre_A.stl",
+   "troncons_neon": 3,
+   "rayon_min_mm": 12,
+   "neon_mm": 465,
+   "plateau_mm": [
+    185,
+    182
+   ],
+   "etanche": true,
+   "ok_plateau": true
+  },
+  {
+   "fichier": "stl/03_lettre_P.stl",
+   "troncons_neon": 2,
+   "rayon_min_mm": 11,
+   "neon_mm": 380,
+   "plateau_mm": [
+    179,
+    181
+   ],
+   "etanche": true,
+   "ok_plateau": true
+  },
+  {
+   "fichier": "stl/04_lettre_A2.stl",
+   "troncons_neon": 4,
+   "rayon_min_mm": 14,
+   "neon_mm": 447,
+   "plateau_mm": [
+    195,
+    194
+   ],
+   "etanche": true,
+   "ok_plateau": true
+  },
+  {
+   "fichier": "stl/05_lettre_I.stl",
+   "troncons_neon": 1,
+   "rayon_min_mm": 19,
+   "neon_mm": 241,
+   "plateau_mm": [
+    159,
+    163
+   ],
+   "etanche": true,
+   "ok_plateau": true
+  },
+  {
+   "fichier": "stl/06_lettre_R.stl",
+   "troncons_neon": 3,
+   "rayon_min_mm": 20,
+   "neon_mm": 447,
+   "plateau_mm": [
+    156,
+    155
+   ],
+   "etanche": true,
+   "ok_plateau": true
+  },
+  {
+   "fichier": "stl/07_lettre_E.stl",
+   "troncons_neon": 3,
+   "rayon_min_mm": 18,
+   "neon_mm": 413,
+   "plateau_mm": [
+    171,
+    171
+   ],
+   "etanche": true,
+   "ok_plateau": true
+  }
+ ],
+ "neon_total_m": 2.68
+}
