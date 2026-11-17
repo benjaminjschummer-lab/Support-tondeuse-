@@ -10,13 +10,17 @@ Les lames sont pressées par un **ressort imprimé en arcs empilés**, ferme et 
 
 ## Imprimer sur Bambu Lab A1 – prêt à l'emploi
 
-Fichier : **`bambu/Distributeur_demi_lames_A1_PLA_noir.3mf`** (corps, couvercle et ressort sur le même plateau).
+Fichiers (corps, couvercle et ressort sur le même plateau, déjà orientés) :
+- **`bambu/Distributeur_demi_lames_A1_PLA_rouge.3mf`** – PLA rouge
+- `bambu/Distributeur_demi_lames_A1_PLA_noir.3mf` – PLA noir
+
+![Plateau](images/plateau_impression.png)
 
 1. Double-clique sur le fichier pour l'ouvrir dans Bambu Studio (accepte de charger les réglages du projet si on te le demande).
 2. Clique sur **Découper le plateau**, puis sur **Imprimer**.
-3. Vérifie que le filament du projet (noir) pointe vers l'emplacement AMS qui contient ton PLA noir.
+3. Vérifie que le filament du projet pointe vers l'emplacement AMS qui contient la bonne couleur.
 
-Réglages : A1 buse 0,4, 0,20 mm Standard, Bambu PLA Basic noir, 3 parois, gyroïde 15 %, **sans supports**.
+Réglages : A1 buse 0,4, 0,20 mm Standard, Bambu PLA Basic, 3 parois, gyroïde 15 %, **sans supports**.
 Le corps s'imprime **couché sur sa face gauche** : c'est voulu, la fente de sortie est ainsi imprimée dans le plan horizontal, là où l'imprimante est la plus précise.
 
 ## Installation

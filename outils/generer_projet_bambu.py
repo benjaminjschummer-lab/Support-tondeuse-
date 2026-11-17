@@ -60,7 +60,7 @@ def resolve(idx, sub, name):
     return out
 
 
-def build_config(root, overrides):
+def build_config(root, overrides, colour=COLOUR):
     idx = index_profiles(root)
     machine = resolve(idx, "machine", PRINTER)
     process = resolve(idx, "process", PROCESS)
@@ -74,7 +74,7 @@ def build_config(root, overrides):
         cfg[k] = v if isinstance(v, list) else [v]
     cfg.update(overrides)
     cfg.update({
-        "filament_colour": [COLOUR],
+        "filament_colour": [colour],
         "filament_ids": [filament.get("filament_id", "GFA00")],
         "filament_settings_id": [FILAMENT],
         "print_settings_id": PROCESS,
@@ -185,6 +185,7 @@ def main():
     ap.add_argument("--nom", required=True)
     ap.add_argument("--miniature")
     ap.add_argument("--reglages", default=json.dumps(PROCESS_OVERRIDES))
+    ap.add_argument("--couleur", default=COLOUR, help="couleur du filament, ex. #C12E1F")
     ap.add_argument("pieces", nargs="+")
     a = ap.parse_args()
     objs = []
@@ -198,7 +199,7 @@ def main():
         mesh.apply_translation([-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2]])
         name = os.path.splitext(os.path.basename(path))[0]
         objs.append((name, mesh, (BED_CENTER[0] + dx, BED_CENTER[1] + dy)))
-    cfg = build_config(a.profils, json.loads(a.reglages))
+    cfg = build_config(a.profils, json.loads(a.reglages), a.couleur)
     with zipfile.ZipFile(a.sortie, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("[Content_Types].xml", CONTENT_TYPES)
         z.writestr("_rels/.rels", rels(a.miniature))
