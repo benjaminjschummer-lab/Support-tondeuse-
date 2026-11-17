@@ -1,137 +1,112 @@
 // =====================================================================
-//  Distributeur de demi-lames à gravité – usage barbier
-//  Chargement par le haut (couvercle), sortie une à une en bas :
-//  on pose le doigt sous la lame du bas (fenêtre) et on la tire vers soi.
-//  Fichier paramétrique OpenSCAD – cotes en mm
+//  Distributeur MURAL de demi-lames emballées – usage barbier (v3)
+//
+//  - Le dos plat se colle au mur (adhésif double face).
+//  - Pile de lames à plat, longueur de gauche à droite, pressée par un
+//    ressort imprimé ; couvercle coulissant (le ressort ne peut pas le soulever).
+//  - Dessous : fond plat avec une longue rainure. Le doigt se pose sous la
+//    lame du bas, côté gauche, et glisse vers la droite jusqu'au milieu :
+//    la lame sort par la fente du côté droit.
+//  Coordonnées : X = gauche -> droite, Y = avant (-) -> mur (+), Z = haut.
 // =====================================================================
 
 /* [Demi-lame emballée dans son papier] */
-// Mesure facile : longueur et largeur du papier à la règle,
-// épaisseur = hauteur d'une pile de 10 lames emballées / 10.
-blade_l = 47.0;   // longueur de la lame emballée (papier compris)
-blade_w = 14.0;   // largeur de la lame emballée (papier compris)
-blade_t = 0.35;   // épaisseur d'une lame emballée (0,1 lame + 2 x papier)
+blade_l = 47.0;   // longueur de la lame emballée
+blade_w = 14.0;   // largeur de la lame emballée
+blade_t = 0.35;   // épaisseur d'une lame emballée
 clr_l   = 0.6;    // jeu aux extrémités (par côté)
 clr_w   = 0.45;   // jeu avant/arrière (par côté)
 
 /* [Sortie] */
-gap     = 1.5 * blade_t;  // fente de sortie : 1,5 épaisseur -> une seule lame passe
+gap     = 1.5 * blade_t;  // fente de sortie à droite : une seule lame passe
 
-/* [Corps] */
-stack_h    = 40;  // hauteur de pile utile (≈ 110 lames emballées, une boîte de 100)
-wall    = 2.4;
-floor_t = 1.4;    // fond sous la pile (le doigt passe par la fenêtre)
-floor_z = 18;      // hauteur du fond : place pour le doigt dessous (14 mm)
-base_d  = 0;       // profondeur du socle (0 = aussi étroit que la tour, à coller au double face)
-base_t  = 4;
-win_l   = 28;     // fenêtre doigt sous la lame (longueur)
-fc_w    = 34;     // largeur de la niche pour le doigt
-view_w  = 4;      // fente latérale pour voir le stock
+/* [Boîte] */
+stack_h = 40;     // hauteur de pile utile (≈ 110 lames emballées)
+wall_x  = 2.4;    // parois gauche / droite
+wall_y  = 3.2;    // parois avant / dos (logent la glissière du couvercle)
+floor_t = 1.6;    // épaisseur du fond
+ledge   = 1.6;    // appui de la lame de chaque côté de la rainure
+slot_r  = 2;      // arrondi des extrémités de la rainure
+view_w  = 4;      // fente de visualisation du stock (face gauche)
 
 /* [Ressort presseur imprimé] */
-// Ressort en zigzag (une seule pièce) : plaque du bas = presseur sur la pile,
-// plaque du haut = appui sous le couvercle. Imprimé à plat sur le côté.
 sp_n     = 10;    // nombre d'ondulations
-sp_gap   = 5;     // espace libre entre deux lames du ressort (au repos)
-sp_t     = 0.9;   // épaisseur des lames du ressort (2 lignes de buse)
+sp_gap   = 5;     // espace entre deux lames du ressort (au repos)
+sp_t     = 0.9;   // épaisseur des lames du ressort
 sp_plate = 2;     // épaisseur des plaques haut / bas
-sp_w     = 46;    // largeur du ressort
-sp_d     = 12;    // profondeur du ressort
-sp_solid = 2*sp_plate + (sp_n - 1)*sp_t + sp_n*0.35;     // hauteur écrasé
-sp_free  = 2*sp_plate + (sp_n - 1)*sp_t + sp_n*sp_gap;   // hauteur au repos
-capacity_h = stack_h + sp_solid;                          // hauteur de la réserve
+sp_w     = 46;    // largeur du ressort (selon X)
+sp_d     = 12;    // profondeur du ressort (selon Y)
 
-/* [Couvercle clipsé] */
-lid_clr  = 0.25;
-lid_skirt= 8;
-lid_top  = 2;
-lid_wall = 1.6;   // jupe fine pour qu'elle se déforme au clipsage
-clip_d   = 5;     // distance du clip sous le haut de la tour
-clip_h   = 0.5;   // saillie du clip
-clip_len = 30;    // longueur du clip
+/* [Couvercle coulissant] */
+lid_t    = 2.0;   // épaisseur du couvercle
+lid_g    = 1.6;   // profondeur de la glissière dans les parois avant/dos
+lid_clr  = 0.25;  // jeu dans la glissière
+lid_lip  = 1.6;   // lèvre au-dessus de la glissière
+lid_tab  = 5;     // languette qui dépasse à droite pour tirer le couvercle
 
-part = "assembly"; // [assembly, body, lid, spring, spring_print, print, body_print, section]
+part = "assembly"; // [assembly, body, lid, spring, body_print, spring_print, lid_print]
 
 eps = 0.01;
-ch_l  = blade_l + 2*clr_l;
-ch_w  = blade_w + 2*clr_w;
-out_l = ch_l + 2*wall;
-out_w = ch_w + 2*wall;
-fl_top = floor_z + floor_t;           // dessus du fond = niveau de la lame du bas
-top_z  = fl_top + capacity_h;
+ch_l = blade_l + 2*clr_l;
+ch_w = blade_w + 2*clr_w;
+out_l = ch_l + 2*wall_x;
+out_w = ch_w + 2*wall_y;
+sp_solid = 2*sp_plate + (sp_n - 1)*sp_t + sp_n*0.35;
+sp_free  = 2*sp_plate + (sp_n - 1)*sp_t + sp_n*sp_gap;
+capacity_h = stack_h + sp_solid;          // du fond au dessous du couvercle
+fl_top  = floor_t;                        // niveau de la lame du bas
+ch_top  = fl_top + capacity_h;            // dessous du couvercle
+g_h     = lid_t + 2*lid_clr;              // hauteur de la glissière
+top_z   = ch_top + g_h + lid_lip;
+slot_w  = ch_w - 2*ledge;                 // largeur de la rainure du dessous
 
 module body() {
     difference() {
-        union() {
-            translate([-out_l/2, -out_w/2, 0]) cube([out_l, out_w, top_z]);
-            if (base_d > out_w) {
-            translate([-out_l/2, -base_d/2, 0]) cube([out_l, base_d, base_t]);
-            // goussets avant / arrière (profil constant selon X)
-            for (s = [-1, 1])
-                rotate([90, 0, 90]) translate([0, 0, -out_l/2])
-                    linear_extrude(out_l)
-                        polygon([[s*out_w/2, base_t - eps], [s*base_d/2, base_t - eps],
-                                 [s*out_w/2, base_t + (base_d - out_w)/2 * 0.9]]);
-            }
-        }
+        translate([-out_l/2, -out_w/2, 0]) cube([out_l, out_w, top_z]);
         // réserve de lames
-        translate([-ch_l/2, -ch_w/2, fl_top]) cube([ch_l, ch_w, capacity_h + 1]);
-        // fente de sortie à l'avant (une seule lame)
-        translate([-ch_l/2, -out_w/2 - 1, fl_top]) cube([ch_l, wall + 2, gap]);
-        // dégagement devant la fente pour attraper la lame (avant du fond abaissé)
-        translate([-ch_l/2, -max(base_d, out_w)/2 - 1, fl_top]) cube([ch_l, max(base_d, out_w)/2 - out_w/2 + 1 - eps, 50]);
-        // niche pour le doigt sous le fond, ouverte vers l'avant
-        translate([-fc_w/2, -max(base_d, out_w)/2 - 1, base_t])
-            cube([fc_w, max(base_d, out_w)/2 + ch_w/2 - 1.2 + 1, floor_z - base_t]);
-        // fenêtre dans le fond, ouverte vers l'avant (pas de rebord où le doigt accroche)
-        translate([-win_l/2, -out_w/2 - 1, floor_z - 1]) cube([win_l, out_w/2 + ch_w/2 - 1.6 + 1, floor_t + 1 + eps]);
-        // rainures de clipsage du couvercle (faces avant et arrière)
-        for (s = [-1, 1])
-            translate([0, s*out_w/2, top_z - clip_d]) clip_shape(clip_len + 4, clip_h + 0.3, 1.6 + 0.6);
-        // chanfrein d'entrée en haut de la tour (guide le couvercle)
-        for (s = [-1, 1])
-            translate([0, s*out_w/2, top_z]) rotate([s*45, 0, 0]) cube([out_l + 2, 1.0, 1.0], center = true);
-        // fente latérale de visualisation du stock (côté gauche)
-        translate([-out_l/2 - 1, -view_w/2, fl_top + 3]) cube([wall + 2, view_w, capacity_h - 6]);
+        translate([-ch_l/2, -ch_w/2, fl_top]) cube([ch_l, ch_w, top_z]);
+        // glissière du couvercle (avant + dos), ouverte à droite
+        translate([-ch_l/2, -ch_w/2 - lid_g, ch_top]) cube([ch_l + wall_x + 1, ch_w + 2*lid_g, g_h]);
+        // passage du couvercle à travers la paroi droite
+        translate([ch_l/2 - eps, -ch_w/2, ch_top]) cube([wall_x + 1, ch_w, top_z]);
+        // fente de sortie à droite : une seule lame
+        translate([ch_l/2 - eps, -ch_w/2, fl_top]) cube([wall_x + 1, ch_w, gap]);
+        // rainure du dessous pour le doigt, ouverte aussi à gauche
+        hull() {
+            translate([-out_l/2 - 1, -slot_w/2, -1]) cube([eps, slot_w, floor_t + 1 + eps]);
+            translate([ch_l/2 - 2 - slot_r, 0, -1]) scale([1, slot_w/(2*slot_r), 1])
+                cylinder(r = slot_r, h = floor_t + 1 + eps, $fn = 32);
+        }
+        // fente de visualisation du stock (paroi gauche)
+        translate([-out_l/2 - 1, -view_w/2, fl_top + 3]) cube([wall_x + 2, view_w, stack_h]);
+        // repère gravé sur la face avant : flèche « sortie »
+        translate([ch_l/2 - 10, -out_w/2 - eps, fl_top + 8]) rotate([90, 0, 0]) mirror([0, 0, 1])
+            linear_extrude(0.6) polygon([[0, -2.5], [6, 0], [0, 2.5]]);
     }
 }
 
-// profil triangulaire (clip / rainure) le long de X, centré en (0, 0, 0)
-module clip_shape(len, depth, height) {
-    rotate([90, 0, 90]) linear_extrude(len, center = true)
-        polygon([[-depth, 0], [depth, 0], [0, height/2], [-depth, 0], [0, -height/2], [depth, 0]]);
-}
 module lid() {
-    il = out_l + 2*lid_clr;
-    iw = out_w + 2*lid_clr;
+    w = ch_w + 2*lid_g - 2*lid_clr;
+    l = ch_l + wall_x + lid_tab;
     difference() {
-        translate([-il/2 - lid_wall, -iw/2 - lid_wall, 0]) cube([il + 2*lid_wall, iw + 2*lid_wall, lid_top + lid_skirt]);
-        translate([-il/2, -iw/2, lid_top]) cube([il, iw, lid_skirt + 1]);
-        // chanfrein d'entrée de la jupe
-        for (s = [-1, 1])
-            translate([0, s*iw/2, lid_top + lid_skirt]) rotate([s*45, 0, 0]) cube([il + 4, 1.2, 1.2], center = true);
+        translate([-ch_l/2 + lid_clr, -w/2, 0]) cube([l - lid_clr, w, lid_t]);
+        // chanfrein du bord d'attaque (côté gauche) : il comprime le ressort en glissant
+        translate([-ch_l/2 + lid_clr, 0, 0]) rotate([0, 45, 0]) cube([1.4, w + 2, 1.4], center = true);
     }
-    // clips : nervures qui s'enclenchent dans les rainures de la tour
-    for (s = [-1, 1])
-        intersection() {
-            translate([0, s*iw/2, lid_top + clip_d]) clip_shape(clip_len, clip_h, 1.6);
-            translate([-il/2, -iw/2, lid_top]) cube([il, iw, lid_skirt]);
-        }
+    // languette de préhension à droite
+    translate([ch_l/2 + wall_x + lid_tab - 2, -w/2, 0]) cube([2, w, lid_t + 3]);
 }
 
 // --- Ressort presseur : profil 2D en zigzag (X = largeur, Y = hauteur) ---
 module spring_profile() {
-    p  = sp_gap + sp_t;                 // pas entre axes des lames
-    lb = sp_w - p - sp_t;               // longueur droite des lames
-    // plaques haut et bas
+    p  = sp_gap + sp_t;
+    lb = sp_w - p - sp_t;
     square([sp_w, sp_plate]);
     translate([0, sp_plate + sp_n*sp_gap + (sp_n - 1)*sp_t]) square([sp_w, sp_plate]);
-    // lames intermédiaires
     for (i = [1 : sp_n - 1])
         translate([(sp_w - lb)/2, sp_plate + i*sp_gap + (i - 1)*sp_t]) square([lb, sp_t]);
-    // boucles alternées gauche / droite reliant les lames
     for (i = [0 : sp_n - 1]) {
-        y0 = sp_plate + i*(sp_gap + sp_t) - sp_t/2;      // axe de la lame du dessous
+        y0 = sp_plate + i*(sp_gap + sp_t) - sp_t/2;
         cy = y0 + p/2;
         right = (i % 2 == 0);
         cx = right ? (sp_w + lb)/2 : (sp_w - lb)/2;
@@ -141,27 +116,22 @@ module spring_profile() {
         }
     }
 }
-module spring() {  // position d'usage : posé sur la pile
-    translate([-sp_w/2, sp_d/2, 0]) rotate([90, 0, 0]) linear_extrude(sp_d) spring_profile();
+module spring(h = sp_free) {  // posé sur la pile ; h < sp_free = ressort comprimé (aperçu)
+    translate([-sp_w/2, sp_d/2, 0]) rotate([90, 0, 0]) linear_extrude(sp_d)
+        scale([1, h/sp_free]) spring_profile();
 }
 
 if (part == "body") body();
 else if (part == "lid") lid();
 else if (part == "spring") spring();
+// impression : corps couché sur la face gauche -> fente de sortie précise (plan XY),
+// aucune surface en porte-à-faux sauf de petits ponts
+else if (part == "body_print") translate([0, 0, out_l/2]) rotate([0, -90, 0]) body();
+else if (part == "lid_print") lid();
 else if (part == "spring_print") linear_extrude(sp_d) spring_profile();
-else if (part == "body_print") {
-    translate([0, 0, out_l/2]) rotate([0, 90, 0]) body();
-}
-else if (part == "print") {
-    // corps couché sur le côté : la fente de sortie est dans le plan XY (précision max)
-    translate([0, 0, out_l/2]) rotate([0, 90, 0]) body();
-    translate([0, max(base_d, out_w)/2 + 20, 0]) lid();
-}
-else if (part == "section") {
-    intersection() { body(); translate([-1, -50, 0]) cube([2, 100, 100]); }
-}
 else {
     body();
-    color("orange") translate([0, 0, fl_top + 15]) spring();
-    %translate([0, 0, top_z + lid_top + 25]) rotate([180, 0, 0]) lid();
+    color("orange") translate([0, 0, fl_top + stack_h * 0.5]) spring(ch_top - fl_top - stack_h*0.5);
+    color("silver") for (i = [0 : 30]) translate([-blade_l/2 + (i == 0 ? 18 : 0), -blade_w/2, fl_top + i*stack_h*0.5/31]) cube([blade_l, blade_w, stack_h*0.5/31 - 0.1]);
+    color([0.3, 0.3, 0.32]) translate([0, 0, ch_top + lid_clr]) lid();
 }

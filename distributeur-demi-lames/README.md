@@ -1,65 +1,65 @@
-# Distributeur de demi-lames à gravité (barbershop)
+# Distributeur mural de demi-lames (barbershop)
 
-Distributeur de comptoir **à ressort** pour **demi-lames emballées individuellement dans leur papier** (lames double tranchant coupées en deux, pour shavette / coupe-chou à lame interchangeable).
-On charge les lames par le haut, on ferme le couvercle, et en bas on tire **une seule lame à la fois** vers soi.
+Distributeur **à coller au mur** pour **demi-lames emballées dans leur papier** (shavette / coupe-chou à lame interchangeable).
+Les lames sont pressées par un **ressort imprimé**. On en sort **une seule à la fois par le côté droit**, en glissant le doigt sous la boîte.
 
-![Rendu](images/rendu_ferme.png)
-![Schéma en coupe](images/schema_coupe.png)
+![Rendu](images/vue_avant.png)
+![Dessous](images/vue_dessous_avant.png)
+![Fonctionnement](images/schema_coupe.png)
 
 ## Imprimer sur Bambu Lab A1 – prêt à l'emploi
 
-Fichier : **`bambu/Distributeur_demi_lames_A1_PLA_noir.3mf`** (corps + couvercle + ressort sur le même plateau).
+Fichier : **`bambu/Distributeur_demi_lames_A1_PLA_noir.3mf`** (corps, couvercle et ressort sur le même plateau).
 
 1. Double-clique sur le fichier pour l'ouvrir dans Bambu Studio (accepte de charger les réglages du projet si on te le demande).
 2. Clique sur **Découper le plateau**, puis sur **Imprimer**.
 3. Vérifie que le filament du projet (noir) pointe vers l'emplacement AMS qui contient ton PLA noir.
 
 Réglages : A1 buse 0,4, 0,20 mm Standard, Bambu PLA Basic noir, 3 parois, gyroïde 15 %, **sans supports**.
-Le corps est **couché sur le côté** sur le plateau : c'est voulu, la fente de sortie est ainsi imprimée dans le plan horizontal, là où l'imprimante est la plus précise.
+Le corps s'imprime **couché sur sa face gauche** : c'est voulu, la fente de sortie est ainsi imprimée dans le plan horizontal, là où l'imprimante est la plus précise.
+
+## Installation
+
+1. Colle le **dos** de la boîte au mur avec de l'adhésif double face (une bande de 50 × 55 mm). Le dos est entièrement plat.
+2. Place-la assez haut pour passer la main dessous, par exemple à hauteur de poitrine, avec **le côté droit dégagé** : c'est par là que sortent les lames.
 
 ## Utilisation
 
-1. Déclipse le couvercle et retire le ressort.
-2. Dépose les demi-lames **dans leur papier**, **à plat**, **tranchant vers l'arrière** (le dos non coupant vers toi).
-3. Remets le ressort par-dessus, **plaque presseur en bas**. Les deux plaques sont identiques, il n'y a donc pas de sens.
-4. Appuie sur le couvercle jusqu'au **clic** : il comprime le ressort et reste bloqué.
-5. Passe le doigt dans la niche, pose-le sous la lame du bas à travers la fenêtre et tire vers toi. La lame sort par la fente avant, par son dos.
+1. **Recharger** : tire la languette du couvercle vers la droite pour l'enlever, sors le ressort, dépose les lames **à plat, dans leur papier**, puis remets le ressort et repousse le couvercle dans sa glissière. Son bord biseauté écrase le ressort en glissant.
+2. **Prendre une lame** : pose le doigt sous la boîte, dans la rainure, **à gauche**, et glisse-le vers la droite jusqu'au milieu. La lame du bas avance avec le doigt et sort d'environ la moitié par la fente du côté droit.
+3. Attrape la partie qui dépasse et tire-la.
 
-Le ressort appuie en permanence sur la pile : même si le doigt pousse un peu vers le haut, la lame du bas reste en face de la fente.
-La fenêtre est ouverte vers l'avant, il n'y a plus de rebord où le doigt peut accrocher.
-La fente latérale permet de voir le stock restant. Capacité : environ 110 lames emballées (une boîte de 100 rentre en entier).
-
-Pas de pied : la base est aussi étroite que la tour (53 × 20 mm). **Colle-le au plan de travail avec de l'adhésif double face** (une bande de 50 × 18 mm suffit). Pour une version autoportante, mets `base_d = 36` dans le `.scad`.
+- **La lame suivante reste en place :** la fente ne laisse passer qu'une lame, et le ressort maintient la pile à plat contre le fond.
+- **Le couvercle tient :** il coulisse dans une glissière, donc le ressort ne peut pas le soulever, même quand ton doigt pousse vers le haut.
+- **Voir le stock :** une fente sur le côté gauche montre combien il en reste.
 
 ## Dimensions
 
 | | |
 |---|---|
 | Lame emballée prévue | **47 × 14 × 0,35 mm** (estimation : demi-lame 43 × 11,1 × 0,1 mm + papier) |
-| Réserve intérieure | 48,2 × 14,9 mm, 55,6 mm de haut (40 mm de lames + ressort écrasé) |
+| Fente de sortie (côté droit) | 0,52 mm (1,5 × l'épaisseur d'une lame emballée : une seule passe) |
+| Rainure du dessous | 11,7 mm de large, sur toute la longueur ; la lame repose sur deux bords de 1,6 mm |
+| Capacité | 40 mm de lames, soit environ 110 lames emballées (une boîte de 100 rentre en entier) |
 | Ressort | zigzag PLA, 10 ondulations, lames de 0,9 mm ; 62 mm au repos, 16 mm écrasé ; il appuie encore sur la dernière lame |
-| Fente de sortie | 0,52 mm (1,5 × l'épaisseur d'une lame emballée : une seule passe) |
-| Encombrement | 53 × 20 mm au sol (pas de pied), 75 mm de haut + couvercle |
+| Encombrement | 53 mm de large, 21 mm d'épaisseur (depuis le mur), 61 mm de haut, + languette du couvercle |
 
 ### Vérifier avec tes lames (30 secondes, une règle suffit)
 
 - **Longueur et largeur** : mesure le papier d'une lame emballée.
 - **Épaisseur** : empile **10 lames emballées**, mesure la hauteur de la pile, divise par 10.
 
-Si tes mesures diffèrent de plus d'1 mm (longueur/largeur) ou de 0,05 mm (épaisseur), mets-les dans `blade_l`, `blade_w`, `blade_t` du `.scad` : la réserve, la fenêtre et la fente se recalculent toutes seules.
+Si tes mesures diffèrent de plus d'1 mm (longueur/largeur) ou de 0,05 mm (épaisseur), mets-les dans `blade_l`, `blade_w`, `blade_t` du `.scad` : la réserve, la rainure et la fente se recalculent toutes seules.
 
-## Si ça ne sort pas parfaitement
+## Réglages possibles
 
-- **Le ressort pousse trop ou pas assez** : change `sp_t` dans le `.scad` (0,9 par défaut ; 1,2 rend le ressort plus dur, 0,8 plus souple).
-- **Le couvercle saute ou se clipse mal** : augmente ou diminue `clip_h` (0,5 mm par défaut).
-
-La fente est fine (0,52 mm), elle dépend donc un peu de l'imprimante :
-- **Deux lames sortent ensemble** : colle un morceau de ruban adhésif fin (scotch d'électricien ou aluminium) sur le bas de la paroi avant, à l'intérieur, pour réduire la fente.
-- **La lame bloque** : passe une lame emballée dans la fente d'avant en arrière, une ou deux fois, pour l'ébavurer.
-- Pour une autre taille de lame, ou pour régler la fente, modifie `blade_l`, `blade_w`, `blade_t` ou `gap` dans `distributeur_demi_lames.scad`, puis relance `../outils/generer_projet_bambu.py`.
+- **Deux lames sortent ensemble** : baisse `gap` (fente), ou colle un ruban adhésif fin en bas de la paroi droite, à l'intérieur.
+- **La lame accroche à la sortie** : passe une lame emballée dans la fente une ou deux fois pour l'ébavurer, ou augmente légèrement `gap`.
+- **Ressort trop dur ou trop mou** : change `sp_t` (0,9 par défaut ; 1,1 plus dur, 0,8 plus souple). Seul le ressort est à réimprimer.
+- **Sortie à gauche plutôt qu'à droite** : imprime le corps en miroir dans Bambu Studio (clic droit → Miroir → axe X).
 
 ## Fichiers
 
 - `bambu/Distributeur_demi_lames_A1_PLA_noir.3mf` – projet Bambu Studio prêt à imprimer
 - `stl/distributeur_corps.stl`, `stl/distributeur_couvercle.stl`, `stl/distributeur_ressort.stl` – pièces en orientation d'impression
-- `distributeur_demi_lames.scad` – source paramétrique (`part` = assembly / body / lid / spring / print)
+- `distributeur_demi_lames.scad` – source paramétrique (`part` = assembly / body / lid / spring / …)
