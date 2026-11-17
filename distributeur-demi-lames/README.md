@@ -1,11 +1,12 @@
 # Distributeur mural de demi-lames (barbershop)
 
 Distributeur **à coller au mur** pour **demi-lames emballées dans leur papier** (shavette / coupe-chou à lame interchangeable).
-Les lames sont pressées par un **ressort imprimé**. On en sort **une seule à la fois par le côté droit**, en glissant le doigt sous la boîte.
+Les lames sont pressées par un **ressort imprimé en arcs empilés**, ferme et presque plat une fois écrasé. On en sort **une seule à la fois par le côté droit**, en glissant le doigt sous la boîte.
 
 ![Rendu](images/vue_avant.png)
 ![Dessous](images/vue_dessous_avant.png)
 ![Fonctionnement](images/schema_coupe.png)
+![Ressort en arcs empilés (profil)](images/ressort_profil.png)
 
 ## Imprimer sur Bambu Lab A1 – prêt à l'emploi
 
@@ -40,9 +41,9 @@ Le corps s'imprime **couché sur sa face gauche** : c'est voulu, la fente de sor
 | Lame emballée prévue | **47 × 14 × 0,35 mm** (estimation : demi-lame 43 × 11,1 × 0,1 mm + papier) |
 | Fente de sortie (côté droit) | 0,52 mm (1,5 × l'épaisseur d'une lame emballée : une seule passe) |
 | Rainure du dessous | 11,7 mm de large, sur toute la longueur ; la lame repose sur deux bords de 1,6 mm |
-| Capacité | 40 mm de lames, soit environ 110 lames emballées (une boîte de 100 rentre en entier) |
-| Ressort | zigzag PLA, 10 ondulations, lames de 0,9 mm ; 62 mm au repos, 16 mm écrasé ; il appuie encore sur la dernière lame |
-| Encombrement | 53 mm de large, 21 mm d'épaisseur (depuis le mur), 61 mm de haut, + languette du couvercle |
+| Capacité | 45 mm de lames, soit environ 125 lames emballées (une boîte de 100 rentre en entier) |
+| Ressort | 8 « lentilles » de deux arcs bombés (corde 42 mm, flèche 3,5 mm, épaisseur 0,7 mm) ; 69 mm au repos, **19 mm écrasé** (arcs à plat) ; il appuie encore sur la dernière lame |
+| Encombrement | 53 mm de large, 21 mm d'épaisseur (depuis le mur), 70 mm de haut, + languette du couvercle |
 
 ### Vérifier avec tes lames (30 secondes, une règle suffit)
 
@@ -55,7 +56,7 @@ Si tes mesures diffèrent de plus d'1 mm (longueur/largeur) ou de 0,05 mm (épai
 
 - **Deux lames sortent ensemble** : baisse `gap` (fente), ou colle un ruban adhésif fin en bas de la paroi droite, à l'intérieur.
 - **La lame accroche à la sortie** : passe une lame emballée dans la fente une ou deux fois pour l'ébavurer, ou augmente légèrement `gap`.
-- **Ressort trop dur ou trop mou** : change `sp_t` (0,9 par défaut ; 1,1 plus dur, 0,8 plus souple). Seul le ressort est à réimprimer.
+- **Ressort trop dur ou trop mou** : change `sp_t` (0,7 par défaut ; 0,8 nettement plus dur, 0,6 plus souple). Seul le ressort est à réimprimer.
 - **Sortie à gauche plutôt qu'à droite** : imprime le corps en miroir dans Bambu Studio (clic droit → Miroir → axe X).
 
 ## Fichiers
