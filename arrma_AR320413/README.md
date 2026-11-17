@@ -12,3 +12,9 @@ et ajuster `L`, `H`, `R` (rayon du berceau), `floor_h` et `depth` avant impressi
 
 Impression conseillée : PETG/ASA ou PA-CF, 4 périmètres, 40 % de remplissage,
 posé sur sa face inférieure (aucun support nécessaire).
+
+## Cale arrière seule (v2, cotes relevées)
+
+`cale_arriere.stl` / `cale_arriere.py` : 28 × 13 × 20 mm (bloc), patte Ø10 avec trou M3.
+Cotes relevées sur la vue éclatée officielle (Vorteks 4x4 3S BLX) avec la vis M3×12
+AR721312 comme étalon (précision ±0,7 mm). Contrôle : bac 165 mm sans cales, 140 mm avec.
