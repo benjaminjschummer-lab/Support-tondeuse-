@@ -4,9 +4,9 @@
 //  - Le dos plat se colle au mur (adhésif double face).
 //  - Pile de lames à plat, longueur de gauche à droite, pressée par un
 //    ressort imprimé ; couvercle coulissant (le ressort ne peut pas le soulever).
-//  - Dessous : fond plat avec une longue rainure. Le doigt se pose sous la
-//    lame du bas, côté gauche, et glisse vers la droite jusqu'au milieu :
-//    la lame sort par la fente du côté droit.
+//  - Dessous : rainure ouverte d'un bout à l'autre. Le doigt se pose sous la
+//    lame du bas, côté gauche, et glisse vers la droite : la lame sort par
+//    la fente du côté droit. La fente de stock est aussi à droite.
 //  Coordonnées : X = gauche -> droite, Y = avant (-) -> mur (+), Z = haut.
 // =====================================================================
 
@@ -77,14 +77,10 @@ module body() {
         translate([ch_l/2 - eps, -ch_w/2, ch_top]) cube([wall_x + 1, ch_w, top_z]);
         // fente de sortie à droite : une seule lame
         translate([ch_l/2 - eps, -ch_w/2, fl_top]) cube([wall_x + 1, ch_w, gap]);
-        // rainure du dessous pour le doigt, ouverte aussi à gauche
-        hull() {
-            translate([-out_l/2 - 1, -slot_w/2, -1]) cube([eps, slot_w, floor_t + 1 + eps]);
-            translate([ch_l/2 - 2 - slot_r, 0, -1]) scale([1, slot_w/(2*slot_r), 1])
-                cylinder(r = slot_r, h = floor_t + 1 + eps, $fn = 32);
-        }
-        // fente de visualisation du stock (paroi gauche)
-        translate([-out_l/2 - 1, -view_w/2, fl_top + 3]) cube([wall_x + 2, view_w, stack_h]);
+        // rainure du dessous pour le doigt : ouverte à gauche ET à droite (aucune barre côté sortie)
+        translate([-out_l/2 - 1, -slot_w/2, -1]) cube([out_l + 2, slot_w, floor_t + 1 + eps]);
+        // fente de visualisation du stock (paroi droite, côté sortie)
+        translate([out_l/2 - wall_x - 1, -view_w/2, fl_top + 3]) cube([wall_x + 2, view_w, stack_h - 3]);
         // repère gravé sur la face avant : flèche « sortie »
         translate([ch_l/2 - 10, -out_w/2 - eps, fl_top + 8]) rotate([90, 0, 0]) mirror([0, 0, 1])
             linear_extrude(0.6) polygon([[0, -2.5], [6, 0], [0, 2.5]]);

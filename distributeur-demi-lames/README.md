@@ -26,17 +26,17 @@ Le corps s'imprime **couché sur sa face gauche** : c'est voulu, la fente de sor
 ## Installation
 
 1. Colle le **dos** de la boîte au mur avec de l'adhésif double face (une bande de 50 × 55 mm). Le dos est entièrement plat.
-2. Place-la assez haut pour passer la main dessous, par exemple à hauteur de poitrine, avec **le côté droit dégagé** : c'est par là que sortent les lames.
+2. Place-la assez haut pour passer la main dessous, par exemple à hauteur de poitrine, avec **le côté droit dégagé** : c'est par là que sortent les lames, et c'est là que tu vois le stock.
 
 ## Utilisation
 
 1. **Recharger** : tire la languette du couvercle vers la droite pour l'enlever, sors le ressort, dépose les lames **à plat, dans leur papier**, puis remets le ressort et repousse le couvercle dans sa glissière. Son bord biseauté écrase le ressort en glissant.
-2. **Prendre une lame** : pose le doigt sous la boîte, dans la rainure, **à gauche**, et glisse-le vers la droite jusqu'au milieu. La lame du bas avance avec le doigt et sort d'environ la moitié par la fente du côté droit.
+2. **Prendre une lame** : pose le doigt sous la boîte, dans la rainure, **à gauche**, et glisse-le vers la droite. La rainure est ouverte d'un bout à l'autre, donc ton doigt ne bute sur rien. La lame du bas avance avec lui et sort par la fente du côté droit.
 3. Attrape la partie qui dépasse et tire-la.
 
 - **La lame suivante reste en place :** la fente ne laisse passer qu'une lame, et le ressort maintient la pile à plat contre le fond.
 - **Le couvercle tient :** il coulisse dans une glissière, donc le ressort ne peut pas le soulever, même quand ton doigt pousse vers le haut.
-- **Voir le stock :** une fente sur le côté gauche montre combien il en reste.
+- **Voir le stock :** une fente sur le **côté droit**, là où sortent les lames, montre combien il en reste.
 
 ## Dimensions
 
@@ -44,7 +44,7 @@ Le corps s'imprime **couché sur sa face gauche** : c'est voulu, la fente de sor
 |---|---|
 | Lame emballée prévue | **47 × 14 × 0,35 mm** (estimation : demi-lame 43 × 11,1 × 0,1 mm + papier) |
 | Fente de sortie (côté droit) | 0,52 mm (1,5 × l'épaisseur d'une lame emballée : une seule passe) |
-| Rainure du dessous | 11,7 mm de large, sur toute la longueur ; la lame repose sur deux bords de 1,6 mm |
+| Rainure du dessous | 11,7 mm de large, ouverte d'un bout à l'autre ; la lame repose sur deux bords de 1,6 mm |
 | Capacité | 45 mm de lames, soit environ 125 lames emballées (une boîte de 100 rentre en entier) |
 | Ressort | 8 « lentilles » de deux arcs bombés (corde 42 mm, flèche 3,5 mm, épaisseur 0,7 mm) ; 69 mm au repos, **19 mm écrasé** (arcs à plat) ; il appuie encore sur la dernière lame |
 | Encombrement | 53 mm de large, 21 mm d'épaisseur (depuis le mur), 70 mm de haut, + languette du couvercle |
