@@ -60,11 +60,11 @@ def resolve(idx, sub, name):
     return out
 
 
-def build_config(root, overrides, colour=COLOUR):
+def build_config(root, overrides, colour=COLOUR, fil=FILAMENT):
     idx = index_profiles(root)
     machine = resolve(idx, "machine", PRINTER)
     process = resolve(idx, "process", PROCESS)
-    filament = resolve(idx, "filament", FILAMENT)
+    filament = resolve(idx, "filament", fil)
     cfg = {}
     for src in (machine, process):
         cfg.update({k: v for k, v in src.items() if k not in META})
@@ -76,12 +76,12 @@ def build_config(root, overrides, colour=COLOUR):
     cfg.update({
         "filament_colour": [colour],
         "filament_ids": [filament.get("filament_id", "GFA00")],
-        "filament_settings_id": [FILAMENT],
+        "filament_settings_id": [fil],
         "print_settings_id": PROCESS,
         "printer_settings_id": PRINTER,
         "curr_bed_type": "Textured PEI Plate",
         "different_settings_to_system": [";".join(sorted(overrides)), "", ""],
-        "inherits_group": [PROCESS, FILAMENT, PRINTER],
+        "inherits_group": [PROCESS, fil, PRINTER],
         "from": "project",
         "name": "project_settings",
         "inherits": "",
@@ -186,6 +186,7 @@ def main():
     ap.add_argument("--miniature")
     ap.add_argument("--reglages", default=json.dumps(PROCESS_OVERRIDES))
     ap.add_argument("--couleur", default=COLOUR, help="couleur du filament, ex. #C12E1F")
+    ap.add_argument("--filament", default=FILAMENT, help='profil filament Bambu, ex. "Bambu PETG Basic @BBL A1"')
     ap.add_argument("pieces", nargs="+")
     a = ap.parse_args()
     objs = []
@@ -199,7 +200,7 @@ def main():
         mesh.apply_translation([-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2]])
         name = os.path.splitext(os.path.basename(path))[0]
         objs.append((name, mesh, (BED_CENTER[0] + dx, BED_CENTER[1] + dy)))
-    cfg = build_config(a.profils, json.loads(a.reglages), a.couleur)
+    cfg = build_config(a.profils, json.loads(a.reglages), a.couleur, a.filament)
     with zipfile.ZipFile(a.sortie, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("[Content_Types].xml", CONTENT_TYPES)
         z.writestr("_rels/.rels", rels(a.miniature))

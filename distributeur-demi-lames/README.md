@@ -11,7 +11,8 @@ Les lames sont pressées par un **ressort imprimé en arcs empilés**, ferme et 
 ## Imprimer sur Bambu Lab A1 – prêt à l'emploi
 
 Fichiers (corps, couvercle et ressort sur le même plateau, déjà orientés) :
-- **`bambu/Ressort_seul_A1_PLA_rouge.3mf`** – le ressort seul, pour le remplacer sans réimprimer la boîte
+- **`bambu/Ressort_seul_A1_PETG.3mf`** – **le ressort seul en PETG (recommandé)** : il se tasse beaucoup moins que le PLA avec le temps. Arcs de 0,85 mm pour garder la même fermeté (le PETG est plus souple). Avec lui, la boîte contient environ 105 lames.
+- `bambu/Ressort_seul_A1_PLA_rouge.3mf` – le ressort seul en PLA
 - **`bambu/Distributeur_demi_lames_A1_PLA_rouge.3mf`** – PLA rouge
 - `bambu/Distributeur_demi_lames_A1_PLA_noir.3mf` – PLA noir
 
@@ -56,6 +57,14 @@ Le corps s'imprime **couché sur sa face gauche** : c'est voulu, la fente de sor
 - **Épaisseur** : empile **10 lames emballées**, mesure la hauteur de la pile, divise par 10.
 
 Si tes mesures diffèrent de plus d'1 mm (longueur/largeur) ou de 0,05 mm (épaisseur), mets-les dans `blade_l`, `blade_w`, `blade_t` du `.scad` : la réserve, la rainure et la fente se recalculent toutes seules.
+
+## Quel matériau ?
+
+| Pièce | Matériau conseillé | Pourquoi |
+|---|---|---|
+| Corps, couvercle | PLA (ou PETG) | Pièces rigides, aucune contrainte particulière |
+| Ressort | **PETG** | Le PLA comprimé en permanence se tasse (fluage) et perd sa force en quelques semaines ; le PETG beaucoup moins |
+| — | TPU : pas utile ici | Trop souple pour le ressort, inutile pour la boîte |
 
 ## Réglages possibles
 
