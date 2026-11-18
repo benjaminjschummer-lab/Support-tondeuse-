@@ -21,7 +21,7 @@ clr_w   = 0.45;   // jeu avant/arrière (par côté)
 gap     = 1.5 * blade_t;  // fente de sortie à droite : une seule lame passe
 
 /* [Boîte] */
-stack_h = 45;     // hauteur de pile utile (≈ 125 lames emballées)
+stack_h = 40;     // hauteur de pile utile (≈ 115 lames emballées)
 wall_x  = 2.4;    // parois gauche / droite
 wall_y  = 3.2;    // parois avant / dos (logent la glissière du couvercle)
 floor_t = 1.6;    // épaisseur du fond
@@ -30,17 +30,18 @@ slot_r  = 2;      // arrondi des extrémités de la rainure
 view_w  = 4;      // fente de visualisation du stock (face gauche)
 
 /* [Ressort presseur imprimé : arcs empilés] */
-// Paires d'arcs bombés (« lentilles ») reliées par leur centre. Écrasés, les arcs
-// deviennent plats : le ressort ne prend presque pas de place.
+// Paires d'arcs bombés (« lentilles »). Chaque lentille est reliée à la suivante par
+// DEUX cales écartées (pas une seule au centre) : le ressort ne bascule plus.
+// Écrasés, les arcs deviennent plats : le ressort prend peu de place.
 sp_n     = 8;     // nombre de lentilles
 sp_L     = 42;    // corde des arcs (selon X)
 sp_h     = 3.5;   // flèche de chaque arc au repos
 sp_t     = 0.7;   // épaisseur des arcs (plus épais = plus dur)
-sp_pad   = 0.4;   // cale entre deux lentilles
-sp_pad_w = 6;     // largeur des cales centrales
+sp_cgap  = 0.4;   // jeu au centre entre deux lentilles
+sp_px    = 6;     // position des deux cales (± depuis le centre)
+sp_pw    = 3;     // largeur d'une cale
 sp_plate = 2;     // épaisseur des plaques haut / bas
-sp_w     = sp_L + 4;  // largeur totale (avec les nœuds aux extrémités)
-sp_d     = 12;    // profondeur du ressort (selon Y)
+sp_clr   = 0.4;   // jeu entre ressort et réserve (par côté)
 
 /* [Couvercle coulissant] */
 lid_t    = 2.0;   // épaisseur du couvercle
@@ -56,9 +57,14 @@ ch_l = blade_l + 2*clr_l;
 ch_w = blade_w + 2*clr_w;
 out_l = ch_l + 2*wall_x;
 out_w = ch_w + 2*wall_y;
-sp_lens  = 2*sp_h + sp_t;                                     // hauteur d'une lentille au repos
-sp_free  = 2*sp_plate + sp_n*sp_lens + (sp_n + 1)*sp_pad;
-sp_solid = 2*sp_plate + sp_n*2*sp_t + (sp_n + 1)*sp_pad;       // arcs à plat
+sp_R     = (sp_L*sp_L/4 + sp_h*sp_h) / (2*sp_h);               // rayon des arcs
+function sp_d(x) = sp_R - sqrt(sp_R*sp_R - x*x);                // descente de l'arc à x du centre
+sp_lens  = 2*sp_h + sp_t;                                       // hauteur d'une lentille au repos
+sp_jh    = sp_cgap + 2*sp_d(sp_px);                             // hauteur d'une cale
+sp_free  = 2*sp_plate + sp_n*sp_lens + (sp_n + 1)*sp_cgap;
+sp_solid = 2*sp_plate + sp_n*2*sp_t + (sp_n + 1)*sp_jh;        // arcs à plat
+sp_w     = ch_l - 2*sp_clr;   // largeur des plaques = réserve moins le jeu (selon X)
+sp_d     = ch_w - 2*sp_clr;   // profondeur du ressort = réserve moins le jeu (selon Y)
 capacity_h = stack_h + sp_solid;          // du fond au dessous du couvercle
 fl_top  = floor_t;                        // niveau de la lame du bas
 ch_top  = fl_top + capacity_h;            // dessous du couvercle
@@ -107,19 +113,31 @@ module arc_band(L, h, t, up) {   // arc de flèche h (axe), extrémités en y = 
         translate([-L/2, up ? -t : -h - t]) square([L, h + 2*t]);
     }
 }
-module lens(y0) {                 // lentille dont le bas extérieur est en y0
-    yc = y0 + t2() + sp_h;        // niveau des extrémités
+module lens(yc) {                 // lentille centrée verticalement en yc (niveau des nœuds)
     translate([sp_w/2, yc]) { arc_band(sp_L, sp_h, sp_t, false); arc_band(sp_L, sp_h, sp_t, true); }
     for (sx = [-1, 1])            // nœuds qui relient les deux arcs aux extrémités
         translate([sp_w/2 + sx*(sp_L/2 + 0.75) - 1.25, yc - sp_t/2 - 0.3]) square([2.5, sp_t + 0.6]);
 }
-function t2() = sp_t/2;
+function lens_yc(i) = sp_plate + sp_cgap + sp_t/2 + sp_h + i*(sp_lens + sp_cgap);
+// cale entre deux surfaces d'arcs (y_bas = surface du dessous au centre, y_haut = surface du dessus au centre)
+module pads(y_lo_apex, lo_is_arc, y_hi_apex, hi_is_arc) {
+    xo = sp_px + sp_pw/2;                       // bord extérieur (arc le plus bas / le plus haut)
+    for (sx = [-1, 1]) {
+        y0 = (lo_is_arc ? y_lo_apex - sp_d(xo) : y_lo_apex) - 0.25;
+        y1 = (hi_is_arc ? y_hi_apex + sp_d(xo) : y_hi_apex) + 0.25;
+        translate([sp_w/2 + sx*sp_px - sp_pw/2, y0]) square([sp_pw, y1 - y0]);
+    }
+}
 module spring_profile() {
     square([sp_w, sp_plate]);                                        // plaque presseur
     translate([0, sp_free - sp_plate]) square([sp_w, sp_plate]);     // plaque haute
-    for (i = [0 : sp_n - 1]) lens(sp_plate + sp_pad + i*(sp_lens + sp_pad));
-    for (i = [0 : sp_n])                                             // cales centrales
-        translate([sp_w/2 - sp_pad_w/2, sp_plate + i*(sp_lens + sp_pad) - 0.2]) square([sp_pad_w, sp_pad + 0.4]);
+    for (i = [0 : sp_n - 1]) lens(lens_yc(i));
+    // plaque basse -> 1re lentille
+    pads(sp_plate, false, lens_yc(0) - sp_h - sp_t/2, true);
+    // lentille i -> lentille i+1
+    for (i = [0 : sp_n - 2]) pads(lens_yc(i) + sp_h + sp_t/2, true, lens_yc(i + 1) - sp_h - sp_t/2, true);
+    // dernière lentille -> plaque haute
+    pads(lens_yc(sp_n - 1) + sp_h + sp_t/2, true, sp_free - sp_plate, false);
 }
 module spring(h = sp_free) {  // posé sur la pile ; h < sp_free = ressort comprimé (aperçu)
     translate([-sp_w/2, sp_d/2, 0]) rotate([90, 0, 0]) linear_extrude(sp_d)

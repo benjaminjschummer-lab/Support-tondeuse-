@@ -11,6 +11,7 @@ Les lames sont pressées par un **ressort imprimé en arcs empilés**, ferme et 
 ## Imprimer sur Bambu Lab A1 – prêt à l'emploi
 
 Fichiers (corps, couvercle et ressort sur le même plateau, déjà orientés) :
+- **`bambu/Ressort_seul_A1_PLA_rouge.3mf`** – le ressort seul, pour le remplacer sans réimprimer la boîte
 - **`bambu/Distributeur_demi_lames_A1_PLA_rouge.3mf`** – PLA rouge
 - `bambu/Distributeur_demi_lames_A1_PLA_noir.3mf` – PLA noir
 
@@ -45,8 +46,8 @@ Le corps s'imprime **couché sur sa face gauche** : c'est voulu, la fente de sor
 | Lame emballée prévue | **47 × 14 × 0,35 mm** (estimation : demi-lame 43 × 11,1 × 0,1 mm + papier) |
 | Fente de sortie (côté droit) | 0,52 mm (1,5 × l'épaisseur d'une lame emballée : une seule passe) |
 | Rainure du dessous | 11,7 mm de large, ouverte d'un bout à l'autre ; la lame repose sur deux bords de 1,6 mm |
-| Capacité | 45 mm de lames, soit environ 125 lames emballées (une boîte de 100 rentre en entier) |
-| Ressort | 8 « lentilles » de deux arcs bombés (corde 42 mm, flèche 3,5 mm, épaisseur 0,7 mm) ; 69 mm au repos, **19 mm écrasé** (arcs à plat) ; il appuie encore sur la dernière lame |
+| Capacité | 40 mm de lames, soit environ 115 lames emballées (une boîte de 100 rentre en entier) |
+| Ressort | 8 « lentilles » de deux arcs bombés (corde 42 mm, flèche 3,5 mm, épaisseur 0,7 mm), reliées par **deux cales écartées de 12 mm** (il ne bascule pas) ; plaques de 47,4 × 14,1 mm qui remplissent la réserve ; 69 mm au repos, 24 mm écrasé |
 | Encombrement | 53 mm de large, 21 mm d'épaisseur (depuis le mur), 70 mm de haut, + languette du couvercle |
 
 ### Vérifier avec tes lames (30 secondes, une règle suffit)
