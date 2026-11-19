@@ -3,7 +3,10 @@
   "short_name": "Pompes",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#11141c",
-  "theme_color": "#11141c",
-  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+  "background_color": "#f2f2f7",
+  "theme_color": "#f2f2f7",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
 }
