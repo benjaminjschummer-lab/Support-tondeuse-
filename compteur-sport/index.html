@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#11141c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Compteur Pompes & Abdos</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* Layout : appli plein écran, onglets en bas, caméra en haut avec compteur géant superposé */
+  :root {
+    --bg: #11141c;
+    --surface: #1a1f2b;
+    --line: #2a3142;
+    --fg: #eef1f7;
+    --muted: #8d96ab;
+    --pompes: #ffb020;
+    --abdos: #4cc9f0;
+    --good: #46d67a;
+    --warn: #ff6b5a;
+    --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body);
+    display: flex; flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { flex: 1; overflow-y: auto; padding-block: 12px 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .view { display: flex; flex-direction: column; gap: 14px; max-width: 720px; margin: 0 auto; }
+  [hidden] { display: none !important; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+  /* Choix de l'exercice */
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--surface);
+    padding: 5px; border-radius: 14px; }
+  .seg button { border: 0; background: transparent; padding: 10px; border-radius: 10px;
+    font: 800 20px/1 var(--display); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--ex); color: #11141c; }
+
+  /* Caméra */
+  .stage { position: relative; border-radius: 18px; overflow: hidden; background: #000;
+    aspect-ratio: 3 / 4; max-height: 62vh; width: 100%; margin: 0 auto; }
+  .stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .stage video { transform: scaleX(-1); }
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between;
+    pointer-events: none; padding: 14px; }
+  .count { font: 800 clamp(96px, 30vw, 170px)/.85 var(--display); color: var(--ex);
+    text-shadow: 0 4px 24px rgba(0,0,0,.6); font-variant-numeric: tabular-nums; transition: transform .12s; }
+  .count.bump { transform: scale(1.12); }
+  .count-label { font: 600 14px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; color: #fff;
+    text-shadow: 0 1px 6px rgba(0,0,0,.8); }
+  .hint { align-self: flex-start; background: rgba(17,20,28,.78); padding: 8px 12px; border-radius: 10px;
+    font-weight: 600; backdrop-filter: blur(6px); }
+  .hint.bad { color: var(--warn); }
+  .meter { position: absolute; right: 12px; top: 14px; bottom: 14px; width: 10px; border-radius: 6px;
+    background: rgba(255,255,255,.15); overflow: hidden; }
+  .meter i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--ex); border-radius: 6px; transition: height .08s; }
+  .placeholder { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px;
+    color: var(--muted); background: var(--surface); }
+  .placeholder strong { display: block; color: var(--fg); font: 800 28px/1.1 var(--display); text-transform: uppercase; margin-bottom: 8px; }
+
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { flex: 1; min-width: 130px; border: 0; border-radius: 14px; padding: 15px 16px;
+    font: 800 20px/1 var(--display); letter-spacing: .05em; text-transform: uppercase; }
+  .btn.primary { background: var(--ex); color: #11141c; }
+  .btn.ghost { background: var(--surface); border: 1px solid var(--line); }
+  .btn.small { flex: 0 0 auto; min-width: 56px; padding: 12px 14px; }
+
+  .today { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { background: var(--surface); border-radius: 14px; padding: 12px 14px; }
+  .tile .k { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .tile .v { font: 800 34px/1.05 var(--display); font-variant-numeric: tabular-nums; }
+  .tile .v small { font: 500 14px var(--body); color: var(--muted); }
+  .bar { height: 6px; border-radius: 4px; background: var(--line); margin-top: 8px; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 4px; }
+
+  details { background: var(--surface); border-radius: 14px; padding: 12px 14px; }
+  summary { font-weight: 600; cursor: pointer; }
+  .tips { color: var(--muted); margin: 10px 0 0; padding-left: 18px; }
+  .tips li + li { margin-top: 6px; }
+  label.slider { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; margin-top: 12px; font-size: 14px; }
+  label.slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--ex); }
+  label.slider output { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .check { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 14px; }
+  .check input { width: 20px; height: 20px; accent-color: var(--ex); }
+
+  /* Progression */
+  h2 { font: 800 30px/1 var(--display); text-transform: uppercase; letter-spacing: .03em; margin: 4px 0 0; text-wrap: balance; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stats .v { font-size: 30px; }
+  .chart-wrap { background: var(--surface); border-radius: 14px; padding: 14px; }
+  .legend { display: flex; gap: 16px; font-size: 13px; color: var(--muted); margin-bottom: 8px; flex-wrap: wrap; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; background: var(--c); }
+  #chart { width: 100%; height: 220px; display: block; }
+  .range { display: flex; gap: 6px; margin-bottom: 10px; }
+  .range button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--muted); }
+  .range button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 9px 6px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  td.p { color: var(--pompes); font-weight: 600; } td.a { color: var(--abdos); font-weight: 600; }
+  .empty { color: var(--muted); text-align: center; padding: 18px 0; }
+
+  /* Onglets */
+  nav { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); background: var(--surface);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+  nav button { border: 0; background: transparent; padding: 14px 8px; font-weight: 600; color: var(--muted); }
+  nav button[aria-current="page"] { color: var(--fg); box-shadow: inset 0 3px 0 var(--fg); }
+
+  .toast { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+    background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; z-index: 5; }
+  @media (prefers-reduced-motion: reduce) { .count, .meter i { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <!-- ============ SÉANCE ============ -->
+  <section class="view" id="view-seance">
+    <div class="seg" role="group" aria-label="Exercice">
+      <button id="ex-pompes" data-ex="pompes" aria-pressed="true">Pompes</button>
+      <button id="ex-abdos" data-ex="abdos" aria-pressed="false">Abdos</button>
+    </div>
+
+    <div class="stage" id="stage">
+      <video id="video" playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="placeholder" id="placeholder">
+        <div><strong>Prêt ?</strong>Pose ton téléphone par terre, de côté, à 1,5–2 m, et appuie sur « Démarrer ». La caméra selfie compte tes répétitions.</div>
+      </div>
+      <div class="meter" id="meter" hidden><i id="meter-fill"></i></div>
+      <div class="overlay" id="overlay" hidden>
+        <div class="hint" id="hint">Mets-toi en place</div>
+        <div>
+          <div class="count" id="count">0</div>
+          <div class="count-label" id="count-label">pompes · cette série</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="btn primary" id="btn-start">Démarrer</button>
+      <button class="btn ghost small" id="btn-minus" aria-label="Retirer une répétition">−1</button>
+      <button class="btn ghost small" id="btn-plus" aria-label="Ajouter une répétition">+1</button>
+    </div>
+
+    <div class="today">
+      <div class="tile"><div class="k">Pompes aujourd'hui</div>
+        <div class="v" style="color:var(--pompes)"><span id="t-pompes">0</span> <small>/ <span id="g-pompes">30</span></small></div>
+        <div class="bar"><i id="b-pompes" style="background:var(--pompes);width:0"></i></div></div>
+      <div class="tile"><div class="k">Abdos aujourd'hui</div>
+        <div class="v" style="color:var(--abdos)"><span id="t-abdos">0</span> <small>/ <span id="g-abdos">30</span></small></div>
+        <div class="bar"><i id="b-abdos" style="background:var(--abdos);width:0"></i></div></div>
+    </div>
+
+    <details>
+      <summary>Comment placer le téléphone</summary>
+      <ul class="tips">
+        <li><b>Pompes :</b> téléphone posé au sol, sur le côté, à environ 1,5 m. On doit voir épaule, coude et poignet. L'appli compte quand tu remontes bras tendus après être descendu.</li>
+        <li><b>Abdos (sit-ups) :</b> allongé, genoux pliés, téléphone sur le côté à 1,5–2 m. On doit voir épaule, hanche et genou. L'appli compte quand tu te redresses.</li>
+        <li>Bonne lumière, pas de contre-jour. Le cadre jaune ou bleu sur ton corps montre que la détection marche.</li>
+        <li>Un raté ? Corrige avec −1 / +1. Tout est enregistré automatiquement dans le total du jour.</li>
+      </ul>
+    </details>
+
+    <details>
+      <summary>Réglages</summary>
+      <label class="slider" for="s-goal">Objectif quotidien (<span class="exname">pompes</span>)<output id="o-goal"></output>
+        <input type="range" id="s-goal" min="5" max="200" step="5"></label>
+      <label class="slider" for="s-flex">Angle « en bas » : compte si tu descends sous<output id="o-flex"></output>
+        <input type="range" id="s-flex" min="40" max="140" step="5"></label>
+      <label class="slider" for="s-ext">Angle « en haut » : bras / buste revenus au-delà de<output id="o-ext"></output>
+        <input type="range" id="s-ext" min="90" max="175" step="5"></label>
+      <label class="check" for="s-voice"><input type="checkbox" id="s-voice"> Annoncer chaque répétition à voix haute</label>
+      <p class="tips" style="padding:0">Si l'appli ne compte pas assez : baisse l'exigence (angle « en bas » plus grand, angle « en haut » plus petit). Si elle compte trop : fais l'inverse.</p>
+    </details>
+  </section>
+
+  <!-- ============ PROGRESSION ============ -->
+  <section class="view" id="view-progres" hidden>
+    <h2>Ta progression</h2>
+    <div class="stats">
+      <div class="tile"><div class="k">Série</div><div class="v" id="st-streak">0</div><div class="k">jours d'affilée</div></div>
+      <div class="tile"><div class="k">Record pompes</div><div class="v" id="st-rp" style="color:var(--pompes)">0</div><div class="k">en un jour</div></div>
+      <div class="tile"><div class="k">Record abdos</div><div class="v" id="st-ra" style="color:var(--abdos)">0</div><div class="k">en un jour</div></div>
+    </div>
+    <div class="chart-wrap">
+      <div class="range" role="group" aria-label="Période">
+        <button data-days="7" aria-pressed="false">7 j</button>
+        <button data-days="14" aria-pressed="true">14 j</button>
+        <button data-days="30" aria-pressed="false">30 j</button>
+      </div>
+      <div class="legend"><span style="--c:var(--pompes)">Pompes</span><span style="--c:var(--abdos)">Abdos</span></div>
+      <canvas id="chart"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <table>
+        <thead><tr><th>Jour</th><th>Pompes</th><th>Abdos</th></tr></thead>
+        <tbody id="hist"></tbody>
+      </table>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="btn-export">Copier une sauvegarde</button>
+      <button class="btn ghost" id="btn-import">Restaurer</button>
+    </div>
+    <p class="tips" style="padding:0">Tes données restent sur ce téléphone, dans ce navigateur. « Copier une sauvegarde » met tout ton historique dans le presse-papiers, à garder dans une note.</p>
+  </section>
+</main>
+
+<nav>
+  <button id="tab-seance" aria-current="page">Séance</button>
+  <button id="tab-progres">Progression</button>
+</nav>
+<div class="toast" id="toast" hidden></div>
+
+<script type="module">
+import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+
+/* ---------- Données ---------- */
+const KEY = "compteur-sport-v1";
+const DEFAULTS = {
+  history: {},  // "2026-11-19": { pompes: 0, abdos: 0 }
+  settings: {
+    pompes: { goal: 30, flex: 90, ext: 150 },
+    abdos:  { goal: 30, flex: 70, ext: 115 },
+    voice: true,
+  },
+};
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY));
+    if (d && d.history) return { history: d.history, settings: { ...DEFAULTS.settings, ...d.settings,
+      pompes: { ...DEFAULTS.settings.pompes, ...(d.settings?.pompes) },
+      abdos: { ...DEFAULTS.settings.abdos, ...(d.settings?.abdos) } } };
+  } catch {}
+  return structuredClone(DEFAULTS);
+}
+let data = load();
+function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} }
+const dayKey = (d = new Date()) => {
+  const z = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+};
+function todayEntry() {
+  const k = dayKey();
+  return (data.history[k] ||= { pompes: 0, abdos: 0 });
+}
+
+/* ---------- Éléments ---------- */
+const $ = id => document.getElementById(id);
+const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
+let ex = "pompes";
+let session = 0;
+let running = false, landmarker = null, stream = null, rafId = 0, wakeLock = null;
+
+/* ---------- Exercice ---------- */
+const JOINTS = {
+  // [épaule, coude/hanche, poignet/genou] pour gauche et droite
+  pompes: { L: [11, 13, 15], R: [12, 14, 16], countOn: "ext", label: "pompes" },
+  abdos:  { L: [11, 23, 25], R: [12, 24, 26], countOn: "flex", label: "abdos" },
+};
+function setEx(next) {
+  if (running && next !== ex) { session = 0; }
+  ex = next;
+  document.body.style.setProperty("--ex", `var(--${ex})`);
+  for (const b of document.querySelectorAll(".seg button")) b.setAttribute("aria-pressed", b.dataset.ex === ex);
+  resetRep();
+  renderCount(); renderSettings();
+}
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => setEx(b.dataset.ex));
+
+/* ---------- Compteur ---------- */
+let phase = "ext", smooth = null, lastRep = 0;
+function resetRep() { phase = "ext"; smooth = null; }
+function renderCount() {
+  $("count").textContent = session;
+  $("count-label").textContent = `${JOINTS[ex].label} · cette série`;
+  const t = todayEntry();
+  for (const k of ["pompes", "abdos"]) {
+    $("t-" + k).textContent = t[k];
+    $("g-" + k).textContent = data.settings[k].goal;
+    $("b-" + k).style.width = Math.min(100, (t[k] / data.settings[k].goal) * 100) + "%";
+  }
+}
+function addRep(n = 1) {
+  const t = todayEntry();
+  if (n < 0 && (session <= 0 || t[ex] <= 0)) return;
+  session += n; t[ex] += n; save();
+  renderCount();
+  if (n > 0) {
+    const c = $("count"); c.classList.add("bump"); setTimeout(() => c.classList.remove("bump"), 140);
+    if (data.settings.voice && "speechSynthesis" in window) {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(String(session)); u.lang = "fr-FR"; u.rate = 1.2;
+      speechSynthesis.speak(u);
+    }
+    if (navigator.vibrate) navigator.vibrate(40);
+    if (t[ex] === data.settings[ex].goal) toast(`Objectif ${JOINTS[ex].label} atteint !`);
+  }
+}
+$("btn-plus").onclick = () => addRep(1);
+$("btn-minus").onclick = () => addRep(-1);
+
+function angle(a, b, c, w, h) {
+  const v1x = (a.x - b.x) * w, v1y = (a.y - b.y) * h;
+  const v2x = (c.x - b.x) * w, v2y = (c.y - b.y) * h;
+  const d = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y);
+  if (!d) return null;
+  return Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / d))) * 180 / Math.PI;
+}
+
+function processPose(lm, w, h) {
+  const J = JOINTS[ex];
+  const vis = ids => ids.reduce((s, i) => s + (lm[i].visibility ?? 0), 0) / ids.length;
+  const side = vis(J.L) >= vis(J.R) ? J.L : J.R;
+  const v = vis(side);
+  drawSkeleton(lm, side, w, h, v);
+  if (v < 0.5) { hint(ex === "pompes" ? "Je ne vois pas bien ton bras" : "Je ne vois pas bien ta hanche et tes genoux", true); return; }
+  const a = angle(lm[side[0]], lm[side[1]], lm[side[2]], w, h);
+  if (a == null) return;
+  smooth = smooth == null ? a : smooth * 0.6 + a * 0.4;
+  const { flex, ext } = data.settings[ex];
+  // jauge : 0 = position haute/étendue, 100 = position basse/fléchie
+  const pct = Math.max(0, Math.min(100, ((ext - smooth) / (ext - flex)) * 100));
+  $("meter-fill").style.height = pct + "%";
+
+  const now = performance.now();
+  if (phase === "ext" && smooth < flex) {
+    phase = "flex";
+    if (J.countOn === "flex" && now - lastRep > 500) { lastRep = now; addRep(1); }
+  } else if (phase === "flex" && smooth > ext) {
+    phase = "ext";
+    if (J.countOn === "ext" && now - lastRep > 500) { lastRep = now; addRep(1); }
+  }
+  if (ex === "pompes") hint(phase === "ext" ? "Descends ⬇" : "Pousse ⬆");
+  else hint(phase === "ext" ? "Monte ⬆" : "Redescends ⬇");
+}
+
+function drawSkeleton(lm, side, w, h, v) {
+  ctx.clearRect(0, 0, w, h);
+  const color = getComputedStyle(document.body).getPropertyValue(`--${ex}`).trim() || "#fff";
+  const X = p => (1 - p.x) * w, Y = p => p.y * h;   // miroir pour la caméra selfie
+  const bones = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+  ctx.lineWidth = Math.max(2, w / 200); ctx.strokeStyle = "rgba(255,255,255,.35)";
+  for (const [i, j] of bones) {
+    if ((lm[i].visibility ?? 0) < .3 || (lm[j].visibility ?? 0) < .3) continue;
+    ctx.beginPath(); ctx.moveTo(X(lm[i]), Y(lm[i])); ctx.lineTo(X(lm[j]), Y(lm[j])); ctx.stroke();
+  }
+  if (v < 0.5) return;
+  ctx.lineWidth = Math.max(5, w / 70); ctx.strokeStyle = color; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.beginPath(); ctx.moveTo(X(lm[side[0]]), Y(lm[side[0]]));
+  ctx.lineTo(X(lm[side[1]]), Y(lm[side[1]])); ctx.lineTo(X(lm[side[2]]), Y(lm[side[2]])); ctx.stroke();
+  ctx.fillStyle = color;
+  for (const i of side) { ctx.beginPath(); ctx.arc(X(lm[i]), Y(lm[i]), Math.max(6, w / 60), 0, 7); ctx.fill(); }
+}
+function hint(text, bad = false) { const el = $("hint"); el.textContent = text; el.classList.toggle("bad", bad); }
+
+/* ---------- Caméra + détection ---------- */
+async function initLandmarker() {
+  const files = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  const opts = (delegate) => ({
+    baseOptions: {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+      delegate,
+    },
+    runningMode: "VIDEO", numPoses: 1,
+  });
+  try { return await PoseLandmarker.createFromOptions(files, opts("GPU")); }
+  catch { return await PoseLandmarker.createFromOptions(files, opts("CPU")); }
+}
+
+async function start() {
+  const btn = $("btn-start");
+  btn.disabled = true; btn.textContent = "Chargement…";
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Ce navigateur ne donne pas accès à la caméra. Ouvre la page en https dans Chrome ou Safari.");
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+    video.srcObject = stream; await video.play();
+    landmarker ||= await initLandmarker();
+    running = true; session = 0; resetRep(); renderCount();
+    $("placeholder").hidden = true; $("overlay").hidden = false; $("meter").hidden = false;
+    btn.textContent = "Arrêter";
+    try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
+    loop();
+  } catch (e) {
+    stop();
+    const msg = e?.name === "NotAllowedError" ? "Autorise l'accès à la caméra dans les réglages du navigateur, puis réessaie." : (e?.message || "Impossible de démarrer la caméra.");
+    $("placeholder").innerHTML = `<div><strong>Oups</strong>${msg}</div>`;
+  } finally { btn.disabled = false; }
+}
+function stop() {
+  running = false; cancelAnimationFrame(rafId);
+  stream?.getTracks().forEach(t => t.stop()); stream = null; video.srcObject = null;
+  try { wakeLock?.release(); } catch {} wakeLock = null;
+  $("overlay").hidden = true; $("meter").hidden = true; $("placeholder").hidden = false;
+  $("btn-start").textContent = "Démarrer";
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (session > 0) {
+    $("placeholder").innerHTML = `<div><strong>${session} ${JOINTS[ex].label}</strong>Bien joué, c'est enregistré. Change d'exercice ou relance une série.</div>`;
+  }
+}
+$("btn-start").onclick = () => running ? stop() : start();
+
+let lastTs = -1;
+function loop() {
+  if (!running) return;
+  rafId = requestAnimationFrame(loop);
+  if (video.readyState < 2) return;
+  const w = video.videoWidth, h = video.videoHeight;
+  if (canvas.width !== w) { canvas.width = w; canvas.height = h; }
+  const ts = performance.now();
+  if (ts <= lastTs) return; lastTs = ts;
+  const res = landmarker.detectForVideo(video, ts);
+  const lm = res.landmarks?.[0];
+  if (lm) processPose(lm, w, h);
+  else { ctx.clearRect(0, 0, w, h); hint("Mets-toi dans le cadre", true); }
+}
+document.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState === "visible" && running) { try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {} }
+});
+
+/* ---------- Réglages ---------- */
+function renderSettings() {
+  const s = data.settings[ex];
+  document.querySelectorAll(".exname").forEach(e => e.textContent = JOINTS[ex].label);
+  $("s-goal").value = s.goal; $("o-goal").textContent = s.goal;
+  $("s-flex").value = s.flex; $("o-flex").textContent = s.flex + "°";
+  $("s-ext").value = s.ext; $("o-ext").textContent = s.ext + "°";
+  $("s-voice").checked = data.settings.voice;
+}
+for (const k of ["goal", "flex", "ext"]) {
+  $("s-" + k).oninput = e => {
+    data.settings[ex][k] = +e.target.value;
+    if (data.settings[ex].ext <= data.settings[ex].flex + 10) data.settings[ex].ext = data.settings[ex].flex + 15;
+    save(); renderSettings(); renderCount();
+  };
+}
+$("s-voice").onchange = e => { data.settings.voice = e.target.checked; save(); };
+
+/* ---------- Progression ---------- */
+let rangeDays = 14;
+function lastDays(n) {
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); out.push(d); }
+  return out;
+}
+function renderProgress() {
+  const H = data.history;
+  // série : jours consécutifs avec au moins une répétition (aujourd'hui compte s'il est commencé)
+  let streak = 0; const d = new Date();
+  const has = k => H[k] && (H[k].pompes + H[k].abdos) > 0;
+  if (!has(dayKey(d))) d.setDate(d.getDate() - 1);
+  while (has(dayKey(d))) { streak++; d.setDate(d.getDate() - 1); }
+  $("st-streak").textContent = streak;
+  const vals = Object.values(H);
+  $("st-rp").textContent = Math.max(0, ...vals.map(v => v.pompes));
+  $("st-ra").textContent = Math.max(0, ...vals.map(v => v.abdos));
+
+  const keys = Object.keys(H).filter(k => H[k].pompes + H[k].abdos > 0).sort().reverse();
+  const fmt = k => new Date(k + "T12:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+  $("hist").innerHTML = keys.length ? keys.slice(0, 60).map(k =>
+    `<tr><td>${fmt(k)}</td><td class="p">${H[k].pompes}</td><td class="a">${H[k].abdos}</td></tr>`).join("")
+    : `<tr><td colspan="3" class="empty">Aucune séance encore. Ta première ligne apparaîtra ce soir !</td></tr>`;
+  drawChart();
+}
+function drawChart() {
+  const c = $("chart"), dpr = window.devicePixelRatio || 1;
+  const W = c.clientWidth, Hh = c.clientHeight;
+  c.width = W * dpr; c.height = Hh * dpr;
+  const g = c.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0, 0, W, Hh);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const days = lastDays(rangeDays).map(d => ({ d, ...(data.history[dayKey(d)] || { pompes: 0, abdos: 0 }) }));
+  const maxV = Math.max(10, ...days.map(x => Math.max(x.pompes, x.abdos)));
+  const step = maxV <= 20 ? 5 : maxV <= 50 ? 10 : maxV <= 100 ? 20 : 50;
+  const top = Math.ceil(maxV / step) * step;
+  const L = 30, R = 6, T = 8, B = 22, cw = W - L - R, ch = Hh - T - B;
+  g.font = `12px ${css("--body")}`; g.fillStyle = css("--muted"); g.strokeStyle = css("--line"); g.lineWidth = 1;
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (let v = 0; v <= top; v += step) {
+    const y = T + ch - (v / top) * ch;
+    g.beginPath(); g.moveTo(L, y + .5); g.lineTo(W - R, y + .5); g.stroke();
+    g.fillText(v, L - 6, y);
+  }
+  const slot = cw / days.length, bw = Math.max(2, Math.min(14, slot / 2 - 2));
+  g.textAlign = "center"; g.textBaseline = "top";
+  const labelEvery = rangeDays <= 7 ? 1 : rangeDays <= 14 ? 2 : 5;
+  days.forEach((x, i) => {
+    const cx = L + slot * i + slot / 2;
+    [["pompes", -1], ["abdos", 1]].forEach(([k, s]) => {
+      const hgt = (x[k] / top) * ch;
+      if (hgt <= 0) return;
+      g.fillStyle = css("--" + k);
+      const bx = cx + (s < 0 ? -bw - 1 : 1);
+      g.beginPath(); g.roundRect ? g.roundRect(bx, T + ch - hgt, bw, hgt, [3, 3, 0, 0]) : g.rect(bx, T + ch - hgt, bw, hgt); g.fill();
+    });
+    if ((rangeDays - 1 - i) % labelEvery === 0) {
+      g.fillStyle = css("--muted");
+      g.fillText(i === days.length - 1 ? "auj." : x.d.getDate(), cx, T + ch + 6);
+    }
+  });
+}
+document.querySelectorAll(".range button").forEach(b => b.onclick = () => {
+  rangeDays = +b.dataset.days;
+  document.querySelectorAll(".range button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  drawChart();
+});
+window.addEventListener("resize", () => { if (!$("view-progres").hidden) drawChart(); });
+
+/* ---------- Sauvegarde ---------- */
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2200); }
+$("btn-export").onclick = async () => {
+  try { await navigator.clipboard.writeText(JSON.stringify(data)); toast("Sauvegarde copiée"); }
+  catch { toast("Copie impossible sur ce navigateur"); }
+};
+$("btn-import").onclick = async () => {
+  let txt = null;
+  try { txt = await navigator.clipboard.readText(); } catch {}
+  if (txt == null) txt = window.prompt("Colle ta sauvegarde ici :");
+  try {
+    const d = JSON.parse(txt);
+    if (!d.history) throw 0;
+    for (const [k, v] of Object.entries(d.history)) {
+      const cur = data.history[k] || { pompes: 0, abdos: 0 };
+      data.history[k] = { pompes: Math.max(cur.pompes, v.pompes || 0), abdos: Math.max(cur.abdos, v.abdos || 0) };
+    }
+    save(); renderProgress(); renderCount(); toast("Historique restauré");
+  } catch { toast("Ce texte n'est pas une sauvegarde valide"); }
+};
+
+/* ---------- Onglets ---------- */
+function showTab(name) {
+  $("view-seance").hidden = name !== "seance"; $("view-progres").hidden = name !== "progres";
+  $("tab-seance").toggleAttribute("aria-current", name === "seance");
+  $("tab-progres").toggleAttribute("aria-current", name === "progres");
+  if (name === "seance") $("tab-seance").setAttribute("aria-current", "page");
+  else $("tab-progres").setAttribute("aria-current", "page");
+  if (name === "progres") { if (running) stop(); renderProgress(); }
+}
+$("tab-seance").onclick = () => showTab("seance");
+$("tab-progres").onclick = () => showTab("progres");
+
+setEx("pompes");
+</script>
+</body>
+</html>
