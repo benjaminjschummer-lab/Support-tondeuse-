@@ -42,7 +42,7 @@
     padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   .view { display: flex; flex-direction: column; gap: 14px; max-width: 720px; margin: 0 auto; }
   [hidden] { display: none !important; }
-  button { font: inherit; color: inherit; cursor: pointer; }
+  button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
   button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 
   /* Choix de l'exercice */
@@ -405,7 +405,7 @@ async function start() {
   } finally { btn.disabled = false; }
 }
 function stop() {
-  running = false; cancelAnimationFrame(rafId);
+  running = false; clearTimeout(rafId); video.pause();
   stream?.getTracks().forEach(t => t.stop()); stream = null; video.srcObject = null;
   try { wakeLock?.release(); } catch {} wakeLock = null;
   $("overlay").hidden = true; $("meter").hidden = true; $("placeholder").hidden = false;
@@ -415,21 +415,32 @@ function stop() {
     $("placeholder").innerHTML = `<div><strong>${session} ${JOINTS[ex].label}</strong>Bien joué, c'est enregistré. Change d'exercice ou relance une série.</div>`;
   }
 }
-$("btn-start").onclick = () => running ? stop() : start();
+// pointerdown réagit dès le contact du doigt, sans attendre la fin du « clic »
+let lastPress = 0;
+function onStartStop(e) {
+  e.preventDefault();
+  const now = Date.now(); if (now - lastPress < 400) return; lastPress = now;
+  running ? stop() : start();
+}
+$("btn-start").addEventListener("pointerdown", onStartStop);
+$("btn-start").addEventListener("click", e => { if (e.detail === 0) onStartStop(e); }); // clavier
 
 let lastTs = -1;
 function loop() {
   if (!running) return;
-  rafId = requestAnimationFrame(loop);
-  if (video.readyState < 2) return;
+  if (video.readyState < 2) { rafId = setTimeout(loop, 100); return; }
   const w = video.videoWidth, h = video.videoHeight;
   if (canvas.width !== w) { canvas.width = w; canvas.height = h; }
-  const ts = performance.now();
-  if (ts <= lastTs) return; lastTs = ts;
+  let ts = performance.now();
+  if (ts <= lastTs) ts = lastTs + 1; lastTs = ts;
   const res = landmarker.detectForVideo(video, ts);
+  const cost = performance.now() - ts;
+  if (!running) return;
   const lm = res.landmarks?.[0];
   if (lm) processPose(lm, w, h);
   else { ctx.clearRect(0, 0, w, h); hint("Mets-toi dans le cadre", true); }
+  // Laisse au moins autant de temps libre que la détection a pris, pour que les boutons restent réactifs
+  rafId = setTimeout(loop, Math.max(50, cost * 1.5));
 }
 document.addEventListener("visibilitychange", async () => {
   if (document.visibilityState === "visible" && running) { try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {} }
