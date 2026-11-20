@@ -18,7 +18,7 @@
     const s = App.state;
     let tab = params[0] || sessionStorage.getItem('ia-tab') || 'chat';
     el.innerHTML = head('Assistant IA', 'Votre expert-comptable disponible 24 h/24 : il connaît toute votre comptabilité, répond à vos questions, scanne vos justificatifs, trie vos opérations et analyse vos chiffres.') +
-      (s.settings.ai.apiKey ? '' : `<div class="alert warning">Pour activer l'assistant, ajoutez votre clé API Claude dans <a href="#/parametres">Paramètres</a>. Elle reste stockée uniquement dans ce navigateur.</div>`) +
+      (App.ai.isReady() ? (App.ai.builtin ? '<div class="alert success">✦ Claude est intégré : aucune clé API nécessaire.</div>' : '') : `<div class="alert warning">Pour activer l'assistant, ajoutez votre clé API Claude dans <a href="#/parametres">Paramètres</a>. Elle reste stockée uniquement dans ce navigateur.</div>`) +
       `<div class="card"><div class="tabs"><button data-t="chat">💬 Questions</button><button data-t="scan">📷 Scanner & trier</button><button data-t="analyse">📈 Analyse financière</button></div><div id="tc"></div></div>`;
     const draw = () => {
       $$('.tabs button', el).forEach((b) => b.classList.toggle('active', b.dataset.t === tab));
@@ -119,9 +119,9 @@
     };
 
     async function handle(files) {
-      if (!s.settings.ai.apiKey) return App.toast('Ajoutez votre clé API dans les paramètres', 'error');
+      if (!App.ai.isReady()) return App.toast('Ajoutez votre clé API dans les paramètres', 'error');
       for (const file of files) {
-        const r = { file, status: 'loading', thumb: await App.compressImage(file, 900) };
+        const r = { file, status: 'loading', thumb: await App.compressImage(file, 800) };
         results.push(r); draw();
         App.ai.scanDocument(file).then((data) => { r.data = data; r.status = 'ok'; draw(); }).catch((e) => { r.status = 'error'; r.error = e.message; draw(); });
       }
@@ -131,7 +131,7 @@
 
   function analyseTab(tc) {
     const last = App.state.lastAnalysis;
-    tc.innerHTML = `<div class="actions" style="margin-bottom:14px"><button class="btn primary" id="go">✦ Lancer une analyse complète</button>${last ? `<span class="muted small">Dernière analyse : ${fdate(last.date)}</span><button class="btn" id="print">Imprimer</button>` : ''}</div>
+    tc.innerHTML = `<div class="actions" style="margin-bottom:14px"><button class="btn primary" id="go">✦ Lancer une analyse complète</button>${last ? `<span class="muted small">Dernière analyse : ${fdate(last.date)}</span>${App.isArtifact ? '' : '<button class="btn" id="print">Imprimer</button>'}` : ''}</div>
       <div class="report" id="out">${last ? App.ai.md(last.text) : '<div class="empty">L\'IA examine votre rentabilité, vos charges, votre trésorerie, la TVA, les anomalies de saisie et les optimisations possibles.</div>'}</div>`;
     $('#go', tc).onclick = async (e) => {
       const btn = e.currentTarget; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Analyse en cours…';
@@ -183,11 +183,11 @@
         <label class="field">Solde bancaire d'ouverture <input type="number" step="0.01" data-o="banque" value="${o.banque}"></label>
       </div></div>
       </form>
-      <div class="card"><h2>Assistant IA (Claude)</h2><div class="form-grid">
+      ${App.ai.builtin ? '<div class="card"><h2>Assistant IA (Claude)</h2><p>✦ Claude est intégré à cette version : aucune clé API à fournir. La première utilisation vous demande simplement l\'autorisation.</p></div><div hidden>' : ''}<div class="card"><h2>Assistant IA (Claude)</h2><div class="form-grid">
         <label class="field full">Clé API Anthropic <input type="password" id="apikey" value="${esc(ai.apiKey)}" placeholder="sk-ant-…" autocomplete="off"></label>
         <label class="field">Modèle <select id="model">${App.options([['claude-opus-5-5', 'Claude Opus 5.5 (recommandé)'], ['claude-sonnet-5-5', 'Claude Sonnet 5.5 (plus rapide)'], ['claude-haiku-5-5', 'Claude Haiku 5.5 (économique)']], ai.model)}</select></label>
         <label class="field">Niveau de réflexion <select id="effort">${App.options([['low', 'Rapide'], ['medium', 'Équilibré'], ['high', 'Approfondi'], ['xhigh', 'Très approfondi']], ai.effort)}</select></label>
-      </div><p class="muted small">Obtenez une clé sur console.anthropic.com. Elle est conservée uniquement dans ce navigateur et les requêtes partent directement de votre appareil vers l'API Anthropic, avec un résumé de vos données comptables pour contextualiser les réponses.</p></div>
+      </div><p class="muted small">Obtenez une clé sur console.anthropic.com. Elle est conservée uniquement dans ce navigateur et les requêtes partent directement de votre appareil vers l'API Anthropic, avec un résumé de vos données comptables pour contextualiser les réponses.</p></div>${App.ai.builtin ? '</div>' : ''}
       <div class="card"><h2>Données & sauvegardes</h2><p class="muted small">Toutes vos données restent sur cet appareil (stockage local du navigateur). Exportez régulièrement une sauvegarde.</p><div class="actions">
         <button class="btn" id="backup">Exporter une sauvegarde (.json)</button>
         <label class="btn">Restaurer une sauvegarde<input type="file" id="restore" accept=".json,application/json" hidden></label>

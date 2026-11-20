@@ -111,7 +111,68 @@ window.App = window.App || {};
 
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); }
-    catch (e) { App.toast && App.toast('Stockage plein : exportez une sauvegarde et supprimez des justificatifs volumineux.', 'error'); }
+    catch (e) { /* stockage local indisponible : la synchronisation cloud prend le relais */ }
+    scheduleCloud();
+  }
+
+  /* ---- Synchronisation dans l'espace privé de l'utilisateur (quand l'app tourne sur claude.ai) ---- */
+  let cloud = null, cloudTimer = null, savedReceipts = {};
+  const clean = (o) => JSON.parse(JSON.stringify(o));
+  function scheduleCloud() {
+    if (!cloud) return;
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(pushCloud, 800);
+  }
+  async function pushCloud() {
+    if (!cloud) return;
+    try {
+      const copy = clean(state);
+      copy.settings.ai.apiKey = '';
+      const receipts = {};
+      copy.expenses.forEach((e) => { if (e.receipt) { receipts[e.id] = e.receipt; e.receipt = 'cloud'; } });
+      await cloud.col.doc('state').set({ json: JSON.stringify(copy), savedAt: new Date().toISOString() });
+      for (const [id, data] of Object.entries(receipts)) {
+        if (savedReceipts[id] === data.length) continue;
+        await cloud.col.doc('r_' + id).set({ data });
+        savedReceipts[id] = data.length;
+      }
+      for (const id of Object.keys(savedReceipts)) {
+        if (!receipts[id]) { await cloud.col.doc('r_' + id).delete().catch(() => {}); delete savedReceipts[id]; }
+      }
+      App.cloudStatus = 'ok';
+    } catch (e) { App.cloudStatus = 'error'; console.warn('Synchronisation impossible', e); }
+  }
+  async function initCloud(onLoaded) {
+    if (!window.claude || !window.claude.use) return;
+    try {
+      const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+      if (!db || !user) return;
+      const id = await user.id();
+      if (!id) return;
+      const col = db.collection('data/users/' + id);
+      const snap = await Promise.race([col.get(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]);
+      const docs = {};
+      snap.docs.forEach((d) => (docs[d.id] = d.data()));
+      cloud = { col };
+      if (docs.state && docs.state.json) {
+        const key = state.settings.ai.apiKey;
+        const loaded = JSON.parse(docs.state.json);
+        loaded.expenses.forEach((e) => {
+          if (e.receipt === 'cloud') {
+            const r = docs['r_' + e.id];
+            e.receipt = r ? r.data : '';
+            if (r) savedReceipts[e.id] = r.data.length;
+          }
+        });
+        state = Object.assign(defaultState(), loaded);
+        state.settings.ai.apiKey = key;
+        try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+      } else if (state.invoices.length || state.expenses.length) {
+        pushCloud();
+      }
+      App.cloudStatus = 'ok';
+      onLoaded && onLoaded();
+    } catch (e) { App.cloudStatus = 'error'; console.warn('Espace de stockage indisponible', e); }
   }
 
   function replace(newState) { state = Object.assign(defaultState(), newState); save(); }
@@ -214,7 +275,7 @@ window.App = window.App || {};
 
   Object.defineProperty(App, 'state', { get: () => state, configurable: true });
   Object.assign(App, {
-    save, replace, reset, loadDemo, uid, today, round2, eur, pct, fdate, esc, addDays,
+    save, replace, reset, loadDemo, initCloud, uid, today, round2, eur, pct, fdate, esc, addDays,
     invoiceTotals, nextNumber, fiscalYear, accountLabel,
     EXPENSE_CATEGORIES, ASSET_CATEGORIES, TVA_RATES, ACCOUNT_LABELS,
   });

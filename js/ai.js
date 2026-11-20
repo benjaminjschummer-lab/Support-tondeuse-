@@ -2,6 +2,17 @@
 (function (App) {
   const SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.4.0/+esm';
   let sdkPromise = null;
+  let sampleFn = null; // Claude intégré (quand l'app tourne sur claude.ai)
+
+  async function init() {
+    if (window.claude && window.claude.use) {
+      sampleFn = await window.claude.use('sample').catch(() => null);
+    }
+    api.builtin = !!sampleFn;
+    api.ready = !!sampleFn || !!App.state.settings.ai.apiKey;
+  }
+  const isReady = () => !!sampleFn || !!App.state.settings.ai.apiKey;
+  const sampleErr = (e) => new Error(e && e.code === 'not_granted' ? 'Accès à Claude refusé pour cette page.' : e && e.code === 'rate_limited' ? 'Trop de demandes : réessayez dans un moment.' : (e && e.message) || 'Erreur de l\'assistant IA');
 
   async function client() {
     const key = App.state.settings.ai.apiKey;
@@ -42,6 +53,12 @@ Utilise du Markdown simple (titres ####, listes, tableaux, gras).`;
 
   /* Conversation en streaming */
   async function chat(history, onText) {
+    if (sampleFn) {
+      const msgs = history.map((m) => ({ role: m.role, content: m.content }));
+      msgs[msgs.length - 1] = { role: 'user', content: `${SYSTEM}\n\n${contextBlock()}\n\nQuestion : ${msgs[msgs.length - 1].content}` };
+      try { const r = await sampleFn(msgs, { cache: false, modelTier: 'complex', onText: ({ text }) => onText && onText(text) }); return r.text; }
+      catch (e) { throw sampleErr(e); }
+    }
     const c = await client();
     const messages = history.map((m) => ({ role: m.role, content: m.content }));
     messages[messages.length - 1] = { role: 'user', content: `${contextBlock()}\n\nQuestion : ${messages[messages.length - 1].content}` };
@@ -52,7 +69,13 @@ Utilise du Markdown simple (titres ####, listes, tableaux, gras).`;
     return textOf(final) || acc;
   }
 
-  async function structured(content, schema, system) {
+  async function structured(content, schema, system, images) {
+    if (sampleFn) {
+      const text = (Array.isArray(content) ? content.filter((b) => b.type === 'text').map((b) => b.text).join('\n') : content);
+      const prompt = `${system || SYSTEM}\n\n${text}\n\nRéponds uniquement avec un objet JSON valide conforme à ce schéma JSON (tous les champs requis) :\n${JSON.stringify(schema)}`;
+      try { return await sampleFn.json(prompt, Object.assign({ modelTier: 'default' }, images ? { images } : {})); }
+      catch (e) { throw sampleErr(e); }
+    }
     const c = await client();
     const stream = c.beta.messages.stream(base({
       system: system || SYSTEM,
@@ -93,7 +116,8 @@ Utilise du Markdown simple (titres ####, listes, tableaux, gras).`;
 
   /* Scan d'un justificatif (image ou PDF) */
   async function scanDocument(file) {
-    const data = await fileToBase64(file);
+    if (sampleFn && file.type === 'application/pdf') throw new Error('Ici, l\'IA lit les photos et images (JPG, PNG) : prenez une capture ou une photo du PDF.');
+    const data = sampleFn ? '' : await fileToBase64(file);
     const isPdf = file.type === 'application/pdf';
     const media = isPdf ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } }
       : { type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data } };
@@ -101,7 +125,7 @@ Utilise du Markdown simple (titres ####, listes, tableaux, gras).`;
     const assets = App.ASSET_CATEGORIES.map((c) => `${c.account} ${c.label} (${c.duration} ans)`).join('\n');
     return structured([media, { type: 'text', text: `Analyse ce justificatif et extrais les données comptables. Entreprise : ${App.state.settings.company.name}.
 Comptes de charges disponibles :\n${cats}\nComptes d'immobilisations :\n${assets}
-Si un montant est absent, calcule-le à partir des autres. Si la TVA n'est pas récupérable (ex. carburant essence, cadeaux > 73 €), mets total_tva à 0 et explique dans remarks. Laisse asset_account vide et asset_duration_years à 0 si ce n'est pas une immobilisation.` }], DOC_SCHEMA);
+Si un montant est absent, calcule-le à partir des autres. Si la TVA n'est pas récupérable (ex. carburant essence, cadeaux > 73 €), mets total_tva à 0 et explique dans remarks. Laisse asset_account vide et asset_duration_years à 0 si ce n'est pas une immobilisation.` }], DOC_SCHEMA, null, sampleFn ? [file] : null);
   }
 
   /* Tri automatique des opérations bancaires */
@@ -125,7 +149,12 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
   }
 
   /* Analyse financière complète */
+  const ANALYSIS = `Rédige une analyse financière complète de l'entreprise : 1) synthèse en 3 phrases, 2) rentabilité et marges, 3) structure des charges et pistes d'économies, 4) trésorerie et BFR (délais clients), 5) TVA et échéances fiscales à venir, 6) anomalies ou incohérences détectées dans la saisie, 7) optimisations fiscales légales à étudier, 8) prévisions pour la fin d'exercice. Sois concret et chiffré.`;
   async function analyze(onText) {
+    if (sampleFn) {
+      try { const r = await sampleFn(`${SYSTEM}\n\n${contextBlock()}\n\n${ANALYSIS}`, { cache: false, modelTier: 'complex', onText: ({ text }) => onText && onText(text) }); return r.text; }
+      catch (e) { throw sampleErr(e); }
+    }
     const c = await client();
     const stream = c.beta.messages.stream(base({
       system: SYSTEM, max_tokens: 32000,
@@ -166,5 +195,6 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
     return html;
   }
 
-  App.ai = { chat, scanDocument, categorizeBank, analyze, md, fileToBase64 };
+  const api = { init, isReady, builtin: false, ready: false, chat, scanDocument, categorizeBank, analyze, md, fileToBase64 };
+  App.ai = api;
 })(window.App);

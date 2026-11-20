@@ -1,0 +1,2464 @@
+<title>ComptaPro</title>
+<style>
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --surface-2: #f0f2f5; --border: #e3e6eb;
+  --text: #16191f; --muted: #626b78; --primary: #2f5bea; --primary-ink: #ffffff; --primary-soft: #e8eefe;
+  --success: #138a52; --success-soft: #e3f5ec; --warning: #b26b00; --warning-soft: #fdf1dc;
+  --danger: #c62f3b; --danger-soft: #fce8ea; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --radius: 10px; --sidebar: 236px;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --surface: #171b21; --surface-2: #1f242c; --border: #2b313b;
+    --text: #e8ebf0; --muted: #98a1ae; --primary: #6b8cff; --primary-ink: #0b0f1a; --primary-soft: #1e2948;
+    --success: #3ccf8e; --success-soft: #11291e; --warning: #f0b44c; --warning-soft: #2c2412;
+    --danger: #ff6b76; --danger-soft: #331a1d; --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1216; --surface: #171b21; --surface-2: #1f242c; --border: #2b313b;
+  --text: #e8ebf0; --muted: #98a1ae; --primary: #6b8cff; --primary-ink: #0b0f1a; --primary-soft: #1e2948;
+  --success: #3ccf8e; --success-soft: #11291e; --warning: #f0b44c; --warning-soft: #2c2412;
+  --danger: #ff6b76; --danger-soft: #331a1d; --shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+a { color: var(--primary); text-decoration: none; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+h2 { font-size: 16px; margin: 0 0 12px; }
+h3 { font-size: 14px; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.num, td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+
+/* Layout */
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: var(--sidebar); background: var(--surface); border-right: 1px solid var(--border); position: fixed; inset: 0 auto 0 0; display: flex; flex-direction: column; z-index: 30; transition: transform .2s; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 18px 18px 14px; font-weight: 700; font-size: 17px; }
+.brand-logo { width: 30px; height: 30px; border-radius: 8px; background: var(--primary); color: var(--primary-ink); display: grid; place-items: center; font-size: 15px; }
+.nav { padding: 6px 10px; overflow-y: auto; flex: 1; }
+.nav-section { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 14px 10px 6px; }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--text); font-weight: 500; }
+.nav a:hover { background: var(--surface-2); }
+.nav a.active { background: var(--primary-soft); color: var(--primary); }
+.nav a .ico { width: 18px; text-align: center; }
+.nav a .pill { margin-left: auto; }
+.sidebar-foot { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+.main { margin-left: var(--sidebar); flex: 1; min-width: 0; }
+.topbar { display: none; align-items: center; gap: 12px; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 20; }
+.content { padding: 28px 32px 60px; max-width: 1280px; margin: 0 auto; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.page-head p { margin: 4px 0 0; color: var(--muted); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); box-shadow: var(--shadow); }
+  body.nav-open .sidebar { transform: none; }
+  .main { margin-left: 0; }
+  .topbar { display: flex; }
+  .content { padding: 18px 16px 60px; }
+}
+
+/* Cards & grids */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+.card + .card { margin-top: 16px; }
+.grid { display: grid; gap: 16px; }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); } }
+.kpi .label { color: var(--muted); font-size: 12px; font-weight: 500; }
+.kpi .value { font-size: 24px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.kpi .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.pos { color: var(--success); } .neg { color: var(--danger); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; margin: 0 -18px; padding: 0 18px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--surface-2); }
+tr.total td { font-weight: 700; background: var(--surface-2); }
+tr.sub td { color: var(--muted); }
+tr.clickable { cursor: pointer; }
+.empty { text-align: center; color: var(--muted); padding: 36px 10px; }
+
+/* Badges */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.badge.success { background: var(--success-soft); color: var(--success); }
+.badge.warning { background: var(--warning-soft); color: var(--warning); }
+.badge.danger { background: var(--danger-soft); color: var(--danger); }
+.badge.primary { background: var(--primary-soft); color: var(--primary); }
+.pill { background: var(--danger); color: #fff; font-size: 11px; border-radius: 999px; padding: 0 7px; font-weight: 700; }
+
+/* Forms */
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 8px 14px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.danger { color: var(--danger); }
+.btn.ghost { border-color: transparent; background: transparent; }
+.btn.sm { padding: 4px 10px; font-size: 12px; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+label.field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); }
+input, select, textarea { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-soft); border-color: var(--primary); }
+textarea { resize: vertical; min-height: 70px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.form-grid .full { grid-column: 1 / -1; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); font-weight: 500; }
+.check input { width: auto; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.toolbar input, .toolbar select { width: auto; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 18px; overflow-x: auto; }
+.tabs button { background: none; border: 0; padding: 10px 14px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs button.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+/* Modal */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(10,14,20,.5); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 100; overflow-y: auto; }
+.modal { background: var(--surface); border-radius: 14px; width: 100%; max-width: 760px; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+.modal.wide { max-width: 1000px; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.modal-head h2 { margin: 0; }
+.modal-body { padding: 20px; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+
+/* Toast */
+.toasts { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 200; }
+.toast { background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; box-shadow: var(--shadow); max-width: 360px; font-weight: 500; }
+.toast.error { background: var(--danger); color: #fff; }
+.toast.success { background: var(--success); color: #fff; }
+
+/* Chart */
+.chart { width: 100%; height: 220px; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.bar-row { display: grid; grid-template-columns: minmax(0, 1fr) 2fr auto; gap: 10px; align-items: center; padding: 5px 0; font-size: 13px; }
+.bar-row .track { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.bar-row .fill { height: 100%; background: var(--primary); border-radius: 4px; }
+
+/* Statements */
+.statement td:first-child { padding-left: 18px; }
+.statement tr.section td { font-weight: 700; padding-left: 10px; background: var(--surface-2); }
+.alert { padding: 12px 14px; border-radius: 8px; background: var(--primary-soft); color: var(--text); border: 1px solid var(--border); margin-bottom: 14px; }
+.alert.warning { background: var(--warning-soft); }
+.alert.danger { background: var(--danger-soft); }
+.alert.success { background: var(--success-soft); }
+.checklist { list-style: none; padding: 0; margin: 0; }
+.checklist li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.checklist li:last-child { border-bottom: 0; }
+.checklist .st { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; flex: none; font-weight: 700; }
+.checklist .ok { background: var(--success-soft); color: var(--success); }
+.checklist .ko { background: var(--warning-soft); color: var(--warning); }
+
+/* Invoice preview */
+.invoice-paper { background: #fff; color: #111; padding: 40px; border-radius: 6px; border: 1px solid var(--border); font-size: 13px; }
+.invoice-paper table th { color: #555; border-color: #ddd; }
+.invoice-paper table td { border-color: #eee; }
+.invoice-paper .inv-head { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px; }
+.invoice-paper h1 { font-size: 26px; color: #2f5bea; }
+.invoice-paper .totals { margin-left: auto; width: 280px; margin-top: 16px; }
+.invoice-paper .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
+.invoice-paper .totals .grand { font-weight: 700; font-size: 16px; border-top: 2px solid #111; padding-top: 8px; }
+.invoice-paper .legal { margin-top: 30px; font-size: 11px; color: #666; white-space: pre-line; }
+.lines-table input, .lines-table select { padding: 6px 8px; }
+.lines-table td { padding: 5px 4px; }
+
+/* AI */
+.chat { display: flex; flex-direction: column; height: calc(100vh - 340px); min-height: 420px; }
+.chat-log { flex: 1; overflow-y: auto; padding: 4px 2px 12px; display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 85%; padding: 10px 14px; border-radius: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.msg.user { align-self: flex-end; background: var(--primary); color: var(--primary-ink); border-bottom-right-radius: 4px; white-space: pre-wrap; }
+.msg.assistant { align-self: flex-start; background: var(--surface-2); border-bottom-left-radius: 4px; }
+.msg.assistant p { margin: 0 0 8px; } .msg.assistant p:last-child { margin-bottom: 0; }
+.msg.assistant table { margin: 8px 0; font-size: 13px; }
+.msg.assistant code { font-family: var(--mono); font-size: 12px; background: var(--surface); padding: 1px 4px; border-radius: 4px; }
+.msg.assistant ul, .msg.assistant ol { margin: 4px 0 8px; padding-left: 20px; }
+.msg.assistant h4 { margin: 10px 0 4px; }
+.chat-input { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+.chat-input textarea { min-height: 44px; height: 44px; }
+.suggestions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.suggestions button { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12px; cursor: pointer; }
+.suggestions button:hover { border-color: var(--primary); color: var(--primary); }
+.dropzone { border: 2px dashed var(--border); border-radius: 12px; padding: 34px 16px; text-align: center; color: var(--muted); cursor: pointer; transition: .15s; }
+.dropzone.over, .dropzone:hover { border-color: var(--primary); background: var(--primary-soft); color: var(--text); }
+.spinner { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; vertical-align: -3px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.receipt-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+.report { line-height: 1.65; }
+.report h4 { margin: 18px 0 6px; font-size: 15px; }
+
+@media print {
+  .sidebar, .topbar, .page-head .actions, .no-print, .toasts { display: none !important; }
+  .main { margin: 0; } .content { padding: 0; max-width: none; }
+  body { background: #fff; color: #000; }
+  .card { box-shadow: none; border: 0; padding: 0; }
+  .modal-backdrop { position: static; background: none; padding: 0; display: block; }
+  .modal { box-shadow: none; max-width: none; } .modal-head, .modal-foot { display: none; }
+  body.printing-modal .layout { display: none; }
+}
+.page-head select { width: auto; }
+
+</style>
+<div class="layout">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-logo">€</div>ComptaPro</div>
+      <nav class="nav" id="nav">
+        <a href="#/dashboard" data-route="dashboard"><span class="ico">◧</span>Tableau de bord</a>
+        <div class="nav-section">Activité</div>
+        <a href="#/factures" data-route="factures"><span class="ico">🧾</span>Factures &amp; devis</a>
+        <a href="#/clients" data-route="clients"><span class="ico">👥</span>Clients</a>
+        <a href="#/depenses" data-route="depenses"><span class="ico">💳</span>Dépenses</a>
+        <a href="#/banque" data-route="banque"><span class="ico">🏦</span>Banque <span class="pill" id="pill-bank" hidden></span></a>
+        <a href="#/immobilisations" data-route="immobilisations"><span class="ico">🖥</span>Immobilisations</a>
+        <div class="nav-section">Fiscalité &amp; clôture</div>
+        <a href="#/tva" data-route="tva"><span class="ico">％</span>TVA</a>
+        <a href="#/journal" data-route="journal"><span class="ico">📒</span>Journal &amp; grand livre</a>
+        <a href="#/etats" data-route="etats"><span class="ico">📊</span>Bilan &amp; résultat</a>
+        <a href="#/cloture" data-route="cloture"><span class="ico">🔒</span>Clôture annuelle</a>
+        <div class="nav-section">Intelligence</div>
+        <a href="#/ia" data-route="ia"><span class="ico">✦</span>Assistant IA</a>
+        <a href="#/parametres" data-route="parametres"><span class="ico">⚙</span>Paramètres</a>
+      </nav>
+      <div class="sidebar-foot" id="company-foot"></div>
+    </aside>
+    <div class="main">
+      <div class="topbar">
+        <button class="btn sm" id="menu-btn" aria-label="Menu">☰</button>
+        <strong>ComptaPro</strong>
+      </div>
+      <main class="content" id="view"></main>
+    </div>
+  </div>
+  <div class="toasts" id="toasts"></div>
+  <div id="modal-root"></div>
+<script>
+/* ComptaPro — stockage local, modèle de données, utilitaires */
+window.App = window.App || {};
+
+(function (App) {
+  const KEY = 'comptapro.v1';
+
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const today = () => new Date().toISOString().slice(0, 10);
+  const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+  const eur = (n) => (Number(n) || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+  const pct = (n) => (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' %';
+  const fdate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('fr-FR') : '—');
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  /* Plan comptable (PCG) simplifié : catégories de dépenses proposées */
+  const EXPENSE_CATEGORIES = [
+    { account: '601000', label: 'Achats de matières premières' },
+    { account: '606100', label: 'Eau, énergie' },
+    { account: '606300', label: 'Petit équipement (< 500 € HT)' },
+    { account: '606400', label: 'Fournitures de bureau' },
+    { account: '607000', label: 'Achats de marchandises' },
+    { account: '611000', label: 'Sous-traitance' },
+    { account: '613200', label: 'Loyers immobiliers' },
+    { account: '613500', label: 'Locations mobilières / leasing' },
+    { account: '615000', label: 'Entretien et réparations' },
+    { account: '616000', label: 'Assurances' },
+    { account: '618000', label: 'Documentation, formation' },
+    { account: '622600', label: 'Honoraires (comptable, avocat…)' },
+    { account: '623000', label: 'Publicité, marketing' },
+    { account: '625100', label: 'Déplacements, transports' },
+    { account: '625600', label: 'Missions, hôtels' },
+    { account: '625700', label: 'Réceptions, repas d\'affaires' },
+    { account: '626000', label: 'Télécom, internet, poste' },
+    { account: '627000', label: 'Frais bancaires' },
+    { account: '628100', label: 'Cotisations professionnelles' },
+    { account: '651000', label: 'Logiciels, abonnements SaaS' },
+    { account: '635100', label: 'Impôts et taxes (CFE…)' },
+    { account: '641000', label: 'Rémunération du personnel / dirigeant' },
+    { account: '645000', label: 'Charges sociales (URSSAF…)' },
+    { account: '661100', label: 'Intérêts d\'emprunt' },
+    { account: '671000', label: 'Charges exceptionnelles' },
+  ];
+
+  const ASSET_CATEGORIES = [
+    { account: '205000', label: 'Logiciels, brevets', duration: 3 },
+    { account: '213500', label: 'Agencements, installations', duration: 10 },
+    { account: '215400', label: 'Matériel industriel / outillage', duration: 5 },
+    { account: '218200', label: 'Matériel de transport (véhicule)', duration: 5 },
+    { account: '218300', label: 'Matériel informatique', duration: 3 },
+    { account: '218400', label: 'Mobilier', duration: 10 },
+  ];
+
+  const ACCOUNT_LABELS = {
+    '101000': 'Capital social', '108000': 'Compte de l\'exploitant', '110000': 'Report à nouveau', '120000': 'Résultat de l\'exercice',
+    '164000': 'Emprunts bancaires', '401000': 'Fournisseurs', '404000': 'Fournisseurs d\'immobilisations', '411000': 'Clients',
+    '421000': 'Personnel - rémunérations dues', '431000': 'URSSAF', '444000': 'État - impôt sur les bénéfices',
+    '445510': 'TVA à décaisser', '445620': 'TVA déductible sur immobilisations', '445660': 'TVA déductible sur ABS',
+    '445670': 'Crédit de TVA à reporter', '445710': 'TVA collectée', '455000': 'Associés - comptes courants',
+    '467000': 'Autres débiteurs / créditeurs', '471000': 'Compte d\'attente', '512000': 'Banque', '530000': 'Caisse',
+    '681100': 'Dotations aux amortissements', '695000': 'Impôt sur les sociétés',
+    '706000': 'Prestations de services', '707000': 'Ventes de marchandises', '708000': 'Produits des activités annexes',
+    '740000': 'Subventions d\'exploitation', '758000': 'Produits divers de gestion', '768000': 'Produits financiers', '771000': 'Produits exceptionnels',
+  };
+  EXPENSE_CATEGORIES.forEach((c) => (ACCOUNT_LABELS[c.account] = c.label));
+  ASSET_CATEGORIES.forEach((c) => {
+    ACCOUNT_LABELS[c.account] = c.label;
+    ACCOUNT_LABELS['28' + c.account.slice(1)] = 'Amort. ' + c.label.toLowerCase();
+  });
+  const accountLabel = (a) => ACCOUNT_LABELS[a] || ('Compte ' + a);
+
+  const TVA_RATES = [20, 10, 5.5, 2.1, 0];
+
+  const defaultState = () => ({
+    version: 1,
+    settings: {
+      company: {
+        name: 'Mon entreprise', legalForm: 'EURL', siret: '', tvaNumber: '', address: '', email: '', phone: '', iban: '', bic: '',
+        regimeTva: 'reel_normal', // franchise | reel_simplifie | reel_normal
+        tvaPeriod: 'mensuelle', // mensuelle | trimestrielle | annuelle
+        exigibilite: 'debits', // debits | encaissements
+        impot: 'IS', // IS | IR
+        fiscalYearStart: '01-01',
+        invoicePrefix: 'F', quotePrefix: 'D', creditPrefix: 'AV',
+        paymentTerms: 30,
+        legalMentions: 'Pénalités de retard : 3 fois le taux d\'intérêt légal. Indemnité forfaitaire pour frais de recouvrement : 40 €.',
+      },
+      ai: { apiKey: '', model: 'claude-opus-5-5', effort: 'medium' },
+      opening: { capital: 0, reportANouveau: 0, emprunts: 0, banque: 0, comptesCourants: 0 },
+    },
+    clients: [],
+    suppliers: [],
+    invoices: [],
+    expenses: [],
+    bank: [],
+    assets: [],
+    entries: [],
+    tvaDeclarations: [],
+    closings: [],
+    aiChat: [],
+  });
+
+  let state = load();
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) return Object.assign(defaultState(), JSON.parse(raw));
+    } catch (e) { console.warn('Lecture impossible', e); }
+    return defaultState();
+  }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch (e) { /* stockage local indisponible : la synchronisation cloud prend le relais */ }
+    scheduleCloud();
+  }
+
+  /* ---- Synchronisation dans l'espace privé de l'utilisateur (quand l'app tourne sur claude.ai) ---- */
+  let cloud = null, cloudTimer = null, savedReceipts = {};
+  const clean = (o) => JSON.parse(JSON.stringify(o));
+  function scheduleCloud() {
+    if (!cloud) return;
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(pushCloud, 800);
+  }
+  async function pushCloud() {
+    if (!cloud) return;
+    try {
+      const copy = clean(state);
+      copy.settings.ai.apiKey = '';
+      const receipts = {};
+      copy.expenses.forEach((e) => { if (e.receipt) { receipts[e.id] = e.receipt; e.receipt = 'cloud'; } });
+      await cloud.col.doc('state').set({ json: JSON.stringify(copy), savedAt: new Date().toISOString() });
+      for (const [id, data] of Object.entries(receipts)) {
+        if (savedReceipts[id] === data.length) continue;
+        await cloud.col.doc('r_' + id).set({ data });
+        savedReceipts[id] = data.length;
+      }
+      for (const id of Object.keys(savedReceipts)) {
+        if (!receipts[id]) { await cloud.col.doc('r_' + id).delete().catch(() => {}); delete savedReceipts[id]; }
+      }
+      App.cloudStatus = 'ok';
+    } catch (e) { App.cloudStatus = 'error'; console.warn('Synchronisation impossible', e); }
+  }
+  async function initCloud(onLoaded) {
+    if (!window.claude || !window.claude.use) return;
+    try {
+      const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+      if (!db || !user) return;
+      const id = await user.id();
+      if (!id) return;
+      const col = db.collection('data/users/' + id);
+      const snap = await Promise.race([col.get(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]);
+      const docs = {};
+      snap.docs.forEach((d) => (docs[d.id] = d.data()));
+      cloud = { col };
+      if (docs.state && docs.state.json) {
+        const key = state.settings.ai.apiKey;
+        const loaded = JSON.parse(docs.state.json);
+        loaded.expenses.forEach((e) => {
+          if (e.receipt === 'cloud') {
+            const r = docs['r_' + e.id];
+            e.receipt = r ? r.data : '';
+            if (r) savedReceipts[e.id] = r.data.length;
+          }
+        });
+        state = Object.assign(defaultState(), loaded);
+        state.settings.ai.apiKey = key;
+        try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+      } else if (state.invoices.length || state.expenses.length) {
+        pushCloud();
+      }
+      App.cloudStatus = 'ok';
+      onLoaded && onLoaded();
+    } catch (e) { App.cloudStatus = 'error'; console.warn('Espace de stockage indisponible', e); }
+  }
+
+  function replace(newState) { state = Object.assign(defaultState(), newState); save(); }
+  function reset() { state = defaultState(); save(); }
+
+  /* Montants d'une facture */
+  function invoiceTotals(inv) {
+    const byRate = {};
+    let ht = 0, tva = 0;
+    (inv.lines || []).forEach((l) => {
+      const lht = round2((Number(l.qty) || 0) * (Number(l.unitPrice) || 0) * (1 - (Number(l.discount) || 0) / 100));
+      const rate = Number(l.tvaRate) || 0;
+      const ltva = round2(lht * rate / 100);
+      ht += lht; tva += ltva;
+      byRate[rate] = byRate[rate] || { base: 0, tva: 0 };
+      byRate[rate].base = round2(byRate[rate].base + lht);
+      byRate[rate].tva = round2(byRate[rate].tva + ltva);
+    });
+    const sign = inv.type === 'avoir' ? -1 : 1;
+    return { ht: round2(ht) * sign, tva: round2(tva) * sign, ttc: round2(ht + tva) * sign, byRate, sign };
+  }
+
+  function nextNumber(type) {
+    const c = state.settings.company;
+    const prefix = type === 'devis' ? c.quotePrefix : type === 'avoir' ? c.creditPrefix : c.invoicePrefix;
+    const year = new Date().getFullYear();
+    const nums = state.invoices.filter((i) => i.type === type && (i.number || '').startsWith(`${prefix}${year}-`))
+      .map((i) => parseInt(i.number.split('-').pop(), 10) || 0);
+    return `${prefix}${year}-${String((Math.max(0, ...nums) + 1)).padStart(4, '0')}`;
+  }
+
+  /* Exercice comptable contenant une date */
+  function fiscalYear(year) {
+    const [mm, dd] = (state.settings.company.fiscalYearStart || '01-01').split('-');
+    const start = `${year}-${mm}-${dd}`;
+    const endDate = new Date(Number(year) + 1, Number(mm) - 1, Number(dd));
+    endDate.setDate(endDate.getDate() - 1);
+    const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+    return { start, end, label: mm === '01' && dd === '01' ? String(year) : `${start} → ${end}` };
+  }
+
+  /* Données de démonstration */
+  function loadDemo() {
+    const y = new Date().getFullYear();
+    const d = (m, day) => `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const s = defaultState();
+    s.settings.company = Object.assign(s.settings.company, {
+      name: 'Studio Lumière SARL', legalForm: 'SARL', siret: '123 456 789 00012', tvaNumber: 'FR12123456789',
+      address: '12 rue des Lilas\n75011 Paris', email: 'contact@studio-lumiere.fr', iban: 'FR76 3000 6000 0112 3456 7890 189', bic: 'AGRIFRPP',
+    });
+    s.settings.opening = { capital: 5000, reportANouveau: 0, emprunts: 10000, banque: 15000, comptesCourants: 0 };
+    const c1 = { id: uid(), name: 'Agence Horizon', email: 'compta@horizon.fr', address: '5 av. Foch, 69006 Lyon', siret: '', tvaNumber: 'FR55987654321' };
+    const c2 = { id: uid(), name: 'Boulangerie Martin', email: 'martin@gmail.com', address: '3 place du Marché, 33000 Bordeaux', siret: '', tvaNumber: '' };
+    const c3 = { id: uid(), name: 'TechNova SAS', email: 'ap@technova.io', address: '40 rue de Rivoli, 75004 Paris', siret: '', tvaNumber: 'FR33456789123' };
+    s.clients = [c1, c2, c3];
+    s.suppliers = [{ id: uid(), name: 'OVHcloud' }, { id: uid(), name: 'SNCF' }, { id: uid(), name: 'Apple Store' }];
+    const inv = (n, client, date, lines, status, paidDate) => ({
+      id: uid(), type: 'facture', number: `F${y}-${String(n).padStart(4, '0')}`, clientId: client.id, date,
+      dueDate: addDays(date, 30), lines, status, paidDate: paidDate || '', notes: '',
+    });
+    s.invoices = [
+      inv(1, c1, d(1, 15), [{ desc: 'Identité visuelle complète', qty: 1, unitPrice: 4500, tvaRate: 20 }], 'payee', d(2, 10)),
+      inv(2, c2, d(2, 20), [{ desc: 'Shooting photo produits', qty: 1, unitPrice: 800, tvaRate: 20 }, { desc: 'Retouches', qty: 10, unitPrice: 35, tvaRate: 20 }], 'payee', d(3, 5)),
+      inv(3, c3, d(3, 28), [{ desc: 'Refonte site web', qty: 1, unitPrice: 9800, tvaRate: 20 }], 'payee', d(5, 2)),
+      inv(4, c1, d(5, 30), [{ desc: 'Campagne réseaux sociaux', qty: 3, unitPrice: 1200, tvaRate: 20 }], 'payee', d(6, 28)),
+      inv(5, c3, d(7, 12), [{ desc: 'Maintenance annuelle', qty: 12, unitPrice: 250, tvaRate: 20 }], 'envoyee'),
+      inv(6, c2, d(9, 3), [{ desc: 'Brochure imprimée (conception)', qty: 1, unitPrice: 1450, tvaRate: 20 }], 'envoyee'),
+    ];
+    s.invoices.push({ id: uid(), type: 'devis', number: `D${y}-0001`, clientId: c3.id, date: d(10, 1), dueDate: d(10, 31), lines: [{ desc: 'Application mobile — phase 1', qty: 1, unitPrice: 18000, tvaRate: 20 }], status: 'envoyee', notes: '' });
+    const exp = (date, supplier, account, description, ht, rate, extra) => Object.assign({
+      id: uid(), date, supplier, account, description, ht, tvaRate: rate, tva: round2(ht * rate / 100), ttc: round2(ht * (1 + rate / 100)), paid: true, paymentMethod: 'virement', receipt: '',
+    }, extra || {});
+    s.expenses = [
+      exp(d(1, 5), 'Foncia', '613200', 'Loyer bureau janvier', 900, 20),
+      exp(d(2, 5), 'Foncia', '613200', 'Loyer bureau février', 900, 20),
+      exp(d(3, 5), 'Foncia', '613200', 'Loyer bureau mars', 900, 20),
+      exp(d(1, 10), 'Adobe', '651000', 'Creative Cloud annuel', 720, 20),
+      exp(d(2, 14), 'SNCF', '625100', 'Train Paris-Lyon client', 96, 10),
+      exp(d(3, 2), 'AXA', '616000', 'RC Pro annuelle', 480, 0),
+      exp(d(4, 18), 'Restaurant Le Zinc', '625700', 'Déjeuner client Horizon', 85, 10),
+      exp(d(5, 6), 'Bouygues Telecom', '626000', 'Box + mobile', 60, 20),
+      exp(d(6, 20), 'Cabinet Durand', '622600', 'Honoraires juridiques', 650, 20),
+      exp(d(8, 1), 'Google Ads', '623000', 'Publicité en ligne', 400, 20),
+    ];
+    s.assets = [{ id: uid(), label: 'MacBook Pro 16"', account: '218300', date: d(2, 1), value: 3200, tvaRate: 20, duration: 3, supplier: 'Apple Store' }];
+    s.bank = [
+      { id: uid(), date: d(10, 3), label: 'PRLV SEPA URSSAF', amount: -1250, matched: null },
+      { id: uid(), date: d(10, 8), label: 'VIR AGENCE HORIZON', amount: 950, matched: null },
+      { id: uid(), date: d(10, 12), label: 'CB AMAZON MKTP FR', amount: -64.9, matched: null },
+    ];
+    state = Object.assign(defaultState(), s);
+    save();
+  }
+
+  function addDays(date, n) {
+    const dt = new Date(date + 'T00:00:00');
+    dt.setDate(dt.getDate() + Number(n || 0));
+    return dt.toISOString().slice(0, 10);
+  }
+
+  Object.defineProperty(App, 'state', { get: () => state, configurable: true });
+  Object.assign(App, {
+    save, replace, reset, loadDemo, initCloud, uid, today, round2, eur, pct, fdate, esc, addDays,
+    invoiceTotals, nextNumber, fiscalYear, accountLabel,
+    EXPENSE_CATEGORIES, ASSET_CATEGORIES, TVA_RATES, ACCOUNT_LABELS,
+  });
+})(window.App);
+
+/* ComptaPro — moteur comptable : partie double, TVA, amortissements, états financiers, FEC */
+(function (App) {
+  const { round2 } = App;
+
+  /* Ajoute une ligne signée : montant > 0 = débit, < 0 = crédit */
+  function line(account, amount, label) {
+    const a = round2(amount);
+    if (!a) return null;
+    return { account, label: label || '', debit: a > 0 ? a : 0, credit: a < 0 ? -a : 0 };
+  }
+  function entry(id, date, journal, ref, label, lines, source) {
+    return { id, date, journal, ref, label, lines: lines.filter(Boolean), source };
+  }
+
+  const JOURNALS = { AN: 'À nouveaux', VE: 'Ventes', AC: 'Achats', BQ: 'Banque', OD: 'Opérations diverses' };
+
+  /* Amortissement linéaire prorata temporis (base 360 jours, usage fiscal français) */
+  function depreciationSchedule(asset) {
+    const rows = [];
+    const value = Number(asset.value) || 0;
+    const years = Math.max(1, Number(asset.duration) || 1);
+    const annual = value / years;
+    const start = new Date(asset.date + 'T00:00:00');
+    let startYear = start.getFullYear();
+    const fy0 = App.fiscalYear(startYear);
+    if (asset.date < fy0.start) startYear -= 1;
+    let remaining = value, cumul = 0, y = startYear;
+    while (remaining > 0.005 && rows.length < 60) {
+      const fy = App.fiscalYear(y);
+      let dot;
+      if (y === startYear) {
+        const end = new Date(fy.end + 'T00:00:00');
+        const days = days360(start, end) + 1;
+        dot = Math.min(remaining, annual * Math.min(days, 360) / 360);
+      } else {
+        dot = Math.min(remaining, annual);
+      }
+      dot = round2(dot);
+      if (remaining - dot < 0.01) dot = round2(remaining);
+      cumul = round2(cumul + dot); remaining = round2(value - cumul);
+      rows.push({ year: y, end: fy.end, dotation: dot, cumul, vnc: remaining });
+      y++;
+    }
+    return rows;
+  }
+  function days360(a, b) {
+    const d1 = Math.min(a.getDate(), 30), d2 = Math.min(b.getDate(), 30);
+    return (b.getFullYear() - a.getFullYear()) * 360 + (b.getMonth() - a.getMonth()) * 30 + (d2 - d1);
+  }
+
+  function amortAccount(account) { return '28' + account.slice(1); }
+
+  /* Génère l'ensemble du journal à partir des pièces */
+  function buildJournal() {
+    const s = App.state, out = [];
+    const today = App.today();
+
+    // À-nouveaux d'ouverture
+    const o = s.settings.opening || {};
+    const allDates = [...s.invoices.map((i) => i.date), ...s.expenses.map((e) => e.date), ...s.bank.map((b) => b.date), ...s.assets.map((a) => a.date)].filter(Boolean).sort();
+    const firstYear = allDates.length ? Number(allDates[0].slice(0, 4)) : new Date().getFullYear();
+    let fyFirst = App.fiscalYear(firstYear);
+    if (allDates.length && allDates[0] < fyFirst.start) fyFirst = App.fiscalYear(firstYear - 1);
+    const openTotal = (Number(o.capital) || 0) + (Number(o.reportANouveau) || 0) + (Number(o.emprunts) || 0) + (Number(o.comptesCourants) || 0);
+    const bankOpen = Number(o.banque) || 0;
+    if (openTotal || bankOpen) {
+      out.push(entry('AN', fyFirst.start, 'AN', 'AN', 'Bilan d\'ouverture', [
+        line('512000', bankOpen),
+        line('101000', -(Number(o.capital) || 0)),
+        line('110000', -(Number(o.reportANouveau) || 0)),
+        line('164000', -(Number(o.emprunts) || 0)),
+        line('455000', -(Number(o.comptesCourants) || 0)),
+        line('471000', openTotal - bankOpen, 'Écart d\'ouverture à justifier'),
+      ], { type: 'opening' }));
+    }
+
+    // Ventes
+    s.invoices.filter((i) => i.type !== 'devis' && i.status !== 'brouillon').forEach((inv) => {
+      const t = App.invoiceTotals(inv);
+      const client = s.clients.find((c) => c.id === inv.clientId);
+      const lbl = `${inv.number} ${client ? client.name : ''}`.trim();
+      const lines = [line('411000', t.ttc, lbl)];
+      Object.entries(t.byRate).forEach(([rate, v]) => {
+        lines.push(line(inv.revenueAccount || '706000', -v.base * t.sign, `${lbl} (HT ${rate} %)`));
+        lines.push(line('445710', -v.tva * t.sign, `${lbl} TVA ${rate} %`));
+      });
+      out.push(entry('VE-' + inv.id, inv.date, 'VE', inv.number, lbl, lines, { type: 'invoice', id: inv.id }));
+      if (inv.status === 'payee') {
+        out.push(entry('BQV-' + inv.id, inv.paidDate || inv.date, 'BQ', inv.number, 'Règlement ' + lbl, [
+          line('512000', t.ttc), line('411000', -t.ttc),
+        ], { type: 'invoice', id: inv.id }));
+      }
+    });
+
+    // Achats / dépenses
+    s.expenses.forEach((e) => {
+      const lbl = `${e.supplier || ''} ${e.description || ''}`.trim();
+      const ref = e.ref || ('DEP-' + e.id.slice(-5).toUpperCase());
+      out.push(entry('AC-' + e.id, e.date, 'AC', ref, lbl, [
+        line(e.account || '471000', Number(e.ht), lbl), line('445660', Number(e.tva), 'TVA ' + lbl), line('401000', -Number(e.ttc), lbl),
+      ], { type: 'expense', id: e.id }));
+      if (e.paid) {
+        const treso = e.paymentMethod === 'especes' ? '530000' : '512000';
+        out.push(entry('BQA-' + e.id, e.paidDate || e.date, 'BQ', ref, 'Paiement ' + lbl, [
+          line('401000', Number(e.ttc)), line(treso, -Number(e.ttc)),
+        ], { type: 'expense', id: e.id }));
+      }
+    });
+
+    // Immobilisations + dotations
+    s.assets.forEach((a) => {
+      const tva = round2((Number(a.value) || 0) * (Number(a.tvaRate) || 0) / 100);
+      const ttc = round2((Number(a.value) || 0) + tva);
+      out.push(entry('IM-' + a.id, a.date, 'AC', 'IMMO', 'Acquisition ' + a.label, [
+        line(a.account, Number(a.value)), line('445620', tva), line('404000', -ttc),
+      ], { type: 'asset', id: a.id }));
+      if (a.paid !== false) {
+        out.push(entry('BQI-' + a.id, a.date, 'BQ', 'IMMO', 'Paiement ' + a.label, [line('404000', ttc), line('512000', -ttc)], { type: 'asset', id: a.id }));
+      }
+      if (a.disposedDate) return;
+      depreciationSchedule(a).forEach((r) => {
+        if (r.year > new Date(today).getFullYear() + 0) return;
+        out.push(entry(`DOT-${a.id}-${r.year}`, r.end, 'OD', 'DOT' + r.year, `Dotation ${r.year} ${a.label}`, [
+          line('681100', r.dotation), line(amortAccount(a.account), -r.dotation),
+        ], { type: 'asset', id: a.id }));
+      });
+    });
+
+    // Banque : opérations catégorisées directement
+    s.bank.forEach((b) => {
+      const m = b.matched;
+      if (!m || m.type !== 'category') return;
+      const amount = Number(b.amount);
+      const rate = Number(m.tvaRate) || 0;
+      const ttc = Math.abs(amount), ht = round2(ttc / (1 + rate / 100)), tva = round2(ttc - ht);
+      const lines = amount < 0
+        ? [line(m.account, ht), line(m.account.startsWith('6') ? '445660' : '471000', tva), line('512000', -ttc)]
+        : [line('512000', ttc), line(m.account, -ht), line('445710', -tva)];
+      out.push(entry('BQC-' + b.id, b.date, 'BQ', 'REL', b.label, lines, { type: 'bank', id: b.id }));
+    });
+
+    // Déclarations de TVA validées
+    s.tvaDeclarations.forEach((d) => {
+      const lines = [line('445710', d.collected), line('445660', -d.deductibleAbs), line('445620', -d.deductibleImmo)];
+      if (d.creditPrevious) lines.push(line('445670', -d.creditPrevious));
+      if (d.net > 0) lines.push(line('445510', -d.net)); else if (d.net < 0) lines.push(line('445670', -d.net));
+      out.push(entry('TVA-' + d.id, d.end, 'OD', 'TVA', 'Liquidation TVA ' + d.label, lines, { type: 'tva', id: d.id }));
+      if (d.paid && d.net > 0) {
+        out.push(entry('BQT-' + d.id, d.paidDate || d.end, 'BQ', 'TVA', 'Paiement TVA ' + d.label, [line('445510', d.net), line('512000', -d.net)], { type: 'tva', id: d.id }));
+      }
+    });
+
+    // Impôt sur les sociétés enregistré à la clôture
+    s.closings.forEach((c) => {
+      if (Number(c.isAmount) > 0) {
+        out.push(entry('IS-' + c.year, App.fiscalYear(c.year).end, 'OD', 'IS' + c.year, 'Impôt sur les sociétés ' + c.year, [line('695000', c.isAmount), line('444000', -c.isAmount)], { type: 'closing' }));
+      }
+    });
+
+    // Écritures manuelles
+    s.entries.forEach((e) => out.push(Object.assign({ source: { type: 'manual', id: e.id } }, e, { lines: e.lines.map((l) => ({ account: l.account, label: l.label || '', debit: round2(l.debit), credit: round2(l.credit) })) })));
+
+    return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  }
+
+  /* Balance des comptes sur une plage */
+  function trialBalance(from, to, journal) {
+    const j = journal || buildJournal();
+    const acc = {};
+    j.forEach((e) => {
+      if ((from && e.date < from) || (to && e.date > to)) return;
+      e.lines.forEach((l) => {
+        acc[l.account] = acc[l.account] || { account: l.account, label: App.accountLabel(l.account), debit: 0, credit: 0 };
+        acc[l.account].debit = round2(acc[l.account].debit + l.debit);
+        acc[l.account].credit = round2(acc[l.account].credit + l.credit);
+      });
+    });
+    return Object.values(acc).map((a) => Object.assign(a, { solde: round2(a.debit - a.credit) })).sort((a, b) => a.account.localeCompare(b.account));
+  }
+
+  const sumPrefix = (bal, prefixes, sign) => round2(bal.filter((a) => prefixes.some((p) => a.account.startsWith(p))).reduce((s, a) => s + a.solde, 0) * (sign || 1));
+
+  /* Compte de résultat */
+  function incomeStatement(year, journal) {
+    const fy = App.fiscalYear(year);
+    const bal = trialBalance(fy.start, fy.end, journal);
+    const r = {
+      fy,
+      ventesMarchandises: sumPrefix(bal, ['707'], -1),
+      production: sumPrefix(bal, ['706', '708', '704', '705'], -1),
+      subventions: sumPrefix(bal, ['74'], -1),
+      autresProduits: sumPrefix(bal, ['75', '78', '79'], -1),
+      achatsMarchandises: sumPrefix(bal, ['607', '6037'], 1),
+      achatsMatieres: sumPrefix(bal, ['601', '602', '6031', '604', '605', '606', '608', '609'], 1),
+      chargesExternes: sumPrefix(bal, ['61', '62'], 1),
+      impotsTaxes: sumPrefix(bal, ['63'], 1),
+      salaires: sumPrefix(bal, ['641', '642', '643', '644'], 1),
+      chargesSociales: sumPrefix(bal, ['645', '646', '647', '648'], 1),
+      dotations: sumPrefix(bal, ['68'], 1),
+      autresCharges: sumPrefix(bal, ['65'], 1),
+      produitsFinanciers: sumPrefix(bal, ['76'], -1),
+      chargesFinancieres: sumPrefix(bal, ['66'], 1),
+      produitsExceptionnels: sumPrefix(bal, ['77'], -1),
+      chargesExceptionnelles: sumPrefix(bal, ['67'], 1),
+      is: sumPrefix(bal, ['69'], 1),
+      balance: bal,
+    };
+    r.chiffreAffaires = round2(r.ventesMarchandises + r.production);
+    r.produitsExploitation = round2(r.chiffreAffaires + r.subventions + r.autresProduits);
+    r.chargesExploitation = round2(r.achatsMarchandises + r.achatsMatieres + r.chargesExternes + r.impotsTaxes + r.salaires + r.chargesSociales + r.dotations + r.autresCharges);
+    r.resultatExploitation = round2(r.produitsExploitation - r.chargesExploitation);
+    r.resultatFinancier = round2(r.produitsFinanciers - r.chargesFinancieres);
+    r.resultatCourant = round2(r.resultatExploitation + r.resultatFinancier);
+    r.resultatExceptionnel = round2(r.produitsExceptionnels - r.chargesExceptionnelles);
+    r.resultatAvantImpot = round2(r.resultatCourant + r.resultatExceptionnel);
+    r.resultatNet = round2(r.resultatAvantImpot - r.is);
+    r.valeurAjoutee = round2(r.chiffreAffaires - r.achatsMarchandises - r.achatsMatieres - r.chargesExternes);
+    r.ebe = round2(r.valeurAjoutee + r.subventions - r.impotsTaxes - r.salaires - r.chargesSociales);
+    return r;
+  }
+
+  /* Bilan à la clôture de l'exercice */
+  function balanceSheet(year, journal) {
+    const j = journal || buildJournal();
+    const fy = App.fiscalYear(year);
+    const bal = trialBalance(null, fy.end, j);
+    const before = trialBalance(null, App.addDays(fy.start, -1), j);
+    const resultPrior = -sumPrefix(before, ['6', '7'], 1);
+    const is = incomeStatement(year, j);
+    const pos = (prefixes) => round2(bal.filter((a) => prefixes.some((p) => a.account.startsWith(p)) && a.solde > 0).reduce((s, a) => s + a.solde, 0));
+    const neg = (prefixes) => round2(-bal.filter((a) => prefixes.some((p) => a.account.startsWith(p)) && a.solde < 0).reduce((s, a) => s + a.solde, 0));
+
+    const immoIncorp = sumPrefix(bal, ['20'], 1), immoCorp = sumPrefix(bal, ['21', '22', '23'], 1), immoFin = sumPrefix(bal, ['26', '27'], 1);
+    const amortIncorp = sumPrefix(bal, ['280'], -1), amortCorp = sumPrefix(bal, ['281', '282'], -1);
+    const actif = {
+      immoIncorp: { brut: immoIncorp, amort: amortIncorp, net: round2(immoIncorp - amortIncorp) },
+      immoCorp: { brut: immoCorp, amort: amortCorp, net: round2(immoCorp - amortCorp) },
+      immoFin: { brut: immoFin, amort: 0, net: immoFin },
+      stocks: pos(['3']),
+      clients: pos(['411', '416', '418']),
+      autresCreances: round2(pos(['40', '44', '45', '46', '47', '42', '43'])),
+      disponibilites: pos(['51', '53']),
+      chargesConstatees: pos(['486']),
+    };
+    actif.totalImmo = round2(actif.immoIncorp.net + actif.immoCorp.net + actif.immoFin.net);
+    actif.totalCirculant = round2(actif.stocks + actif.clients + actif.autresCreances + actif.disponibilites + actif.chargesConstatees);
+    actif.total = round2(actif.totalImmo + actif.totalCirculant);
+
+    const passif = {
+      capital: round2(sumPrefix(bal, ['101', '108'], -1)),
+      reserves: round2(sumPrefix(bal, ['106'], -1)),
+      reportANouveau: round2(sumPrefix(bal, ['110', '119', '120', '129'], -1) + resultPrior),
+      resultat: is.resultatNet,
+      provisions: round2(sumPrefix(bal, ['15'], -1)),
+      emprunts: round2(neg(['16']) + neg(['51'])),
+      fournisseurs: neg(['401', '403', '404', '408']),
+      dettesFiscales: neg(['42', '43', '44']),
+      autresDettes: round2(neg(['45', '46', '47', '419'])),
+      produitsConstates: neg(['487']),
+    };
+    passif.capitauxPropres = round2(passif.capital + passif.reserves + passif.reportANouveau + passif.resultat);
+    passif.dettes = round2(passif.emprunts + passif.fournisseurs + passif.dettesFiscales + passif.autresDettes + passif.produitsConstates);
+    passif.total = round2(passif.capitauxPropres + passif.provisions + passif.dettes);
+    return { fy, actif, passif, equilibre: Math.abs(actif.total - passif.total) < 0.05, ecart: round2(actif.total - passif.total) };
+  }
+
+  /* Périodes de TVA d'une année */
+  function tvaPeriods(year) {
+    const p = App.state.settings.company.tvaPeriod;
+    const out = [];
+    const mk = (m1, m2, label) => {
+      const end = new Date(year, m2, 0);
+      out.push({ start: `${year}-${String(m1).padStart(2, '0')}-01`, end: `${year}-${String(m2).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`, label });
+    };
+    const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    if (p === 'mensuelle') for (let m = 1; m <= 12; m++) mk(m, m, `${months[m - 1]} ${year}`);
+    else if (p === 'trimestrielle') for (let q = 0; q < 4; q++) mk(q * 3 + 1, q * 3 + 3, `T${q + 1} ${year}`);
+    else mk(1, 12, `Année ${year} (CA12)`);
+    return out;
+  }
+
+  /* Calcul d'une déclaration de TVA type CA3 */
+  function computeTva(start, end) {
+    const s = App.state;
+    const exig = s.settings.company.exigibilite;
+    const rates = {};
+    const addRate = (rate, base, tva) => {
+      rates[rate] = rates[rate] || { base: 0, tva: 0 };
+      rates[rate].base = round2(rates[rate].base + base);
+      rates[rate].tva = round2(rates[rate].tva + tva);
+    };
+    const inP = (d) => d && d >= start && d <= end;
+    const docs = { invoices: [], expenses: [], assets: [], bank: [] };
+
+    s.invoices.filter((i) => i.type !== 'devis' && i.status !== 'brouillon').forEach((inv) => {
+      const d = exig === 'encaissements' ? (inv.status === 'payee' ? inv.paidDate : null) : inv.date;
+      if (!inP(d)) return;
+      const t = App.invoiceTotals(inv);
+      Object.entries(t.byRate).forEach(([r, v]) => addRate(r, v.base * t.sign, v.tva * t.sign));
+      docs.invoices.push(inv);
+    });
+    let dedAbs = 0, dedImmo = 0;
+    s.expenses.forEach((e) => { if (inP(e.date)) { dedAbs += Number(e.tva) || 0; docs.expenses.push(e); } });
+    s.assets.forEach((a) => { if (inP(a.date)) { dedImmo += round2((Number(a.value) || 0) * (Number(a.tvaRate) || 0) / 100); docs.assets.push(a); } });
+    s.bank.forEach((b) => {
+      if (!inP(b.date) || !b.matched || b.matched.type !== 'category') return;
+      const rate = Number(b.matched.tvaRate) || 0; if (!rate) return;
+      const ttc = Math.abs(b.amount), ht = round2(ttc / (1 + rate / 100)), tva = round2(ttc - ht);
+      if (b.amount > 0) addRate(rate, ht, tva); else if (b.matched.account.startsWith('6')) dedAbs += tva;
+      docs.bank.push(b);
+    });
+    const collected = round2(Object.values(rates).reduce((x, r) => x + r.tva, 0));
+    const baseTotal = round2(Object.values(rates).reduce((x, r) => x + r.base, 0));
+
+    // crédit reporté de la déclaration précédente
+    const prev = s.tvaDeclarations.filter((d) => d.end < start).sort((a, b) => (a.end < b.end ? 1 : -1))[0];
+    const creditPrevious = prev && prev.net < 0 ? round2(-prev.net) : 0;
+    dedAbs = round2(dedAbs); dedImmo = round2(dedImmo);
+    const totalDed = round2(dedAbs + dedImmo + creditPrevious);
+    const net = round2(collected - totalDed);
+    return {
+      start, end, rates, baseTotal, collected, deductibleAbs: dedAbs, deductibleImmo: dedImmo, creditPrevious, totalDed, net, docs,
+      ca3: {
+        '01 — Ventes, prestations de services': baseTotal,
+        '08 — Base taux normal 20 %': rates[20]?.base || 0,
+        '9B — Base taux intermédiaire 10 %': rates[10]?.base || 0,
+        '09 — Base taux réduit 5,5 %': rates[5.5]?.base || 0,
+        '10 — Base taux particulier 2,1 %': rates[2.1]?.base || 0,
+        '16 — Total TVA brute due': collected,
+        '19 — TVA déductible sur immobilisations': dedImmo,
+        '20 — TVA déductible sur autres biens et services': dedAbs,
+        '22 — Report du crédit apparaissant ligne 27 précédente': creditPrevious,
+        '23 — Total TVA déductible': totalDed,
+        '25 — Crédit de TVA': net < 0 ? -net : 0,
+        '28 — TVA nette due': net > 0 ? net : 0,
+      },
+    };
+  }
+
+  /* Estimation de l'impôt sur les sociétés (taux réduit PME 15 % jusqu'à 42 500 €) */
+  function estimateIS(resultatFiscal) {
+    const r = Math.max(0, Number(resultatFiscal) || 0);
+    const low = Math.min(r, 42500), high = Math.max(0, r - 42500);
+    return round2(low * 0.15 + high * 0.25);
+  }
+
+  /* Export FEC (art. A47 A-1 du LPF) */
+  function exportFEC(year) {
+    const fy = App.fiscalYear(year);
+    const j = buildJournal().filter((e) => e.date >= fy.start && e.date <= fy.end);
+    const head = ['JournalCode', 'JournalLib', 'EcritureNum', 'EcritureDate', 'CompteNum', 'CompteLib', 'CompAuxNum', 'CompAuxLib', 'PieceRef', 'PieceDate', 'EcritureLib', 'Debit', 'Credit', 'EcritureLet', 'DateLet', 'ValidDate', 'Montantdevise', 'Idevise'];
+    const d8 = (d) => d.replace(/-/g, '');
+    const num = (n) => (Number(n) || 0).toFixed(2).replace('.', ',');
+    const clean = (s) => String(s || '').replace(/[\t\r\n|]/g, ' ');
+    const rows = [head.join('\t')];
+    j.forEach((e, i) => {
+      e.lines.forEach((l) => {
+        rows.push([e.journal, JOURNALS[e.journal] || e.journal, String(i + 1).padStart(6, '0'), d8(e.date), l.account, clean(App.accountLabel(l.account)), '', '', clean(e.ref), d8(e.date), clean(l.label || e.label), num(l.debit), num(l.credit), '', '', d8(e.date), '', ''].join('\t'));
+      });
+    });
+    const siren = (App.state.settings.company.siret || '000000000').replace(/\s/g, '').slice(0, 9) || '000000000';
+    return { filename: `${siren}FEC${d8(fy.end)}.txt`, content: rows.join('\r\n') };
+  }
+
+  /* Indicateurs du tableau de bord */
+  function dashboard(year) {
+    const j = buildJournal();
+    const is = incomeStatement(year, j);
+    const fy = is.fy;
+    const bal = trialBalance(null, App.today(), j);
+    const treso = sumPrefix(bal, ['512', '530'], 1);
+    const s = App.state;
+    const unpaid = s.invoices.filter((i) => i.type === 'facture' && i.status === 'envoyee');
+    const overdue = unpaid.filter((i) => i.dueDate && i.dueDate < App.today());
+    const monthly = Array.from({ length: 12 }, (_, k) => {
+      const d = new Date(fy.start + 'T00:00:00'); d.setMonth(d.getMonth() + k);
+      const key = d.toISOString().slice(0, 7);
+      return { key, label: d.toLocaleDateString('fr-FR', { month: 'short' }), produits: 0, charges: 0 };
+    });
+    j.forEach((e) => {
+      if (e.date < fy.start || e.date > fy.end) return;
+      const m = monthly.find((x) => x.key === e.date.slice(0, 7)); if (!m) return;
+      e.lines.forEach((l) => {
+        if (l.account.startsWith('7')) m.produits = round2(m.produits + l.credit - l.debit);
+        if (l.account.startsWith('6') && !l.account.startsWith('695')) m.charges = round2(m.charges + l.debit - l.credit);
+      });
+    });
+    const byCategory = {};
+    is.balance.filter((a) => a.account.startsWith('6')).forEach((a) => (byCategory[a.label] = round2((byCategory[a.label] || 0) + a.solde)));
+    const now = App.today();
+    const currentPeriod = tvaPeriods(Number(now.slice(0, 4))).find((p) => now >= p.start && now <= p.end);
+    const tvaCurrent = currentPeriod ? computeTva(currentPeriod.start, currentPeriod.end) : null;
+    return {
+      is, treso, unpaid, overdue, monthly, byCategory, currentPeriod, tvaCurrent,
+      unpaidTotal: round2(unpaid.reduce((x, i) => x + App.invoiceTotals(i).ttc, 0)),
+      overdueTotal: round2(overdue.reduce((x, i) => x + App.invoiceTotals(i).ttc, 0)),
+      bankToReconcile: s.bank.filter((b) => !b.matched).length,
+    };
+  }
+
+  /* Contexte comptable résumé pour l'IA */
+  function aiContext() {
+    const s = App.state;
+    const year = new Date().getFullYear();
+    const db = dashboard(year);
+    const bs = balanceSheet(year);
+    return {
+      date_du_jour: App.today(),
+      entreprise: { nom: s.settings.company.name, forme: s.settings.company.legalForm, regime_tva: s.settings.company.regimeTva, periodicite_tva: s.settings.company.tvaPeriod, exigibilite: s.settings.company.exigibilite, impot: s.settings.company.impot },
+      exercice: db.is.fy,
+      compte_de_resultat: Object.fromEntries(Object.entries(db.is).filter(([k, v]) => typeof v === 'number')),
+      bilan: { actif: bs.actif, passif: bs.passif, equilibre: bs.equilibre },
+      tresorerie: db.treso,
+      factures_impayees: db.unpaid.map((i) => ({ numero: i.number, client: (s.clients.find((c) => c.id === i.clientId) || {}).name, ttc: App.invoiceTotals(i).ttc, echeance: i.dueDate })),
+      tva_periode_en_cours: db.tvaCurrent ? { periode: db.currentPeriod.label, collectee: db.tvaCurrent.collected, deductible: db.tvaCurrent.totalDed, nette: db.tvaCurrent.net } : null,
+      charges_par_categorie: db.byCategory,
+      ca_mensuel: db.monthly,
+      operations_bancaires_a_rapprocher: s.bank.filter((b) => !b.matched).map((b) => ({ date: b.date, libelle: b.label, montant: b.amount })),
+      nb_depenses: s.expenses.length, nb_factures: s.invoices.length,
+      dernieres_depenses: s.expenses.slice(-30).map((e) => ({ date: e.date, fournisseur: e.supplier, compte: e.account, ht: e.ht, tva: e.tva })),
+      immobilisations: s.assets.map((a) => ({ libelle: a.label, valeur: a.value, date: a.date, duree: a.duration })),
+    };
+  }
+
+  Object.assign(App, {
+    JOURNALS, buildJournal, trialBalance, incomeStatement, balanceSheet, tvaPeriods, computeTva,
+    depreciationSchedule, estimateIS, exportFEC, dashboard, aiContext, amortAccount,
+  });
+})(window.App);
+
+/* ComptaPro — composants d'interface */
+(function (App) {
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+  function toast(msg, type) {
+    const el = document.createElement('div');
+    el.className = 'toast ' + (type || '');
+    el.textContent = msg;
+    $('#toasts').appendChild(el);
+    setTimeout(() => el.remove(), type === 'error' ? 6000 : 3200);
+  }
+
+  function modal({ title, body, footer, wide, onMount }) {
+    const root = $('#modal-root');
+    const wrap = document.createElement('div');
+    wrap.className = 'modal-backdrop';
+    wrap.innerHTML = `<div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true">
+      <div class="modal-head"><h2>${title}</h2><button class="btn ghost sm" data-close aria-label="Fermer">✕</button></div>
+      <div class="modal-body">${body}</div>
+      ${footer ? `<div class="modal-foot">${footer}</div>` : ''}
+    </div>`;
+    const close = () => { wrap.remove(); document.body.classList.remove('printing-modal'); };
+    wrap.addEventListener('mousedown', (e) => { if (e.target === wrap) close(); });
+    $$('[data-close]', wrap).forEach((b) => b.addEventListener('click', close));
+    root.appendChild(wrap);
+    if (onMount) onMount(wrap, close);
+    const first = $('input, select, textarea', wrap); if (first) first.focus();
+    return { el: wrap, close };
+  }
+
+  function confirmBox(message, onYes, label) {
+    modal({
+      title: 'Confirmation', body: `<p>${message}</p>`,
+      footer: `<button class="btn" data-close>Annuler</button><button class="btn primary" id="cf-yes">${label || 'Confirmer'}</button>`,
+      onMount: (el, close) => $('#cf-yes', el).addEventListener('click', () => { close(); onYes(); }),
+    });
+  }
+
+  function formData(form) {
+    const o = {};
+    $$('input, select, textarea', form).forEach((el) => {
+      if (!el.name) return;
+      if (el.type === 'checkbox') o[el.name] = el.checked;
+      else if (el.type === 'number') o[el.name] = el.value === '' ? 0 : Number(el.value);
+      else if (el.type !== 'file') o[el.name] = el.value;
+    });
+    return o;
+  }
+
+  async function download(filename, content, mime) {
+    if (App.isArtifact) {
+      const dl = await window.claude.use('downloads').catch(() => null);
+      if (!dl) return toast('Le téléchargement n\'est pas disponible ici.', 'error');
+      try { await dl.save({ filename, data: content }); toast('Fichier enregistré', 'success'); }
+      catch (e) { if (e && e.code !== 'declined') toast('Téléchargement impossible (' + (e.code || e.message) + ')', 'error'); }
+      return;
+    }
+    const blob = content instanceof Blob ? content : new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  function toCSV(rows) {
+    return '﻿' + rows.map((r) => r.map((c) => {
+      const v = typeof c === 'number' ? String(c).replace('.', ',') : String(c ?? '');
+      return /[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+    }).join(';')).join('\r\n');
+  }
+
+  /* Analyse CSV tolérante (séparateur ; , ou tabulation) */
+  function parseCSV(text) {
+    const first = text.split(/\r?\n/)[0] || '';
+    const sep = [';', '\t', ','].sort((a, b) => first.split(b).length - first.split(a).length)[0];
+    const rows = []; let row = [], cur = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) { if (ch === '"' && text[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === sep) { row.push(cur); cur = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
+      else cur += ch;
+    }
+    if (cur || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter((r) => r.some((c) => c.trim()));
+  }
+  const parseAmount = (s) => {
+    let v = String(s || '').replace(/[\s€ ]/g, '');
+    if (/,\d{1,2}$/.test(v)) v = v.replace(/\./g, '').replace(',', '.');
+    else v = v.replace(/,/g, '');
+    return Number(v) || 0;
+  };
+  const parseDate = (s) => {
+    s = String(s || '').trim();
+    let m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/);
+    if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; }
+    m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? m[0] : '';
+  };
+
+  /* Graphique en barres SVG (produits / charges) */
+  function barChart(data) {
+    const W = 720, H = 220, P = { l: 52, r: 8, t: 10, b: 26 };
+    const max = Math.max(1, ...data.flatMap((d) => [d.produits, d.charges]));
+    const step = (W - P.l - P.r) / data.length, bw = Math.min(16, step / 3);
+    const y = (v) => P.t + (H - P.t - P.b) * (1 - Math.max(0, v) / max);
+    const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => max * t);
+    const k = (v) => (v >= 1000 ? Math.round(v / 100) / 10 + ' k' : Math.round(v));
+    let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Produits et charges par mois">`;
+    ticks.forEach((t) => { svg += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--border)"/><text x="${P.l - 6}" y="${y(t) + 4}" text-anchor="end" font-size="10" fill="var(--muted)">${k(t)}</text>`; });
+    data.forEach((d, i) => {
+      const x = P.l + i * step + step / 2;
+      svg += `<rect x="${x - bw - 1}" y="${y(d.produits)}" width="${bw}" height="${H - P.b - y(d.produits)}" rx="2" fill="var(--primary)"><title>${d.label} — produits ${App.eur(d.produits)}</title></rect>`;
+      svg += `<rect x="${x + 1}" y="${y(d.charges)}" width="${bw}" height="${H - P.b - y(d.charges)}" rx="2" fill="var(--warning)"><title>${d.label} — charges ${App.eur(d.charges)}</title></rect>`;
+      svg += `<text x="${x}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--muted)">${d.label}</text>`;
+    });
+    return svg + '</svg>';
+  }
+
+  const statusBadge = (st) => ({
+    brouillon: '<span class="badge">Brouillon</span>', envoyee: '<span class="badge primary">Envoyée</span>',
+    payee: '<span class="badge success">Payée</span>', retard: '<span class="badge danger">En retard</span>',
+    accepte: '<span class="badge success">Accepté</span>', refuse: '<span class="badge danger">Refusé</span>', annulee: '<span class="badge">Annulée</span>',
+  }[st] || `<span class="badge">${App.esc(st)}</span>`);
+
+  const options = (list, selected) => list.map((o) => {
+    const [v, l] = Array.isArray(o) ? o : [o.value ?? o.account ?? o, o.label ?? o];
+    return `<option value="${App.esc(v)}" ${String(v) === String(selected) ? 'selected' : ''}>${App.esc(l)}</option>`;
+  }).join('');
+  const tvaOptions = (sel) => options(App.TVA_RATES.map((r) => [r, r + ' %']), sel);
+  const yearOptions = (sel) => {
+    const now = new Date().getFullYear();
+    const years = new Set([now + 1, now, now - 1, now - 2, now - 3]);
+    App.state.invoices.concat(App.state.expenses).forEach((x) => x.date && years.add(Number(x.date.slice(0, 4))));
+    return options([...years].sort((a, b) => b - a).map((y) => [y, 'Exercice ' + App.fiscalYear(y).label]), sel);
+  };
+
+  /* Compresse une image pour le stockage local */
+  function compressImage(file, maxW) {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) return resolve('');
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, (maxW || 1000) / img.width);
+        const c = document.createElement('canvas');
+        c.width = img.width * scale; c.height = img.height * scale;
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', 0.6));
+      };
+      img.onerror = () => resolve('');
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  App.isArtifact = !!(window.claude && window.claude.use);
+  Object.assign(App, { $, $$, toast, modal, confirmBox, formData, download, toCSV, parseCSV, parseAmount, parseDate, barChart, statusBadge, options, tvaOptions, yearOptions, compressImage });
+})(window.App);
+
+/* ComptaPro — Assistant IA (Claude) : questions, scan de justificatifs, tri bancaire, analyse */
+(function (App) {
+  const SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.4.0/+esm';
+  let sdkPromise = null;
+  let sampleFn = null; // Claude intégré (quand l'app tourne sur claude.ai)
+
+  async function init() {
+    if (window.claude && window.claude.use) {
+      sampleFn = await window.claude.use('sample').catch(() => null);
+    }
+    api.builtin = !!sampleFn;
+    api.ready = !!sampleFn || !!App.state.settings.ai.apiKey;
+  }
+  const isReady = () => !!sampleFn || !!App.state.settings.ai.apiKey;
+  const sampleErr = (e) => new Error(e && e.code === 'not_granted' ? 'Accès à Claude refusé pour cette page.' : e && e.code === 'rate_limited' ? 'Trop de demandes : réessayez dans un moment.' : (e && e.message) || 'Erreur de l\'assistant IA');
+
+  async function client() {
+    const key = App.state.settings.ai.apiKey;
+    if (!key) throw new Error('Ajoutez votre clé API Claude dans Paramètres → Assistant IA.');
+    sdkPromise = sdkPromise || import(SDK_URL);
+    const { default: Anthropic } = await sdkPromise;
+    // Clé stockée uniquement dans ce navigateur ; appel direct à l'API depuis le poste de l'utilisateur.
+    return new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
+  }
+
+  const SYSTEM = `Tu es l'expert-comptable intégré à ComptaPro, une application de comptabilité française.
+Tu maîtrises le Plan comptable général (PCG), la TVA française (CA3, CA12, exigibilité, autoliquidation, franchise en base), les régimes fiscaux (micro, réel simplifié, réel normal, IS, IR), les amortissements, la clôture annuelle, la liasse fiscale (2033 / 2050), le FEC, les cotisations sociales des dirigeants et les obligations déclaratives.
+Réponds en français, de façon claire, concrète et chiffrée à partir des données de l'entreprise fournies. Cite les comptes PCG utiles et les échéances.
+Quand une donnée manque, dis-le et explique comment la saisir dans l'application. Signale quand une situation mérite la validation d'un expert-comptable.
+Utilise du Markdown simple (titres ####, listes, tableaux, gras).`;
+
+  function base(extra) {
+    const ai = App.state.settings.ai;
+    return Object.assign({
+      model: ai.model || 'claude-opus-5-5',
+      max_tokens: 16000,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: ai.effort || 'medium' },
+      // Repli automatique sur un autre modèle si une demande est refusée par les filtres de sécurité
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+    }, extra);
+  }
+
+  function textOf(msg) {
+    if (msg.stop_reason === 'refusal') throw new Error('La demande a été refusée par le modèle.');
+    return msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+  }
+
+  function contextBlock() {
+    return `Données comptables actuelles de l'entreprise (JSON) :\n${JSON.stringify(App.aiContext())}`;
+  }
+
+  /* Conversation en streaming */
+  async function chat(history, onText) {
+    if (sampleFn) {
+      const msgs = history.map((m) => ({ role: m.role, content: m.content }));
+      msgs[msgs.length - 1] = { role: 'user', content: `${SYSTEM}\n\n${contextBlock()}\n\nQuestion : ${msgs[msgs.length - 1].content}` };
+      try { const r = await sampleFn(msgs, { cache: false, modelTier: 'complex', onText: ({ text }) => onText && onText(text) }); return r.text; }
+      catch (e) { throw sampleErr(e); }
+    }
+    const c = await client();
+    const messages = history.map((m) => ({ role: m.role, content: m.content }));
+    messages[messages.length - 1] = { role: 'user', content: `${contextBlock()}\n\nQuestion : ${messages[messages.length - 1].content}` };
+    const stream = c.beta.messages.stream(base({ system: SYSTEM, messages, max_tokens: 32000 }));
+    let acc = '';
+    stream.on('text', (t) => { acc += t; onText && onText(acc); });
+    const final = await stream.finalMessage();
+    return textOf(final) || acc;
+  }
+
+  async function structured(content, schema, system, images) {
+    if (sampleFn) {
+      const text = (Array.isArray(content) ? content.filter((b) => b.type === 'text').map((b) => b.text).join('\n') : content);
+      const prompt = `${system || SYSTEM}\n\n${text}\n\nRéponds uniquement avec un objet JSON valide conforme à ce schéma JSON (tous les champs requis) :\n${JSON.stringify(schema)}`;
+      try { return await sampleFn.json(prompt, Object.assign({ modelTier: 'default' }, images ? { images } : {})); }
+      catch (e) { throw sampleErr(e); }
+    }
+    const c = await client();
+    const stream = c.beta.messages.stream(base({
+      system: system || SYSTEM,
+      messages: [{ role: 'user', content }],
+      output_config: { effort: App.state.settings.ai.effort || 'medium', format: { type: 'json_schema', schema } },
+    }));
+    const msg = await stream.finalMessage();
+    const txt = textOf(msg);
+    try { return JSON.parse(txt); }
+    catch (e) { const m = txt.match(/\{[\s\S]*\}/); if (m) return JSON.parse(m[0]); throw new Error('Réponse IA illisible.'); }
+  }
+
+  const fileToBase64 = (file) => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
+  const DOC_SCHEMA = {
+    type: 'object', additionalProperties: false,
+    required: ['document_type', 'supplier', 'customer', 'date', 'number', 'description', 'total_ht', 'total_tva', 'total_ttc', 'tva_rate', 'account', 'is_asset', 'asset_account', 'asset_duration_years', 'payment_method', 'confidence', 'remarks'],
+    properties: {
+      document_type: { type: 'string', enum: ['facture_achat', 'ticket_caisse', 'facture_vente', 'note_de_frais', 'releve_bancaire', 'autre'] },
+      supplier: { type: 'string' }, customer: { type: 'string' },
+      date: { type: 'string', description: 'AAAA-MM-JJ' }, number: { type: 'string' },
+      description: { type: 'string' },
+      total_ht: { type: 'number' }, total_tva: { type: 'number' }, total_ttc: { type: 'number' },
+      tva_rate: { type: 'number', description: 'Taux principal : 20, 10, 5.5, 2.1 ou 0' },
+      account: { type: 'string', description: 'Compte de charge PCG à 6 chiffres' },
+      is_asset: { type: 'boolean', description: 'Vrai si immobilisation (bien durable > 500 € HT)' },
+      asset_account: { type: 'string' }, asset_duration_years: { type: 'number' },
+      payment_method: { type: 'string', enum: ['carte', 'virement', 'especes', 'prelevement', 'cheque', 'inconnu'] },
+      confidence: { type: 'number', description: '0 à 1' },
+      remarks: { type: 'string', description: 'Points d\'attention : TVA non récupérable, mentions manquantes, etc.' },
+    },
+  };
+
+  /* Scan d'un justificatif (image ou PDF) */
+  async function scanDocument(file) {
+    if (sampleFn && file.type === 'application/pdf') throw new Error('Ici, l\'IA lit les photos et images (JPG, PNG) : prenez une capture ou une photo du PDF.');
+    const data = sampleFn ? '' : await fileToBase64(file);
+    const isPdf = file.type === 'application/pdf';
+    const media = isPdf ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } }
+      : { type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data } };
+    const cats = App.EXPENSE_CATEGORIES.map((c) => `${c.account} ${c.label}`).join('\n');
+    const assets = App.ASSET_CATEGORIES.map((c) => `${c.account} ${c.label} (${c.duration} ans)`).join('\n');
+    return structured([media, { type: 'text', text: `Analyse ce justificatif et extrais les données comptables. Entreprise : ${App.state.settings.company.name}.
+Comptes de charges disponibles :\n${cats}\nComptes d'immobilisations :\n${assets}
+Si un montant est absent, calcule-le à partir des autres. Si la TVA n'est pas récupérable (ex. carburant essence, cadeaux > 73 €), mets total_tva à 0 et explique dans remarks. Laisse asset_account vide et asset_duration_years à 0 si ce n'est pas une immobilisation.` }], DOC_SCHEMA, null, sampleFn ? [file] : null);
+  }
+
+  /* Tri automatique des opérations bancaires */
+  async function categorizeBank(lines) {
+    const s = App.state;
+    const openInvoices = s.invoices.filter((i) => i.type === 'facture' && i.status === 'envoyee').map((i) => ({ id: i.id, numero: i.number, client: (s.clients.find((c) => c.id === i.clientId) || {}).name, ttc: App.invoiceTotals(i).ttc }));
+    const unpaidExpenses = s.expenses.filter((e) => !e.paid).map((e) => ({ id: e.id, fournisseur: e.supplier, ttc: e.ttc, date: e.date }));
+    const accounts = [...App.EXPENSE_CATEGORIES, { account: '706000', label: 'Prestations de services' }, { account: '707000', label: 'Ventes de marchandises' }, { account: '758000', label: 'Produits divers' }, { account: '108000', label: 'Apport / prélèvement de l\'exploitant' }, { account: '455000', label: 'Compte courant d\'associé' }, { account: '164000', label: 'Emprunt (capital remboursé)' }, { account: '445510', label: 'Paiement de TVA' }, { account: '444000', label: 'Paiement impôt sur les sociétés' }, { account: '471000', label: 'Compte d\'attente' }];
+    const schema = {
+      type: 'object', additionalProperties: false, required: ['results'],
+      properties: { results: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'match_type', 'match_id', 'account', 'tva_rate', 'confidence', 'reason'], properties: {
+        id: { type: 'string' }, match_type: { type: 'string', enum: ['invoice', 'expense', 'category'] }, match_id: { type: 'string' },
+        account: { type: 'string' }, tva_rate: { type: 'number' }, confidence: { type: 'number' }, reason: { type: 'string' },
+      } } } },
+    };
+    return structured(`Classe chaque opération bancaire. Si un encaissement correspond à une facture client ouverte (montant et nom), utilise match_type "invoice" avec son id. Si un débit correspond à une dépense non payée, "expense". Sinon "category" avec le compte PCG le plus adapté et le taux de TVA probable (0 pour URSSAF, impôts, banque, assurance, salaires, emprunts).
+Opérations : ${JSON.stringify(lines.map((b) => ({ id: b.id, date: b.date, libelle: b.label, montant: b.amount })))}
+Factures clients ouvertes : ${JSON.stringify(openInvoices)}
+Dépenses non payées : ${JSON.stringify(unpaidExpenses)}
+Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | ')}`, schema);
+  }
+
+  /* Analyse financière complète */
+  const ANALYSIS = `Rédige une analyse financière complète de l'entreprise : 1) synthèse en 3 phrases, 2) rentabilité et marges, 3) structure des charges et pistes d'économies, 4) trésorerie et BFR (délais clients), 5) TVA et échéances fiscales à venir, 6) anomalies ou incohérences détectées dans la saisie, 7) optimisations fiscales légales à étudier, 8) prévisions pour la fin d'exercice. Sois concret et chiffré.`;
+  async function analyze(onText) {
+    if (sampleFn) {
+      try { const r = await sampleFn(`${SYSTEM}\n\n${contextBlock()}\n\n${ANALYSIS}`, { cache: false, modelTier: 'complex', onText: ({ text }) => onText && onText(text) }); return r.text; }
+      catch (e) { throw sampleErr(e); }
+    }
+    const c = await client();
+    const stream = c.beta.messages.stream(base({
+      system: SYSTEM, max_tokens: 32000,
+      messages: [{ role: 'user', content: `${contextBlock()}\n\nRédige une analyse financière complète de l'entreprise : 1) synthèse en 3 phrases, 2) rentabilité et marges, 3) structure des charges et pistes d'économies, 4) trésorerie et BFR (délais clients), 5) TVA et échéances fiscales à venir, 6) anomalies ou incohérences détectées dans la saisie, 7) optimisations fiscales légales à étudier, 8) prévisions pour la fin d'exercice. Sois concret et chiffré.` }],
+    }));
+    let acc = '';
+    stream.on('text', (t) => { acc += t; onText && onText(acc); });
+    return textOf(await stream.finalMessage()) || acc;
+  }
+
+  /* Rendu Markdown minimal et sûr */
+  function md(src) {
+    const esc = App.esc;
+    const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
+    const lines = String(src || '').split('\n');
+    let html = '', list = null, i = 0;
+    const closeList = () => { if (list) { html += `</${list}>`; list = null; } };
+    while (i < lines.length) {
+      const l = lines[i];
+      if (/^\s*\|.*\|\s*$/.test(l) && i + 1 < lines.length && /^\s*\|?[\s:-]+\|/.test(lines[i + 1])) {
+        closeList();
+        const cells = (r) => r.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+        html += '<div class="table-wrap"><table><thead><tr>' + cells(l).map((c) => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>';
+        i += 2;
+        while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { html += '<tr>' + cells(lines[i]).map((c) => `<td>${inline(c)}</td>`).join('') + '</tr>'; i++; }
+        html += '</tbody></table></div>';
+        continue;
+      }
+      let m;
+      if ((m = l.match(/^#{1,6}\s+(.*)/))) { closeList(); html += `<h4>${inline(m[1])}</h4>`; }
+      else if ((m = l.match(/^\s*[-*•]\s+(.*)/))) { if (list !== 'ul') { closeList(); html += '<ul>'; list = 'ul'; } html += `<li>${inline(m[1])}</li>`; }
+      else if ((m = l.match(/^\s*\d+[.)]\s+(.*)/))) { if (list !== 'ol') { closeList(); html += '<ol>'; list = 'ol'; } html += `<li>${inline(m[1])}</li>`; }
+      else if (!l.trim()) { closeList(); }
+      else { closeList(); html += `<p>${inline(l)}</p>`; }
+      i++;
+    }
+    closeList();
+    return html;
+  }
+
+  const api = { init, isReady, builtin: false, ready: false, chat, scanDocument, categorizeBank, analyze, md, fileToBase64 };
+  App.ai = api;
+})(window.App);
+
+/* ComptaPro — écrans d'activité */
+(function (App) {
+  const { $, $$, esc, eur, fdate, round2 } = App;
+  const V = (App.views = App.views || {});
+  let selectedYear = new Date().getFullYear();
+  App.getYear = () => selectedYear;
+  App.setYear = (y) => (selectedYear = Number(y));
+
+  const head = (title, sub, actions) => `<div class="page-head"><div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="actions">${actions || ''}</div></div>`;
+  App.head = head;
+  const clientName = (id) => (App.state.clients.find((c) => c.id === id) || {}).name || '—';
+  const invStatus = (i) => (i.type === 'facture' && i.status === 'envoyee' && i.dueDate && i.dueDate < App.today() ? 'retard' : i.status);
+
+  /* ============ TABLEAU DE BORD ============ */
+  V.dashboard = (el) => {
+    const y = selectedYear;
+    const d = App.dashboard(y);
+    const is = d.is;
+    const marge = is.chiffreAffaires ? (is.resultatExploitation / is.chiffreAffaires) * 100 : 0;
+    const cats = Object.entries(d.byCategory).sort((a, b) => b[1] - a[1]).slice(0, 7);
+    const catMax = Math.max(1, ...cats.map((c) => c[1]));
+    const empty = !App.state.invoices.length && !App.state.expenses.length;
+    el.innerHTML = head('Tableau de bord', `${esc(App.state.settings.company.name)} · exercice ${is.fy.label}`,
+      `<select id="year">${App.yearOptions(y)}</select><a class="btn primary" href="#/factures/new">+ Facture</a><a class="btn" href="#/depenses/new">+ Dépense</a>`) +
+      (empty ? `<div class="alert">Bienvenue ! Commencez par renseigner votre entreprise dans <a href="#/parametres">Paramètres</a>, ou <a href="#" id="demo">chargez des données de démonstration</a> pour explorer l'application.</div>` : '') +
+      `<div class="grid grid-4">
+        <div class="card kpi"><div class="label">Chiffre d'affaires HT</div><div class="value">${eur(is.chiffreAffaires)}</div><div class="sub">Exercice ${is.fy.label}</div></div>
+        <div class="card kpi"><div class="label">Charges d'exploitation</div><div class="value">${eur(is.chargesExploitation)}</div><div class="sub">dont amortissements ${eur(is.dotations)}</div></div>
+        <div class="card kpi"><div class="label">Résultat net</div><div class="value ${is.resultatNet >= 0 ? 'pos' : 'neg'}">${eur(is.resultatNet)}</div><div class="sub">Marge d'exploitation ${App.pct(marge)}</div></div>
+        <div class="card kpi"><div class="label">Trésorerie</div><div class="value ${d.treso >= 0 ? '' : 'neg'}">${eur(d.treso)}</div><div class="sub">Banque + caisse à ce jour</div></div>
+      </div>
+      <div class="grid grid-3" style="margin-top:16px">
+        <div class="card kpi"><div class="label">À encaisser</div><div class="value">${eur(d.unpaidTotal)}</div><div class="sub">${d.unpaid.length} facture(s) ouverte(s)${d.overdue.length ? ` · <span class="neg">${d.overdue.length} en retard (${eur(d.overdueTotal)})</span>` : ''}</div></div>
+        <div class="card kpi"><div class="label">TVA ${d.currentPeriod ? esc(d.currentPeriod.label) : ''}</div><div class="value">${d.tvaCurrent ? eur(d.tvaCurrent.net) : '—'}</div><div class="sub">${d.tvaCurrent ? (d.tvaCurrent.net >= 0 ? 'à reverser (estimation)' : 'crédit de TVA') : 'Franchise ou non applicable'}</div></div>
+        <div class="card kpi"><div class="label">Impôt estimé (${App.state.settings.company.impot})</div><div class="value">${App.state.settings.company.impot === 'IS' ? eur(App.estimateIS(is.resultatAvantImpot)) : '—'}</div><div class="sub">${App.state.settings.company.impot === 'IS' ? 'Taux réduit 15 % jusqu\'à 42 500 €, puis 25 %' : 'Résultat imposable à l\'IR : ' + eur(is.resultatAvantImpot)}</div></div>
+      </div>
+      <div class="grid grid-2" style="margin-top:16px">
+        <div class="card"><div class="page-head" style="margin:0 0 8px"><h2 style="margin:0">Produits et charges par mois</h2><div class="legend"><span><i style="background:var(--primary)"></i>Produits</span><span><i style="background:var(--warning)"></i>Charges</span></div></div>${App.barChart(d.monthly)}</div>
+        <div class="card"><h2>Principaux postes de charges</h2>${cats.length ? cats.map(([l, v]) => `<div class="bar-row"><span>${esc(l)}</span><div class="track"><div class="fill" style="width:${(v / catMax) * 100}%"></div></div><span class="num">${eur(v)}</span></div>`).join('') : '<div class="empty">Aucune charge enregistrée</div>'}</div>
+      </div>
+      <div class="grid grid-2" style="margin-top:16px">
+        <div class="card"><h2>Factures à suivre</h2>${d.unpaid.length ? `<div class="table-wrap"><table><tbody>${d.unpaid.slice(0, 6).map((i) => `<tr class="clickable" data-href="#/factures/${i.id}"><td>${esc(i.number)}</td><td>${esc(clientName(i.clientId))}</td><td>${App.statusBadge(invStatus(i))}</td><td class="num">${eur(App.invoiceTotals(i).ttc)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Tout est encaissé 🎉</div>'}</div>
+        <div class="card"><h2>À faire</h2><ul class="checklist">
+          ${todo(d).map((t) => `<li><span class="st ${t.ok ? 'ok' : 'ko'}">${t.ok ? '✓' : '!'}</span><div>${t.html}</div></li>`).join('')}
+        </ul></div>
+      </div>`;
+    $('#year', el).onchange = (e) => { selectedYear = Number(e.target.value); V.dashboard(el); };
+    const demo = $('#demo', el);
+    if (demo) demo.onclick = (e) => { e.preventDefault(); App.loadDemo(); App.toast('Données de démonstration chargées', 'success'); App.render(); };
+    $$('[data-href]', el).forEach((r) => (r.onclick = () => App.go(r.dataset.href)));
+  };
+
+  function todo(d) {
+    const s = App.state, items = [];
+    items.push({ ok: !d.bankToReconcile, html: d.bankToReconcile ? `<a href="#/banque">${d.bankToReconcile} opération(s) bancaire(s)</a> à rapprocher` : 'Banque rapprochée' });
+    items.push({ ok: !d.overdue.length, html: d.overdue.length ? `<a href="#/factures">Relancer ${d.overdue.length} facture(s) en retard</a>` : 'Aucune facture en retard' });
+    const missing = s.expenses.filter((e) => !e.receipt).length;
+    items.push({ ok: !missing, html: missing ? `<a href="#/depenses">${missing} dépense(s) sans justificatif</a>` : 'Tous les justificatifs sont joints' });
+    if (s.settings.company.regimeTva !== 'franchise' && d.currentPeriod) {
+      const prev = App.tvaPeriods(Number(App.today().slice(0, 4))).filter((p) => p.end < App.today()).pop();
+      const declared = prev && s.tvaDeclarations.some((x) => x.start === prev.start);
+      if (prev) items.push({ ok: declared, html: declared ? `TVA ${esc(prev.label)} déclarée` : `<a href="#/tva">Déclarer la TVA ${esc(prev.label)}</a>` });
+    }
+    items.push({ ok: App.ai.isReady(), html: App.ai.isReady() ? 'Assistant IA activé' : '<a href="#/parametres">Activer l\'assistant IA</a> (clé API Claude)' });
+    return items;
+  }
+
+  /* ============ FACTURES & DEVIS ============ */
+  V.factures = (el, params) => {
+    if (params[0] === 'new') return invoiceEditor(el, null, params[1] || 'facture');
+    if (params[0]) { const inv = App.state.invoices.find((i) => i.id === params[0]); if (inv) return invoiceEditor(el, inv); }
+    let filter = sessionStorage.getItem('inv-filter') || 'facture';
+    const draw = () => {
+      const q = ($('#q', el) || {}).value || '';
+      const list = App.state.invoices.filter((i) => i.type === filter)
+        .filter((i) => !q || (i.number + clientName(i.clientId)).toLowerCase().includes(q.toLowerCase()))
+        .sort((a, b) => (a.date < b.date ? 1 : -1));
+      const tot = list.reduce((s, i) => { const t = App.invoiceTotals(i); s.ht += t.ht; s.ttc += t.ttc; return s; }, { ht: 0, ttc: 0 });
+      $('#list', el).innerHTML = list.length ? `<div class="table-wrap"><table><thead><tr><th>Numéro</th><th>Client</th><th>Date</th><th>Échéance</th><th>Statut</th><th class="num">HT</th><th class="num">TTC</th></tr></thead><tbody>
+        ${list.map((i) => { const t = App.invoiceTotals(i); return `<tr class="clickable" data-id="${i.id}"><td><strong>${esc(i.number)}</strong></td><td>${esc(clientName(i.clientId))}</td><td>${fdate(i.date)}</td><td>${fdate(i.dueDate)}</td><td>${App.statusBadge(invStatus(i))}</td><td class="num">${eur(t.ht)}</td><td class="num">${eur(t.ttc)}</td></tr>`; }).join('')}
+        <tr class="total"><td colspan="5">Total (${list.length})</td><td class="num">${eur(tot.ht)}</td><td class="num">${eur(tot.ttc)}</td></tr></tbody></table></div>`
+        : `<div class="empty">Aucun document. <a href="#/factures/new/${filter}">Créer ${filter === 'devis' ? 'un devis' : filter === 'avoir' ? 'un avoir' : 'une facture'}</a></div>`;
+      $$('[data-id]', el).forEach((r) => (r.onclick = () => App.go('#/factures/' + r.dataset.id)));
+      $$('.tabs button', el).forEach((b) => b.classList.toggle('active', b.dataset.t === filter));
+    };
+    el.innerHTML = head('Factures & devis', 'Numérotation automatique, mentions légales, suivi des paiements et relances.',
+      `<a class="btn" href="#/factures/new/devis">+ Devis</a><a class="btn" href="#/factures/new/avoir">+ Avoir</a><a class="btn primary" href="#/factures/new/facture">+ Facture</a>`) +
+      `<div class="card"><div class="tabs"><button data-t="facture">Factures</button><button data-t="devis">Devis</button><button data-t="avoir">Avoirs</button></div>
+      <div class="toolbar"><input id="q" placeholder="Rechercher un numéro ou un client…" style="max-width:320px"><button class="btn sm" id="export">Exporter CSV</button></div><div id="list"></div></div>`;
+    $$('.tabs button', el).forEach((b) => (b.onclick = () => { filter = b.dataset.t; sessionStorage.setItem('inv-filter', filter); draw(); }));
+    $('#q', el).oninput = draw;
+    $('#export', el).onclick = () => {
+      const rows = [['Type', 'Numéro', 'Client', 'Date', 'Échéance', 'Statut', 'HT', 'TVA', 'TTC', 'Payée le']];
+      App.state.invoices.forEach((i) => { const t = App.invoiceTotals(i); rows.push([i.type, i.number, clientName(i.clientId), i.date, i.dueDate, i.status, t.ht, t.tva, t.ttc, i.paidDate || '']); });
+      App.download('factures.csv', App.toCSV(rows), 'text/csv');
+    };
+    draw();
+  };
+
+  function invoiceEditor(el, existing, type) {
+    const s = App.state;
+    const isNew = !existing;
+    const inv = existing ? JSON.parse(JSON.stringify(existing)) : {
+      id: App.uid(), type, number: App.nextNumber(type), clientId: (s.clients[0] || {}).id || '', date: App.today(),
+      dueDate: App.addDays(App.today(), s.settings.company.paymentTerms || 30), status: 'brouillon', paidDate: '', notes: '',
+      revenueAccount: '706000',
+      lines: [{ desc: '', qty: 1, unitPrice: 0, tvaRate: s.settings.company.regimeTva === 'franchise' ? 0 : 20, discount: 0 }],
+    };
+    const label = { facture: 'Facture', devis: 'Devis', avoir: 'Avoir' }[inv.type];
+    const draw = () => {
+      const t = App.invoiceTotals(inv);
+      el.innerHTML = head(`${label} ${esc(inv.number)}`, isNew ? 'Nouveau document' : App.statusBadge(invStatus(inv)),
+        `<a class="btn" href="#/factures">← Retour</a>${!isNew ? `<button class="btn danger" id="del">Supprimer</button>` : ''}
+         ${inv.type === 'devis' && !isNew ? '<button class="btn" id="convert">Convertir en facture</button>' : ''}
+         ${inv.type === 'facture' && !isNew ? '<button class="btn" id="credit">Créer un avoir</button>' : ''}
+         ${!isNew && inv.type === 'facture' && invStatus(inv) === 'retard' ? '<button class="btn" id="remind">Relance</button>' : ''}
+         <button class="btn" id="preview">Aperçu / PDF</button><button class="btn primary" id="save">Enregistrer</button>`) +
+        `<div class="card"><div class="form-grid">
+          <label class="field">Client <select id="client">${App.options([['', '— Choisir —'], ...s.clients.map((c) => [c.id, c.name])], inv.clientId)}<option value="__new">+ Nouveau client…</option></select></label>
+          <label class="field">Numéro <input id="number" value="${esc(inv.number)}"></label>
+          <label class="field">Date <input type="date" id="date" value="${inv.date}"></label>
+          <label class="field">${inv.type === 'devis' ? 'Valide jusqu\'au' : 'Échéance'} <input type="date" id="due" value="${inv.dueDate || ''}"></label>
+          <label class="field">Statut <select id="status">${App.options(inv.type === 'devis' ? [['brouillon', 'Brouillon'], ['envoyee', 'Envoyé'], ['accepte', 'Accepté'], ['refuse', 'Refusé']] : [['brouillon', 'Brouillon (non comptabilisé)'], ['envoyee', 'Émise / envoyée'], ['payee', 'Payée'], ['annulee', 'Annulée']], inv.status)}</select></label>
+          <label class="field">Payée le <input type="date" id="paid" value="${inv.paidDate || ''}" ${inv.status === 'payee' ? '' : 'disabled'}></label>
+          <label class="field">Compte de produit <select id="rev">${App.options([['706000', '706 Prestations de services'], ['707000', '707 Ventes de marchandises'], ['708000', '708 Activités annexes']], inv.revenueAccount || '706000')}</select></label>
+        </div></div>
+        <div class="card"><h2>Lignes</h2><div class="table-wrap"><table class="lines-table"><thead><tr><th style="min-width:220px">Désignation</th><th style="width:80px">Qté</th><th style="width:120px">Prix unit. HT</th><th style="width:80px">Remise %</th><th style="width:90px">TVA</th><th class="num" style="width:110px">Total HT</th><th></th></tr></thead><tbody>
+          ${inv.lines.map((l, k) => `<tr data-k="${k}"><td><input data-f="desc" value="${esc(l.desc)}" placeholder="Description de la prestation"></td><td><input type="number" step="any" data-f="qty" value="${l.qty}"></td><td><input type="number" step="any" data-f="unitPrice" value="${l.unitPrice}"></td><td><input type="number" step="any" data-f="discount" value="${l.discount || 0}"></td><td><select data-f="tvaRate">${App.tvaOptions(l.tvaRate)}</select></td><td class="num">${eur(round2(l.qty * l.unitPrice * (1 - (l.discount || 0) / 100)))}</td><td><button class="btn ghost sm" data-rm="${k}" aria-label="Supprimer la ligne">✕</button></td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="toolbar" style="margin-top:10px"><button class="btn sm" id="add">+ Ajouter une ligne</button></div>
+        <div style="display:flex;justify-content:flex-end"><table style="width:300px"><tbody>
+          <tr><td>Total HT</td><td class="num">${eur(t.ht)}</td></tr>
+          ${Object.entries(t.byRate).map(([r, v]) => `<tr class="sub"><td>TVA ${r} %</td><td class="num">${eur(v.tva * t.sign)}</td></tr>`).join('')}
+          <tr class="total"><td>Total TTC</td><td class="num">${eur(t.ttc)}</td></tr></tbody></table></div></div>
+        <div class="card"><label class="field">Notes / conditions <textarea id="notes" placeholder="Conditions particulières, référence de commande…">${esc(inv.notes || '')}</textarea></label></div>`;
+      bind();
+    };
+    const sync = () => {
+      inv.clientId = $('#client', el).value; inv.number = $('#number', el).value; inv.date = $('#date', el).value;
+      inv.dueDate = $('#due', el).value; inv.status = $('#status', el).value; inv.paidDate = $('#paid', el).value;
+      inv.notes = $('#notes', el).value; inv.revenueAccount = $('#rev', el).value;
+      $$('tr[data-k]', el).forEach((tr) => {
+        const l = inv.lines[tr.dataset.k];
+        $$('[data-f]', tr).forEach((i) => (l[i.dataset.f] = i.dataset.f === 'desc' ? i.value : Number(i.value) || 0));
+      });
+    };
+    const bind = () => {
+      $$('input, select, textarea', el).forEach((i) => i.addEventListener('change', () => {
+        sync();
+        if (i.id === 'client' && i.value === '__new') return App.editClient(null, (c) => { inv.clientId = c.id; draw(); });
+        if (i.id === 'status' && inv.status === 'payee' && !inv.paidDate) inv.paidDate = App.today();
+        if (i.id === 'date' && inv.type !== 'devis') inv.dueDate = App.addDays(inv.date, s.settings.company.paymentTerms || 30);
+        draw();
+      }));
+      $('#add', el).onclick = () => { sync(); inv.lines.push({ desc: '', qty: 1, unitPrice: 0, tvaRate: inv.lines.at(-1)?.tvaRate ?? 20, discount: 0 }); draw(); };
+      $$('[data-rm]', el).forEach((b) => (b.onclick = () => { sync(); inv.lines.splice(Number(b.dataset.rm), 1); if (!inv.lines.length) inv.lines.push({ desc: '', qty: 1, unitPrice: 0, tvaRate: 20 }); draw(); }));
+      $('#save', el).onclick = () => {
+        sync();
+        if (!inv.clientId || inv.clientId === '__new') return App.toast('Choisissez un client', 'error');
+        if (s.invoices.some((x) => x.number === inv.number && x.id !== inv.id)) return App.toast('Ce numéro existe déjà', 'error');
+        const idx = s.invoices.findIndex((x) => x.id === inv.id);
+        if (idx >= 0) s.invoices[idx] = inv; else s.invoices.push(inv);
+        App.save(); App.toast('Document enregistré', 'success'); App.go('#/factures');
+      };
+      $('#preview', el).onclick = () => { sync(); previewInvoice(inv); };
+      const del = $('#del', el);
+      if (del) del.onclick = () => App.confirmBox(inv.status !== 'brouillon' && inv.type === 'facture' ? 'Attention : une facture émise ne devrait pas être supprimée (obligation de numérotation continue). Préférez un avoir. Supprimer quand même ?' : 'Supprimer ce document ?', () => {
+        s.invoices = s.invoices.filter((x) => x.id !== inv.id); App.save(); App.go('#/factures');
+      }, 'Supprimer');
+      const conv = $('#convert', el);
+      if (conv) conv.onclick = () => {
+        const f = Object.assign(JSON.parse(JSON.stringify(inv)), { id: App.uid(), type: 'facture', number: App.nextNumber('facture'), date: App.today(), dueDate: App.addDays(App.today(), s.settings.company.paymentTerms || 30), status: 'brouillon', quoteRef: inv.number });
+        const q = s.invoices.find((x) => x.id === inv.id); if (q) q.status = 'accepte';
+        s.invoices.push(f); App.save(); App.toast('Facture créée depuis le devis', 'success'); App.go('#/factures/' + f.id);
+      };
+      const cr = $('#credit', el);
+      if (cr) cr.onclick = () => {
+        const a = Object.assign(JSON.parse(JSON.stringify(inv)), { id: App.uid(), type: 'avoir', number: App.nextNumber('avoir'), date: App.today(), status: 'envoyee', paidDate: '', notes: `Avoir sur facture ${inv.number}` });
+        s.invoices.push(a); App.save(); App.go('#/factures/' + a.id);
+      };
+      const rem = $('#remind', el);
+      if (rem) rem.onclick = () => reminder(inv);
+    };
+    draw();
+  }
+
+  function invoiceHTML(inv) {
+    const c = App.state.settings.company, cl = App.state.clients.find((x) => x.id === inv.clientId) || {};
+    const t = App.invoiceTotals(inv);
+    const title = { facture: 'FACTURE', devis: 'DEVIS', avoir: 'AVOIR' }[inv.type];
+    return `<div class="invoice-paper">
+      <div class="inv-head"><div><h1>${title}</h1><div>N° <strong>${esc(inv.number)}</strong></div><div>Date : ${fdate(inv.date)}</div>${inv.dueDate ? `<div>${inv.type === 'devis' ? 'Validité' : 'Échéance'} : ${fdate(inv.dueDate)}</div>` : ''}</div>
+      <div style="text-align:right"><strong>${esc(c.name)}</strong> ${esc(c.legalForm)}<br>${esc(c.address).replace(/\n/g, '<br>')}<br>${c.siret ? 'SIRET ' + esc(c.siret) + '<br>' : ''}${c.tvaNumber ? 'TVA ' + esc(c.tvaNumber) + '<br>' : ''}${esc(c.email)}</div></div>
+      <div style="margin-bottom:24px"><div style="color:#666;font-size:11px">FACTURÉ À</div><strong>${esc(cl.name)}</strong><br>${esc(cl.address || '').replace(/\n/g, '<br>')}${cl.tvaNumber ? '<br>TVA ' + esc(cl.tvaNumber) : ''}${cl.siret ? '<br>SIRET ' + esc(cl.siret) : ''}</div>
+      <table><thead><tr><th>Désignation</th><th class="num">Qté</th><th class="num">P.U. HT</th><th class="num">TVA</th><th class="num">Total HT</th></tr></thead><tbody>
+      ${inv.lines.map((l) => `<tr><td>${esc(l.desc)}${l.discount ? ` <em>(remise ${l.discount} %)</em>` : ''}</td><td class="num">${l.qty}</td><td class="num">${eur(l.unitPrice)}</td><td class="num">${l.tvaRate} %</td><td class="num">${eur(round2(l.qty * l.unitPrice * (1 - (l.discount || 0) / 100)))}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="totals"><div><span>Total HT</span><span>${eur(t.ht)}</span></div>
+      ${Object.entries(t.byRate).filter(([r]) => Number(r)).map(([r, v]) => `<div><span>TVA ${r} %</span><span>${eur(v.tva * t.sign)}</span></div>`).join('')}
+      <div class="grand"><span>Total TTC</span><span>${eur(t.ttc)}</span></div></div>
+      ${inv.notes ? `<p style="margin-top:20px">${esc(inv.notes)}</p>` : ''}
+      <div class="legal">${App.state.settings.company.regimeTva === 'franchise' ? 'TVA non applicable, art. 293 B du CGI.\n' : ''}${inv.type === 'facture' ? `Conditions de paiement : ${c.paymentTerms} jours. ${c.iban ? 'IBAN : ' + esc(c.iban) + (c.bic ? ' — BIC : ' + esc(c.bic) : '') : ''}\n${esc(c.legalMentions)}` : ''}${inv.type === 'devis' ? 'Bon pour accord — date et signature :' : ''}</div>
+    </div>`;
+  }
+
+  function previewInvoice(inv) {
+    App.modal({
+      title: 'Aperçu', wide: true, body: invoiceHTML(inv),
+      footer: `<button class="btn" data-close>Fermer</button><button class="btn" id="mail">Envoyer par e-mail</button><button class="btn primary" id="print">${App.isArtifact ? 'Télécharger (à imprimer en PDF)' : 'Imprimer / PDF'}</button>`,
+      onMount: (m) => {
+        $('#print', m).onclick = () => { if (App.isArtifact) return App.download(`${inv.number}.html`, `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(inv.number)}</title><style>body{font-family:Arial,sans-serif;margin:30px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}.num{text-align:right}.inv-head{display:flex;justify-content:space-between;margin-bottom:30px}h1{color:#2f5bea}.totals{margin-left:auto;width:280px;margin-top:16px}.totals div{display:flex;justify-content:space-between;padding:4px 0}.grand{font-weight:700;border-top:2px solid #111}.legal{margin-top:30px;font-size:11px;color:#666;white-space:pre-line}</style></head><body>${invoiceHTML(inv)}<script>window.print()<\/script></body></html>`); document.body.classList.add('printing-modal'); window.print(); setTimeout(() => document.body.classList.remove('printing-modal'), 500); };
+        $('#mail', m).onclick = () => {
+          const cl = App.state.clients.find((x) => x.id === inv.clientId) || {};
+          const t = App.invoiceTotals(inv);
+          location.href = `mailto:${encodeURIComponent(cl.email || '')}?subject=${encodeURIComponent(`${inv.type === 'devis' ? 'Devis' : 'Facture'} ${inv.number} — ${App.state.settings.company.name}`)}&body=${encodeURIComponent(`Bonjour,\n\nVeuillez trouver ci-joint ${inv.type === 'devis' ? 'notre devis' : 'notre facture'} ${inv.number} d'un montant de ${eur(t.ttc)} TTC.\n\nCordialement,\n${App.state.settings.company.name}`)}`;
+        };
+      },
+    });
+  }
+
+  function reminder(inv) {
+    const cl = App.state.clients.find((x) => x.id === inv.clientId) || {};
+    const t = App.invoiceTotals(inv);
+    const days = Math.round((new Date(App.today()) - new Date(inv.dueDate)) / 86400000);
+    const txt = `Bonjour,\n\nSauf erreur de notre part, la facture ${inv.number} du ${fdate(inv.date)}, d'un montant de ${eur(t.ttc)} TTC, arrivée à échéance le ${fdate(inv.dueDate)} (il y a ${days} jours), reste impayée.\n\nNous vous remercions de bien vouloir procéder à son règlement dans les meilleurs délais${App.state.settings.company.iban ? ' (IBAN : ' + App.state.settings.company.iban + ')' : ''}.\n\nNous vous rappelons que tout retard de paiement entraîne l'application de pénalités ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement.\n\nCordialement,\n${App.state.settings.company.name}`;
+    App.modal({
+      title: 'Relance de paiement', body: `<textarea id="rt" style="min-height:260px">${esc(txt)}</textarea>`,
+      footer: `<button class="btn" data-close>Fermer</button><button class="btn primary" id="send">Ouvrir dans la messagerie</button>`,
+      onMount: (m) => ($('#send', m).onclick = () => (location.href = `mailto:${encodeURIComponent(cl.email || '')}?subject=${encodeURIComponent('Relance — facture ' + inv.number)}&body=${encodeURIComponent($('#rt', m).value)}`)),
+    });
+  }
+
+  /* ============ CLIENTS ============ */
+  App.editClient = (client, onSaved) => {
+    const c = client || { id: App.uid(), name: '', email: '', address: '', siret: '', tvaNumber: '', phone: '' };
+    App.modal({
+      title: client ? 'Modifier le client' : 'Nouveau client',
+      body: `<form class="form-grid" id="cf">
+        <label class="field full">Nom / raison sociale <input name="name" value="${esc(c.name)}" required></label>
+        <label class="field">E-mail <input name="email" type="email" value="${esc(c.email)}"></label>
+        <label class="field">Téléphone <input name="phone" value="${esc(c.phone || '')}"></label>
+        <label class="field">SIRET <input name="siret" value="${esc(c.siret)}"></label>
+        <label class="field">N° TVA intracom. <input name="tvaNumber" value="${esc(c.tvaNumber)}"></label>
+        <label class="field full">Adresse <textarea name="address">${esc(c.address)}</textarea></label></form>`,
+      footer: `<button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Enregistrer</button>`,
+      onMount: (m, close) => ($('#ok', m).onclick = () => {
+        const d = App.formData($('#cf', m));
+        if (!d.name.trim()) return App.toast('Le nom est obligatoire', 'error');
+        Object.assign(c, d);
+        if (!App.state.clients.includes(c)) App.state.clients.push(c);
+        App.save(); close(); onSaved ? onSaved(c) : App.render();
+      }),
+    });
+  };
+
+  V.clients = (el) => {
+    const s = App.state;
+    const stats = (id) => {
+      const inv = s.invoices.filter((i) => i.clientId === id && i.type !== 'devis' && i.status !== 'brouillon');
+      return { ca: round2(inv.reduce((x, i) => x + App.invoiceTotals(i).ht, 0)), du: round2(inv.filter((i) => i.status === 'envoyee').reduce((x, i) => x + App.invoiceTotals(i).ttc, 0)), n: inv.length };
+    };
+    el.innerHTML = head('Clients', `${s.clients.length} client(s)`, '<button class="btn primary" id="new">+ Client</button>') +
+      `<div class="card">${s.clients.length ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>E-mail</th><th>N° TVA</th><th class="num">Factures</th><th class="num">CA HT</th><th class="num">Reste dû</th><th></th></tr></thead><tbody>
+      ${s.clients.map((c) => { const st = stats(c.id); return `<tr><td><strong>${esc(c.name)}</strong></td><td>${esc(c.email)}</td><td>${esc(c.tvaNumber)}</td><td class="num">${st.n}</td><td class="num">${eur(st.ca)}</td><td class="num ${st.du ? 'neg' : ''}">${eur(st.du)}</td><td class="num"><button class="btn sm" data-edit="${c.id}">Modifier</button> <button class="btn sm danger" data-del="${c.id}">✕</button></td></tr>`; }).join('')}
+      </tbody></table></div>` : '<div class="empty">Aucun client pour l\'instant.</div>'}</div>`;
+    $('#new', el).onclick = () => App.editClient(null);
+    $$('[data-edit]', el).forEach((b) => (b.onclick = () => App.editClient(s.clients.find((c) => c.id === b.dataset.edit))));
+    $$('[data-del]', el).forEach((b) => (b.onclick = () => {
+      if (s.invoices.some((i) => i.clientId === b.dataset.del)) return App.toast('Ce client a des factures : impossible de le supprimer.', 'error');
+      App.confirmBox('Supprimer ce client ?', () => { s.clients = s.clients.filter((c) => c.id !== b.dataset.del); App.save(); App.render(); }, 'Supprimer');
+    }));
+  };
+
+  /* ============ DÉPENSES ============ */
+  App.editExpense = (exp, prefill) => {
+    const s = App.state;
+    const e = exp ? JSON.parse(JSON.stringify(exp)) : Object.assign({ id: App.uid(), date: App.today(), supplier: '', account: '606400', description: '', ht: 0, tvaRate: 20, tva: 0, ttc: 0, paid: true, paidDate: '', paymentMethod: 'carte', receipt: '' }, prefill || {});
+    App.modal({
+      title: exp ? 'Modifier la dépense' : 'Nouvelle dépense',
+      body: `<form class="form-grid" id="ef">
+        <label class="field">Date <input type="date" name="date" value="${e.date}"></label>
+        <label class="field">Fournisseur <input name="supplier" value="${esc(e.supplier)}" list="sup-list"><datalist id="sup-list">${[...new Set(s.expenses.map((x) => x.supplier))].map((x) => `<option value="${esc(x)}">`).join('')}</datalist></label>
+        <label class="field full">Catégorie (compte PCG) <select name="account">${App.options(App.EXPENSE_CATEGORIES.map((c) => [c.account, `${c.account} — ${c.label}`]), e.account)}</select></label>
+        <label class="field full">Description <input name="description" value="${esc(e.description)}"></label>
+        <label class="field">Montant TTC <input type="number" step="0.01" name="ttc" value="${e.ttc}"></label>
+        <label class="field">Taux TVA <select name="tvaRate">${App.tvaOptions(e.tvaRate)}</select></label>
+        <label class="field">Montant HT <input type="number" step="0.01" name="ht" value="${e.ht}"></label>
+        <label class="field">TVA déductible <input type="number" step="0.01" name="tva" value="${e.tva}"></label>
+        <label class="field">Moyen de paiement <select name="paymentMethod">${App.options([['carte', 'Carte'], ['virement', 'Virement'], ['prelevement', 'Prélèvement'], ['cheque', 'Chèque'], ['especes', 'Espèces']], e.paymentMethod)}</select></label>
+        <label class="field">Payée le <input type="date" name="paidDate" value="${e.paidDate || ''}"></label>
+        <label class="check full"><input type="checkbox" name="paid" ${e.paid ? 'checked' : ''}> Dépense déjà payée</label>
+        <label class="field full">Justificatif (photo ou PDF) <input type="file" id="rcpt" accept="image/*,application/pdf" capture="environment"></label>
+        ${e.receipt ? `<div class="full"><img src="${e.receipt}" style="max-width:180px;border-radius:8px;border:1px solid var(--border)" alt="Justificatif"></div>` : ''}
+        <div class="full alert small" id="ai-hint" ${App.ai.isReady() ? '' : 'hidden'}>✦ Ajoutez un justificatif puis cliquez sur « Remplir avec l'IA » pour extraire automatiquement les montants.</div>
+      </form>`,
+      footer: `${exp ? '<button class="btn danger" id="del">Supprimer</button>' : ''}<button class="btn" id="ai-fill" ${App.ai.isReady() ? '' : 'hidden'}>✦ Remplir avec l'IA</button><button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Enregistrer</button>`,
+      onMount: (m, close) => {
+        const f = $('#ef', m);
+        const recalc = (src) => {
+          const rate = Number(f.tvaRate.value) || 0;
+          if (src === 'ht') { f.tva.value = round2(f.ht.value * rate / 100); f.ttc.value = round2(Number(f.ht.value) + Number(f.tva.value)); }
+          else if (src !== 'tva') { f.ht.value = round2(f.ttc.value / (1 + rate / 100)); f.tva.value = round2(f.ttc.value - f.ht.value); }
+          else f.ht.value = round2(f.ttc.value - f.tva.value);
+        };
+        f.ttc.oninput = () => recalc('ttc'); f.tvaRate.onchange = () => recalc('ttc'); f.ht.oninput = () => recalc('ht'); f.tva.oninput = () => recalc('tva');
+        let file = null;
+        $('#rcpt', m).onchange = async (ev) => { file = ev.target.files[0]; if (file) e.receipt = await App.compressImage(file, 800); };
+        $('#ai-fill', m).onclick = async (ev) => {
+          if (!file) return App.toast('Ajoutez d\'abord un justificatif', 'error');
+          const btn = ev.currentTarget; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Analyse…';
+          try {
+            const r = await App.ai.scanDocument(file);
+            if (r.date) f.date.value = r.date;
+            f.supplier.value = r.supplier || f.supplier.value; f.description.value = r.description || '';
+            if (App.EXPENSE_CATEGORIES.some((c) => c.account === r.account)) f.account.value = r.account;
+            f.tvaRate.value = App.TVA_RATES.includes(Number(r.tva_rate)) ? r.tva_rate : 20;
+            f.ttc.value = r.total_ttc; f.ht.value = r.total_ht; f.tva.value = r.total_tva;
+            if (['carte', 'virement', 'prelevement', 'cheque', 'especes'].includes(r.payment_method)) f.paymentMethod.value = r.payment_method;
+            $('#ai-hint', m).hidden = false;
+            $('#ai-hint', m).innerHTML = `✦ Extraction terminée (confiance ${Math.round((r.confidence || 0) * 100)} %). ${esc(r.remarks || '')}${r.is_asset ? '<br><strong>Ce bien semble être une immobilisation</strong> : enregistrez-le plutôt dans Immobilisations pour l\'amortir.' : ''}`;
+          } catch (err) { App.toast(err.message, 'error'); }
+          btn.disabled = false; btn.textContent = '✦ Remplir avec l\'IA';
+        };
+        $('#ok', m).onclick = () => {
+          const d = App.formData(f);
+          Object.assign(e, d);
+          e.ht = round2(e.ht); e.tva = round2(e.tva); e.ttc = round2(e.ttc);
+          if (!e.ttc) return App.toast('Indiquez un montant', 'error');
+          if (e.paid && !e.paidDate) e.paidDate = e.date;
+          const i = s.expenses.findIndex((x) => x.id === e.id);
+          const bankId = e._bank; delete e._bank;
+          if (i >= 0) s.expenses[i] = e; else s.expenses.push(e);
+          const bl = bankId && s.bank.find((x) => x.id === bankId);
+          if (bl) applyMatch(bl, { type: 'expense', id: e.id });
+          if (e.supplier && !s.suppliers.some((x) => x.name === e.supplier)) s.suppliers.push({ id: App.uid(), name: e.supplier });
+          App.save(); close(); App.toast('Dépense enregistrée', 'success'); App.render();
+        };
+        const del = $('#del', m);
+        if (del) del.onclick = () => { s.expenses = s.expenses.filter((x) => x.id !== e.id); s.bank.forEach((b) => { if (b.matched && b.matched.id === e.id) b.matched = null; }); App.save(); close(); App.render(); };
+      },
+    });
+  };
+
+  V.depenses = (el, params) => {
+    const s = App.state;
+    if (params[0] === 'new') setTimeout(() => App.editExpense(null), 0);
+    const y = selectedYear, fy = App.fiscalYear(y);
+    const draw = () => {
+      const q = ($('#q', el).value || '').toLowerCase(), cat = $('#cat', el).value;
+      const list = s.expenses.filter((e) => e.date >= fy.start && e.date <= fy.end)
+        .filter((e) => !cat || e.account === cat)
+        .filter((e) => !q || `${e.supplier} ${e.description}`.toLowerCase().includes(q))
+        .sort((a, b) => (a.date < b.date ? 1 : -1));
+      const tot = list.reduce((x, e) => ({ ht: x.ht + e.ht, tva: x.tva + e.tva, ttc: x.ttc + e.ttc }), { ht: 0, tva: 0, ttc: 0 });
+      $('#list', el).innerHTML = list.length ? `<div class="table-wrap"><table><thead><tr><th></th><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th>Statut</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th></tr></thead><tbody>
+        ${list.map((e) => `<tr class="clickable" data-id="${e.id}"><td>${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" alt="">` : '<span class="badge warning" title="Justificatif manquant">!</span>'}</td><td>${fdate(e.date)}</td><td><strong>${esc(e.supplier)}</strong><div class="small muted">${esc(e.description)}</div></td><td>${esc(App.accountLabel(e.account))}</td><td>${e.paid ? '<span class="badge success">Payée</span>' : '<span class="badge warning">À payer</span>'}</td><td class="num">${eur(e.ht)}</td><td class="num">${eur(e.tva)}</td><td class="num">${eur(e.ttc)}</td></tr>`).join('')}
+        <tr class="total"><td colspan="5">Total (${list.length})</td><td class="num">${eur(tot.ht)}</td><td class="num">${eur(tot.tva)}</td><td class="num">${eur(tot.ttc)}</td></tr></tbody></table></div>`
+        : '<div class="empty">Aucune dépense sur cette période.</div>';
+      $$('[data-id]', el).forEach((r) => (r.onclick = () => App.editExpense(s.expenses.find((e) => e.id === r.dataset.id))));
+    };
+    el.innerHTML = head('Dépenses', 'Achats, frais généraux et notes de frais, avec justificatifs et TVA déductible.',
+      `<select id="year">${App.yearOptions(y)}</select><a class="btn" href="#/ia/scan">✦ Scanner des justificatifs</a><button class="btn" id="exp">Exporter CSV</button><button class="btn primary" id="new">+ Dépense</button>`) +
+      `<div class="card"><div class="toolbar"><input id="q" placeholder="Rechercher…" style="max-width:260px"><select id="cat"><option value="">Toutes catégories</option>${App.options(App.EXPENSE_CATEGORIES.map((c) => [c.account, c.label]))}</select></div><div id="list"></div></div>`;
+    $('#year', el).onchange = (e) => { selectedYear = Number(e.target.value); V.depenses(el, []); };
+    $('#q', el).oninput = draw; $('#cat', el).onchange = draw;
+    $('#new', el).onclick = () => App.editExpense(null);
+    $('#exp', el).onclick = () => App.download('depenses.csv', App.toCSV([['Date', 'Fournisseur', 'Description', 'Compte', 'Catégorie', 'HT', 'Taux TVA', 'TVA', 'TTC', 'Payée'], ...s.expenses.map((e) => [e.date, e.supplier, e.description, e.account, App.accountLabel(e.account), e.ht, e.tvaRate, e.tva, e.ttc, e.paid ? 'oui' : 'non'])]), 'text/csv');
+    draw();
+  };
+
+  /* ============ BANQUE ============ */
+  V.banque = (el) => {
+    const s = App.state;
+    const matchLabel = (b) => {
+      const m = b.matched; if (!m) return '<span class="badge warning">À rapprocher</span>';
+      if (m.type === 'invoice') { const i = s.invoices.find((x) => x.id === m.id); return `<span class="badge success">Facture ${esc(i ? i.number : '?')}</span>`; }
+      if (m.type === 'expense') { const e = s.expenses.find((x) => x.id === m.id); return `<span class="badge success">Dépense ${esc(e ? e.supplier : '?')}</span>`; }
+      return `<span class="badge primary">${esc(App.accountLabel(m.account))}${m.tvaRate ? ' · TVA ' + m.tvaRate + ' %' : ''}</span>`;
+    };
+    const list = [...s.bank].sort((a, b) => (a.date < b.date ? 1 : -1));
+    const solde = App.trialBalance(null, App.today()).filter((a) => a.account === '512000').reduce((x, a) => x + a.solde, 0);
+    const relevé = round2((Number(s.settings.opening.banque) || 0) + s.bank.reduce((x, b) => x + Number(b.amount), 0));
+    el.innerHTML = head('Banque & rapprochement', 'Importez votre relevé (CSV), puis rapprochez chaque opération d\'une facture, d\'une dépense ou d\'une catégorie.',
+      `<label class="btn">Importer un relevé CSV<input type="file" id="csv" accept=".csv,.txt,text/csv" hidden></label><button class="btn" id="add">+ Opération</button><button class="btn primary" id="ai" ${s.bank.some((b) => !b.matched) ? '' : 'disabled'}>✦ Trier avec l'IA</button>`) +
+      `<div class="grid grid-3"><div class="card kpi"><div class="label">Solde comptable 512</div><div class="value">${eur(solde)}</div><div class="sub">Calculé à partir des écritures</div></div>
+       <div class="card kpi"><div class="label">Opérations à rapprocher</div><div class="value">${s.bank.filter((b) => !b.matched).length}</div><div class="sub">sur ${s.bank.length} importée(s)</div></div>
+       <div class="card kpi"><div class="label">Solde d'ouverture + relevés importés</div><div class="value">${eur(relevé)}</div><div class="sub">À comparer avec votre banque</div></div></div>
+       <div class="card" style="margin-top:16px">${list.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Libellé</th><th class="num">Montant</th><th>Rapprochement</th><th></th></tr></thead><tbody>
+       ${list.map((b) => `<tr><td>${fdate(b.date)}</td><td>${esc(b.label)}${b.aiReason ? `<div class="small muted">✦ ${esc(b.aiReason)}</div>` : ''}</td><td class="num ${b.amount < 0 ? 'neg' : 'pos'}">${eur(b.amount)}</td><td>${matchLabel(b)}</td><td class="num"><button class="btn sm" data-m="${b.id}">${b.matched ? 'Modifier' : 'Rapprocher'}</button> <button class="btn sm danger" data-d="${b.id}" aria-label="Supprimer">✕</button></td></tr>`).join('')}
+       </tbody></table></div>` : '<div class="empty">Aucune opération. Importez un relevé CSV exporté depuis votre banque (colonnes date, libellé, montant ou débit/crédit).</div>'}</div>`;
+    $('#csv', el).onchange = (e) => importCSV(e.target.files[0]);
+    $('#add', el).onclick = () => matchModal({ id: App.uid(), date: App.today(), label: '', amount: 0, matched: null }, true);
+    $$('[data-m]', el).forEach((b) => (b.onclick = () => matchModal(s.bank.find((x) => x.id === b.dataset.m))));
+    $$('[data-d]', el).forEach((b) => (b.onclick = () => App.confirmBox('Supprimer cette opération ?', () => { unmatch(s.bank.find((x) => x.id === b.dataset.d)); s.bank = s.bank.filter((x) => x.id !== b.dataset.d); App.save(); App.render(); }, 'Supprimer')));
+    $('#ai', el).onclick = async (ev) => {
+      const btn = ev.currentTarget; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Tri en cours…';
+      try {
+        const todo = s.bank.filter((b) => !b.matched);
+        const res = await App.ai.categorizeBank(todo);
+        let n = 0;
+        (res.results || []).forEach((r) => {
+          const b = s.bank.find((x) => x.id === r.id); if (!b || b.matched) return;
+          if (r.match_type === 'invoice' && s.invoices.some((i) => i.id === r.match_id)) applyMatch(b, { type: 'invoice', id: r.match_id });
+          else if (r.match_type === 'expense' && s.expenses.some((i) => i.id === r.match_id)) applyMatch(b, { type: 'expense', id: r.match_id });
+          else if (r.account) applyMatch(b, { type: 'category', account: r.account, tvaRate: Number(r.tva_rate) || 0 });
+          b.aiReason = `${r.reason} (confiance ${Math.round((r.confidence || 0) * 100)} %)`; n++;
+        });
+        App.save(); App.toast(`${n} opération(s) classée(s) par l'IA — vérifiez-les`, 'success'); App.render();
+      } catch (err) { App.toast(err.message, 'error'); btn.disabled = false; btn.textContent = '✦ Trier avec l\'IA'; }
+    };
+  };
+
+  function unmatch(b) {
+    if (!b || !b.matched) return;
+    const s = App.state, m = b.matched;
+    if (m.type === 'invoice') { const i = s.invoices.find((x) => x.id === m.id); if (i && i.status === 'payee') { i.status = 'envoyee'; i.paidDate = ''; } }
+    if (m.type === 'expense') { const e = s.expenses.find((x) => x.id === m.id); if (e) { e.paid = false; e.paidDate = ''; } }
+    b.matched = null;
+  }
+  function applyMatch(b, m) {
+    const s = App.state;
+    unmatch(b);
+    b.matched = m;
+    if (m.type === 'invoice') { const i = s.invoices.find((x) => x.id === m.id); if (i) { i.status = 'payee'; i.paidDate = b.date; } }
+    if (m.type === 'expense') { const e = s.expenses.find((x) => x.id === m.id); if (e) { e.paid = true; e.paidDate = b.date; } }
+  }
+
+  function matchModal(b, isNew) {
+    const s = App.state;
+    const openInv = s.invoices.filter((i) => i.type !== 'devis' && i.status !== 'brouillon' && (i.status !== 'payee' || (b.matched && b.matched.id === i.id)));
+    const unpaidExp = s.expenses.filter((e) => !e.paid || (b.matched && b.matched.id === e.id));
+    const best = (arr, amt) => arr.slice().sort((a, c) => Math.abs(Math.abs(amt) - Math.abs(a.v)) - Math.abs(Math.abs(amt) - Math.abs(c.v)));
+    const invOpts = best(openInv.map((i) => ({ id: i.id, v: App.invoiceTotals(i).ttc, l: `${i.number} — ${clientName(i.clientId)} — ${eur(App.invoiceTotals(i).ttc)}` })), b.amount);
+    const expOpts = best(unpaidExp.map((e) => ({ id: e.id, v: e.ttc, l: `${fdate(e.date)} ${e.supplier} — ${eur(e.ttc)}` })), b.amount);
+    const cats = [...App.EXPENSE_CATEGORIES.map((c) => [c.account, `${c.account} — ${c.label}`]), ['706000', '706000 — Prestations de services'], ['707000', '707000 — Ventes de marchandises'], ['758000', '758000 — Produits divers'], ['768000', '768000 — Produits financiers'], ['108000', '108000 — Apport / prélèvement exploitant'], ['455000', '455000 — Compte courant d\'associé'], ['164000', '164000 — Remboursement d\'emprunt'], ['445510', '445510 — Paiement de TVA'], ['444000', '444000 — Paiement de l\'IS'], ['431000', '431000 — URSSAF'], ['421000', '421000 — Salaires nets'], ['471000', '471000 — Compte d\'attente']];
+    const m = b.matched || {};
+    App.modal({
+      title: isNew ? 'Nouvelle opération' : 'Rapprocher l\'opération',
+      body: `<form class="form-grid" id="bf">
+        <label class="field">Date <input type="date" name="date" value="${b.date}"></label>
+        <label class="field">Montant (− débit / + crédit) <input type="number" step="0.01" name="amount" value="${b.amount}"></label>
+        <label class="field full">Libellé <input name="label" value="${esc(b.label)}"></label>
+        <label class="field full">Type de rapprochement <select name="type">${App.options([['', '— Non rapprochée —'], ['invoice', 'Règlement d\'une facture client'], ['expense', 'Paiement d\'une dépense saisie'], ['category', 'Catégoriser directement'], ['newexp', 'Créer une dépense à partir de l\'opération']], m.type || (b.amount > 0 && invOpts.length ? 'invoice' : b.amount < 0 && expOpts.length ? 'expense' : 'category'))}</select></label>
+        <label class="field full" data-show="invoice">Facture <select name="invoice">${App.options(invOpts.map((o) => [o.id, o.l]), m.id)}</select></label>
+        <label class="field full" data-show="expense">Dépense <select name="expense">${App.options(expOpts.map((o) => [o.id, o.l]), m.id)}</select></label>
+        <label class="field" data-show="category">Compte <select name="account">${App.options(cats, m.account || (b.amount > 0 ? '706000' : '471000'))}</select></label>
+        <label class="field" data-show="category">TVA incluse <select name="tvaRate">${App.tvaOptions(m.tvaRate ?? 0)}</select></label>
+      </form>`,
+      footer: `<button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Valider</button>`,
+      onMount: (md, close) => {
+        const f = $('#bf', md);
+        const vis = () => $$('[data-show]', md).forEach((x) => (x.hidden = x.dataset.show !== f.type.value));
+        f.type.onchange = vis; vis();
+        $('#ok', md).onclick = () => {
+          const d = App.formData(f);
+          b.date = d.date; b.amount = round2(d.amount); b.label = d.label;
+          if (isNew) s.bank.push(b);
+          if (d.type === 'newexp') {
+            App.save(); close();
+            return App.editExpense(null, { date: b.date, supplier: b.label, ttc: Math.abs(b.amount), ht: round2(Math.abs(b.amount) / 1.2), tva: round2(Math.abs(b.amount) - Math.abs(b.amount) / 1.2), paid: true, paidDate: b.date, _bank: b.id });
+          }
+          if (!d.type) unmatch(b);
+          else if (d.type === 'invoice' && d.invoice) applyMatch(b, { type: 'invoice', id: d.invoice });
+          else if (d.type === 'expense' && d.expense) applyMatch(b, { type: 'expense', id: d.expense });
+          else if (d.type === 'category') applyMatch(b, { type: 'category', account: d.account, tvaRate: Number(d.tvaRate) || 0 });
+          App.save(); close(); App.render();
+        };
+      },
+    });
+  }
+
+  function importCSV(file) {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      const rows = App.parseCSV(String(r.result));
+      if (rows.length < 2) return App.toast('Fichier vide ou illisible', 'error');
+      const header = rows[0].map((h) => h.toLowerCase());
+      const find = (...keys) => header.findIndex((h) => keys.some((k) => h.includes(k)));
+      let iDate = find('date'), iLabel = find('libell', 'label', 'description', 'intitul', 'détail', 'detail'), iAmount = find('montant', 'amount', 'valeur');
+      const iDebit = find('débit', 'debit'), iCredit = find('crédit', 'credit');
+      if (iDate < 0) iDate = 0; if (iLabel < 0) iLabel = 1;
+      let n = 0, dup = 0;
+      rows.slice(1).forEach((row) => {
+        const date = App.parseDate(row[iDate]); if (!date) return;
+        let amount = iAmount >= 0 ? App.parseAmount(row[iAmount]) : App.parseAmount(row[iCredit]) - Math.abs(App.parseAmount(row[iDebit]));
+        if (iAmount < 0 && iDebit < 0) amount = App.parseAmount(row[2]);
+        const label = (row[iLabel] || '').trim();
+        if (App.state.bank.some((b) => b.date === date && b.label === label && b.amount === round2(amount))) { dup++; return; }
+        App.state.bank.push({ id: App.uid(), date, label, amount: round2(amount), matched: null }); n++;
+      });
+      App.save(); App.toast(`${n} opération(s) importée(s)${dup ? `, ${dup} doublon(s) ignoré(s)` : ''}`, 'success'); App.render();
+    };
+    r.readAsText(file, 'utf-8');
+  }
+
+  /* ============ IMMOBILISATIONS ============ */
+  V.immobilisations = (el) => {
+    const s = App.state;
+    const y = selectedYear;
+    el.innerHTML = head('Immobilisations & amortissements', 'Biens durables de plus de 500 € HT, amortis en linéaire prorata temporis. Les dotations sont passées automatiquement à chaque clôture.',
+      '<button class="btn primary" id="new">+ Immobilisation</button>') +
+      `<div class="card">${s.assets.length ? `<div class="table-wrap"><table><thead><tr><th>Bien</th><th>Compte</th><th>Mise en service</th><th class="num">Durée</th><th class="num">Valeur HT</th><th class="num">Dotation ${y}</th><th class="num">Amort. cumulés</th><th class="num">VNC fin ${y}</th><th></th></tr></thead><tbody>
+      ${s.assets.map((a) => { const sch = App.depreciationSchedule(a); const row = sch.find((r) => r.year === y); const last = sch.filter((r) => r.year <= y).pop(); return `<tr><td><strong>${esc(a.label)}</strong><div class="small muted">${esc(a.supplier || '')}</div></td><td>${a.account}</td><td>${fdate(a.date)}</td><td class="num">${a.duration} ans</td><td class="num">${eur(a.value)}</td><td class="num">${eur(row ? row.dotation : 0)}</td><td class="num">${eur(last ? last.cumul : 0)}</td><td class="num">${eur(last ? last.vnc : a.value)}</td><td class="num"><button class="btn sm" data-plan="${a.id}">Plan</button> <button class="btn sm" data-e="${a.id}">Modifier</button></td></tr>`; }).join('')}
+      </tbody></table></div>` : '<div class="empty">Aucune immobilisation.</div>'}</div>`;
+    $('#new', el).onclick = () => editAsset(null);
+    $$('[data-e]', el).forEach((b) => (b.onclick = () => editAsset(s.assets.find((a) => a.id === b.dataset.e))));
+    $$('[data-plan]', el).forEach((b) => (b.onclick = () => {
+      const a = s.assets.find((x) => x.id === b.dataset.plan);
+      App.modal({ title: 'Plan d\'amortissement — ' + esc(a.label), body: `<table><thead><tr><th>Exercice</th><th class="num">Dotation</th><th class="num">Cumul</th><th class="num">VNC</th></tr></thead><tbody>${App.depreciationSchedule(a).map((r) => `<tr><td>${r.year}</td><td class="num">${eur(r.dotation)}</td><td class="num">${eur(r.cumul)}</td><td class="num">${eur(r.vnc)}</td></tr>`).join('')}</tbody></table>`, footer: '<button class="btn" data-close>Fermer</button>' });
+    }));
+  };
+
+  function editAsset(asset) {
+    const s = App.state;
+    const a = asset ? JSON.parse(JSON.stringify(asset)) : { id: App.uid(), label: '', account: '218300', date: App.today(), value: 0, tvaRate: 20, duration: 3, supplier: '', paid: true };
+    App.modal({
+      title: asset ? 'Modifier l\'immobilisation' : 'Nouvelle immobilisation',
+      body: `<form class="form-grid" id="af">
+        <label class="field full">Désignation <input name="label" value="${esc(a.label)}"></label>
+        <label class="field full">Catégorie <select name="account">${App.options(App.ASSET_CATEGORIES.map((c) => [c.account, `${c.account} — ${c.label} (${c.duration} ans usuels)`]), a.account)}</select></label>
+        <label class="field">Date de mise en service <input type="date" name="date" value="${a.date}"></label>
+        <label class="field">Fournisseur <input name="supplier" value="${esc(a.supplier || '')}"></label>
+        <label class="field">Valeur HT <input type="number" step="0.01" name="value" value="${a.value}"></label>
+        <label class="field">TVA <select name="tvaRate">${App.tvaOptions(a.tvaRate)}</select></label>
+        <label class="field">Durée (années) <input type="number" min="1" name="duration" value="${a.duration}"></label>
+        <label class="check"><input type="checkbox" name="paid" ${a.paid !== false ? 'checked' : ''}> Payée</label>
+      </form>`,
+      footer: `${asset ? '<button class="btn danger" id="del">Supprimer</button>' : ''}<button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Enregistrer</button>`,
+      onMount: (m, close) => {
+        const f = $('#af', m);
+        f.account.onchange = () => { const c = App.ASSET_CATEGORIES.find((x) => x.account === f.account.value); if (c) f.duration.value = c.duration; };
+        $('#ok', m).onclick = () => {
+          Object.assign(a, App.formData(f));
+          if (!a.label || !a.value) return App.toast('Désignation et valeur obligatoires', 'error');
+          const i = s.assets.findIndex((x) => x.id === a.id); if (i >= 0) s.assets[i] = a; else s.assets.push(a);
+          App.save(); close(); App.render();
+        };
+        const del = $('#del', m);
+        if (del) del.onclick = () => { s.assets = s.assets.filter((x) => x.id !== a.id); App.save(); close(); App.render(); };
+      },
+    });
+  }
+})(window.App);
+
+/* ComptaPro — TVA, journal, états financiers, clôture annuelle */
+(function (App) {
+  const { $, $$, esc, eur, fdate, round2, head } = App;
+  const V = App.views;
+
+  /* ============ TVA ============ */
+  V.tva = (el) => {
+    const s = App.state, c = s.settings.company;
+    const y = App.getYear();
+    if (c.regimeTva === 'franchise') {
+      const ca = App.incomeStatement(y).chiffreAffaires;
+      el.innerHTML = head('TVA', 'Franchise en base de TVA (art. 293 B du CGI)') + `<div class="card"><div class="alert">Vous êtes en franchise en base : vous ne facturez pas de TVA et ne la récupérez pas. La mention « TVA non applicable, art. 293 B du CGI » est ajoutée automatiquement à vos factures.</div>
+        <div class="kpi"><div class="label">Chiffre d'affaires ${y}</div><div class="value">${eur(ca)}</div><div class="sub">Surveillez les seuils de franchise (prestations de services / ventes) : en cas de dépassement, la TVA devient exigible. Demandez le seuil applicable à l'assistant IA.</div></div>
+        <p><a class="btn" href="#/parametres">Changer de régime de TVA</a></p></div>`;
+      return;
+    }
+    const periods = App.tvaPeriods(y);
+    el.innerHTML = head('TVA', `Régime ${c.regimeTva === 'reel_normal' ? 'réel normal' : 'réel simplifié'} · déclaration ${c.tvaPeriod} · TVA sur les ${c.exigibilite}`, `<select id="year">${App.yearOptions(y)}</select>`) +
+      `<div class="card"><div class="table-wrap"><table><thead><tr><th>Période</th><th class="num">Base HT</th><th class="num">TVA collectée</th><th class="num">TVA déductible</th><th class="num">Solde</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${periods.map((p) => {
+        const dec = s.tvaDeclarations.find((d) => d.start === p.start && d.end === p.end);
+        const t = dec || App.computeTva(p.start, p.end);
+        const future = p.start > App.today();
+        const st = dec ? (dec.paid || dec.net <= 0 ? '<span class="badge success">Déclarée' + (dec.net > 0 ? ' & payée' : '') + '</span>' : '<span class="badge primary">Déclarée — à payer</span>') : future ? '<span class="badge">À venir</span>' : p.end < App.today() ? '<span class="badge warning">À déclarer</span>' : '<span class="badge">En cours</span>';
+        return `<tr><td><strong>${esc(p.label)}</strong><div class="small muted">${fdate(p.start)} → ${fdate(p.end)}</div></td><td class="num">${eur(t.baseTotal)}</td><td class="num">${eur(t.collected)}</td><td class="num">${eur(t.totalDed)}</td><td class="num ${t.net > 0 ? 'neg' : 'pos'}">${t.net >= 0 ? eur(t.net) + ' à payer' : eur(-t.net) + ' crédit'}</td><td>${st}</td><td class="num">${future ? '' : `<button class="btn sm" data-p="${p.start}|${p.end}|${esc(p.label)}">${dec ? 'Voir' : 'Préparer'}</button>`}</td></tr>`;
+      }).join('')}
+      </tbody></table></div></div>
+      <div class="card"><h2>Comment ça marche</h2><p class="muted">La TVA collectée provient de vos factures émises (ou encaissées, selon l'exigibilité choisie), la TVA déductible de vos dépenses et immobilisations. « Préparer » calcule les cases du formulaire CA3 (ou CA12) à reporter sur impots.gouv.fr ; « Valider » passe l'écriture de liquidation (44571 / 44566 / 44562 / 44551) et le paiement en banque.</p></div>`;
+    $('#year', el).onchange = (e) => { App.setYear(e.target.value); V.tva(el); };
+    $$('[data-p]', el).forEach((b) => (b.onclick = () => { const [st, en, lb] = b.dataset.p.split('|'); tvaModal(st, en, lb); }));
+  };
+
+  function tvaModal(start, end, label) {
+    const s = App.state;
+    const dec = s.tvaDeclarations.find((d) => d.start === start && d.end === end);
+    const t = App.computeTva(start, end);
+    const shown = dec || t;
+    const ca3 = dec ? dec.ca3 : t.ca3;
+    App.modal({
+      title: `TVA — ${esc(label)}`, wide: true,
+      body: `${dec ? `<div class="alert success">Déclaration validée le ${fdate(dec.validatedAt)}. Les montants sont figés.</div>` : ''}
+        ${!dec && Math.abs(t.net - (dec ? dec.net : t.net)) > 0.01 ? '' : ''}
+        <div class="grid grid-2"><div><h3>Formulaire CA3 — cases à reporter</h3><table><tbody>${Object.entries(ca3).map(([k, v]) => `<tr ${/^(16|23|28|25)/.test(k) ? 'class="total"' : ''}><td>${esc(k)}</td><td class="num">${eur(v)}</td></tr>`).join('')}</tbody></table></div>
+        <div><h3>Détail par taux</h3><table><thead><tr><th>Taux</th><th class="num">Base HT</th><th class="num">TVA</th></tr></thead><tbody>${Object.entries(shown.rates || {}).map(([r, v]) => `<tr><td>${r} %</td><td class="num">${eur(v.base)}</td><td class="num">${eur(v.tva)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Aucune vente</td></tr>'}</tbody></table>
+        ${!dec ? `<h3 style="margin-top:18px">Pièces prises en compte</h3><p class="small muted">${t.docs.invoices.length} facture(s), ${t.docs.expenses.length} dépense(s), ${t.docs.assets.length} immobilisation(s), ${t.docs.bank.length} opération(s) bancaire(s).</p>` : ''}
+        <div class="alert ${shown.net > 0 ? 'warning' : 'success'}" style="margin-top:14px"><strong>${shown.net > 0 ? 'TVA nette à payer : ' + eur(shown.net) : 'Crédit de TVA : ' + eur(-shown.net)}</strong>${shown.net < 0 ? '<br><span class="small">Reporté automatiquement sur la déclaration suivante (ou remboursable sur demande, formulaire 3519).</span>' : ''}</div></div></div>
+        ${dec && dec.net > 0 ? `<label class="field" style="max-width:240px;margin-top:12px">Date de paiement <input type="date" id="pd" value="${dec.paidDate || App.today()}"></label>` : ''}`,
+      footer: dec
+        ? `<button class="btn danger" id="cancel">Annuler la validation</button><button class="btn" data-close>Fermer</button>${dec.net > 0 && !dec.paid ? '<button class="btn primary" id="pay">Marquer comme payée</button>' : ''}`
+        : `<button class="btn" data-close>Fermer</button><button class="btn" id="csv">Exporter</button><button class="btn primary" id="val">Valider la déclaration</button>`,
+      onMount: (m, close) => {
+        const v = $('#val', m);
+        if (v) v.onclick = () => {
+          s.tvaDeclarations.push({ id: App.uid(), start, end, label, validatedAt: App.today(), rates: t.rates, baseTotal: t.baseTotal, collected: t.collected, deductibleAbs: t.deductibleAbs, deductibleImmo: t.deductibleImmo, creditPrevious: t.creditPrevious, totalDed: t.totalDed, net: t.net, ca3: t.ca3, paid: false, paidDate: '' });
+          App.save(); close(); App.toast('Déclaration validée et écriture passée', 'success'); App.render();
+        };
+        const csv = $('#csv', m);
+        if (csv) csv.onclick = () => App.download(`TVA_${start}_${end}.csv`, App.toCSV([['Case', 'Montant'], ...Object.entries(t.ca3)]), 'text/csv');
+        const pay = $('#pay', m);
+        if (pay) pay.onclick = () => { dec.paid = true; dec.paidDate = $('#pd', m).value; App.save(); close(); App.render(); };
+        const cancel = $('#cancel', m);
+        if (cancel) cancel.onclick = () => App.confirmBox('Annuler la validation de cette déclaration ? L\'écriture de liquidation sera supprimée.', () => { s.tvaDeclarations = s.tvaDeclarations.filter((x) => x !== dec); App.save(); close(); App.render(); });
+      },
+    });
+  }
+
+  /* ============ JOURNAL, GRAND LIVRE, BALANCE ============ */
+  V.journal = (el) => {
+    const y = App.getYear(), fy = App.fiscalYear(y);
+    let tab = sessionStorage.getItem('jr-tab') || 'journal';
+    const all = App.buildJournal();
+    const j = all.filter((e) => e.date >= fy.start && e.date <= fy.end);
+    el.innerHTML = head('Journal & grand livre', 'Écritures en partie double générées automatiquement depuis vos pièces, plus vos opérations diverses.',
+      `<select id="year">${App.yearOptions(y)}</select><button class="btn" id="od">+ Écriture manuelle</button><button class="btn" id="fec">Export FEC</button>`) +
+      `<div class="card"><div class="tabs"><button data-t="journal">Journal</button><button data-t="gl">Grand livre</button><button data-t="balance">Balance</button></div><div id="tc"></div></div>`;
+    const draw = () => {
+      $$('.tabs button', el).forEach((b) => b.classList.toggle('active', b.dataset.t === tab));
+      const tc = $('#tc', el);
+      if (tab === 'journal') {
+        const jf = sessionStorage.getItem('jr-j') || '';
+        const list = j.filter((e) => !jf || e.journal === jf);
+        const tot = list.reduce((x, e) => { e.lines.forEach((l) => { x.d += l.debit; x.c += l.credit; }); return x; }, { d: 0, c: 0 });
+        tc.innerHTML = `<div class="toolbar"><select id="jf"><option value="">Tous les journaux</option>${App.options(Object.entries(App.JOURNALS), jf)}</select><span class="muted small">${list.length} écriture(s)</span></div>
+          ${list.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Jnl</th><th>Pièce</th><th>Compte</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead><tbody>
+          ${list.map((e) => e.lines.map((l, k) => `<tr ${k === 0 ? 'style="border-top:2px solid var(--border)"' : ''}><td>${k === 0 ? fdate(e.date) : ''}</td><td>${k === 0 ? e.journal : ''}</td><td>${k === 0 ? esc(e.ref) + (e.source.type === 'manual' ? ` <button class="btn ghost sm" data-del="${e.id}" title="Supprimer">✕</button>` : '') : ''}</td><td title="${esc(App.accountLabel(l.account))}">${l.account}</td><td>${esc(l.label || e.label)}</td><td class="num">${l.debit ? eur(l.debit) : ''}</td><td class="num">${l.credit ? eur(l.credit) : ''}</td></tr>`).join('')).join('')}
+          <tr class="total"><td colspan="5">Totaux</td><td class="num">${eur(tot.d)}</td><td class="num">${eur(tot.c)}</td></tr></tbody></table></div>` : '<div class="empty">Aucune écriture sur cet exercice.</div>'}`;
+        $('#jf', tc).onchange = (e) => { sessionStorage.setItem('jr-j', e.target.value); draw(); };
+        $$('[data-del]', tc).forEach((b) => (b.onclick = () => App.confirmBox('Supprimer cette écriture manuelle ?', () => { App.state.entries = App.state.entries.filter((x) => x.id !== b.dataset.del); App.save(); App.render(); })));
+      } else if (tab === 'gl') {
+        const bal = App.trialBalance(fy.start, fy.end, all);
+        tc.innerHTML = bal.length ? bal.map((a) => {
+          let run = 0;
+          const lines = j.flatMap((e) => e.lines.filter((l) => l.account === a.account).map((l) => ({ e, l })));
+          return `<h2 style="margin-top:18px">${a.account} — ${esc(a.label)}</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Pièce</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th><th class="num">Solde</th></tr></thead><tbody>
+            ${lines.map(({ e, l }) => { run = round2(run + l.debit - l.credit); return `<tr><td>${fdate(e.date)}</td><td>${esc(e.ref)}</td><td>${esc(l.label || e.label)}</td><td class="num">${l.debit ? eur(l.debit) : ''}</td><td class="num">${l.credit ? eur(l.credit) : ''}</td><td class="num">${eur(run)}</td></tr>`; }).join('')}
+            <tr class="total"><td colspan="3">Total compte</td><td class="num">${eur(a.debit)}</td><td class="num">${eur(a.credit)}</td><td class="num">${eur(a.solde)}</td></tr></tbody></table></div>`;
+        }).join('') : '<div class="empty">Aucune écriture.</div>';
+      } else {
+        const bal = App.trialBalance(fy.start, fy.end, all);
+        const t = bal.reduce((x, a) => ({ d: x.d + a.debit, c: x.c + a.credit }), { d: 0, c: 0 });
+        tc.innerHTML = `<div class="toolbar"><button class="btn sm" id="bcsv">Exporter la balance</button></div><div class="table-wrap"><table><thead><tr><th>Compte</th><th>Intitulé</th><th class="num">Débit</th><th class="num">Crédit</th><th class="num">Solde débiteur</th><th class="num">Solde créditeur</th></tr></thead><tbody>
+          ${bal.map((a) => `<tr><td>${a.account}</td><td>${esc(a.label)}</td><td class="num">${eur(a.debit)}</td><td class="num">${eur(a.credit)}</td><td class="num">${a.solde > 0 ? eur(a.solde) : ''}</td><td class="num">${a.solde < 0 ? eur(-a.solde) : ''}</td></tr>`).join('')}
+          <tr class="total"><td colspan="2">Totaux ${Math.abs(t.d - t.c) < 0.01 ? '<span class="badge success">équilibrée</span>' : '<span class="badge danger">déséquilibrée</span>'}</td><td class="num">${eur(t.d)}</td><td class="num">${eur(t.c)}</td><td></td><td></td></tr></tbody></table></div>`;
+        $('#bcsv', tc).onclick = () => App.download(`balance_${y}.csv`, App.toCSV([['Compte', 'Intitulé', 'Débit', 'Crédit', 'Solde'], ...bal.map((a) => [a.account, a.label, a.debit, a.credit, a.solde])]), 'text/csv');
+      }
+    };
+    $$('.tabs button', el).forEach((b) => (b.onclick = () => { tab = b.dataset.t; sessionStorage.setItem('jr-tab', tab); draw(); }));
+    $('#year', el).onchange = (e) => { App.setYear(e.target.value); V.journal(el); };
+    $('#fec', el).onclick = () => { const f = App.exportFEC(y); App.download(f.filename, f.content); App.toast('FEC exporté : ' + f.filename, 'success'); };
+    $('#od', el).onclick = manualEntry;
+    draw();
+  };
+
+  function manualEntry() {
+    const lines = [{ account: '', label: '', debit: 0, credit: 0 }, { account: '', label: '', debit: 0, credit: 0 }];
+    const known = Object.entries(App.ACCOUNT_LABELS).sort();
+    const draw = (m) => {
+      const t = lines.reduce((x, l) => ({ d: x.d + Number(l.debit || 0), c: x.c + Number(l.credit || 0) }), { d: 0, c: 0 });
+      $('#ol', m).innerHTML = lines.map((l, k) => `<tr data-k="${k}"><td><input list="acc-list" data-f="account" value="${esc(l.account)}" placeholder="ex. 625100"></td><td><input data-f="label" value="${esc(l.label)}"></td><td><input type="number" step="0.01" data-f="debit" value="${l.debit || ''}"></td><td><input type="number" step="0.01" data-f="credit" value="${l.credit || ''}"></td></tr>`).join('') +
+        `<tr class="total"><td colspan="2">${Math.abs(t.d - t.c) < 0.01 && t.d > 0 ? '<span class="badge success">Équilibrée</span>' : `<span class="badge danger">Écart ${eur(t.d - t.c)}</span>`}</td><td class="num">${eur(t.d)}</td><td class="num">${eur(t.c)}</td></tr>`;
+      $$('[data-f]', m).forEach((i) => (i.onchange = () => { const l = lines[i.closest('tr').dataset.k]; l[i.dataset.f] = i.dataset.f === 'debit' || i.dataset.f === 'credit' ? Number(i.value) || 0 : i.value.trim(); draw(m); }));
+    };
+    App.modal({
+      title: 'Écriture manuelle (opération diverse)', wide: true,
+      body: `<div class="form-grid"><label class="field">Date <input type="date" id="od-date" value="${App.today()}"></label><label class="field">Journal <select id="od-j">${App.options(Object.entries(App.JOURNALS), 'OD')}</select></label><label class="field">Pièce <input id="od-ref" value="OD"></label><label class="field full">Libellé <input id="od-label" placeholder="ex. Charges constatées d'avance, salaires, emprunt…"></label></div>
+        <datalist id="acc-list">${known.map(([a, l]) => `<option value="${a}">${esc(l)}</option>`).join('')}</datalist>
+        <div class="table-wrap" style="margin-top:14px"><table class="lines-table"><thead><tr><th>Compte</th><th>Libellé</th><th>Débit</th><th>Crédit</th></tr></thead><tbody id="ol"></tbody></table></div>
+        <button class="btn sm" id="addl" style="margin-top:8px">+ Ligne</button>`,
+      footer: '<button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Enregistrer</button>',
+      onMount: (m, close) => {
+        draw(m);
+        $('#addl', m).onclick = () => { lines.push({ account: '', label: '', debit: 0, credit: 0 }); draw(m); };
+        $('#ok', m).onclick = () => {
+          const valid = lines.filter((l) => l.account && (l.debit || l.credit));
+          const d = round2(valid.reduce((x, l) => x + l.debit, 0)), c = round2(valid.reduce((x, l) => x + l.credit, 0));
+          if (valid.length < 2 || d !== c) return App.toast('L\'écriture doit comporter au moins 2 lignes et être équilibrée', 'error');
+          if (valid.some((l) => !/^\d{3,8}$/.test(l.account))) return App.toast('Numéro de compte invalide (chiffres uniquement)', 'error');
+          valid.forEach((l) => { l.account = l.account.padEnd(6, '0'); });
+          App.state.entries.push({ id: 'OD-' + App.uid(), date: $('#od-date', m).value, journal: $('#od-j', m).value, ref: $('#od-ref', m).value, label: $('#od-label', m).value || 'Opération diverse', lines: valid });
+          App.save(); close(); App.toast('Écriture enregistrée', 'success'); App.render();
+        };
+      },
+    });
+  }
+
+  /* ============ ÉTATS FINANCIERS ============ */
+  function incomeHTML(r, prev) {
+    const row = (l, v, p, cls) => `<tr class="${cls || ''}"><td>${l}</td><td class="num">${eur(v)}</td>${prev ? `<td class="num muted">${eur(p)}</td>` : ''}</tr>`;
+    const P = prev || {};
+    return `<table class="statement"><thead><tr><th>Compte de résultat</th><th class="num">${r.fy.label}</th>${prev ? `<th class="num">${prev.fy.label}</th>` : ''}</tr></thead><tbody>
+      <tr class="section"><td colspan="3">Produits d'exploitation</td></tr>
+      ${row('Ventes de marchandises', r.ventesMarchandises, P.ventesMarchandises)}${row('Production vendue (services)', r.production, P.production)}
+      ${row('Chiffre d\'affaires net', r.chiffreAffaires, P.chiffreAffaires, 'sub')}${row('Subventions d\'exploitation', r.subventions, P.subventions)}${row('Autres produits', r.autresProduits, P.autresProduits)}
+      ${row('Total produits d\'exploitation', r.produitsExploitation, P.produitsExploitation, 'total')}
+      <tr class="section"><td colspan="3">Charges d'exploitation</td></tr>
+      ${row('Achats de marchandises', r.achatsMarchandises, P.achatsMarchandises)}${row('Achats de matières et fournitures', r.achatsMatieres, P.achatsMatieres)}${row('Autres achats et charges externes', r.chargesExternes, P.chargesExternes)}
+      ${row('Impôts, taxes et versements assimilés', r.impotsTaxes, P.impotsTaxes)}${row('Salaires et traitements', r.salaires, P.salaires)}${row('Charges sociales', r.chargesSociales, P.chargesSociales)}
+      ${row('Dotations aux amortissements', r.dotations, P.dotations)}${row('Autres charges', r.autresCharges, P.autresCharges)}
+      ${row('Total charges d\'exploitation', r.chargesExploitation, P.chargesExploitation, 'total')}
+      ${row('<strong>Résultat d\'exploitation</strong>', r.resultatExploitation, P.resultatExploitation, 'total')}
+      ${row('Produits financiers', r.produitsFinanciers, P.produitsFinanciers)}${row('Charges financières', r.chargesFinancieres, P.chargesFinancieres)}
+      ${row('Résultat financier', r.resultatFinancier, P.resultatFinancier, 'sub')}${row('<strong>Résultat courant avant impôt</strong>', r.resultatCourant, P.resultatCourant, 'total')}
+      ${row('Produits exceptionnels', r.produitsExceptionnels, P.produitsExceptionnels)}${row('Charges exceptionnelles', r.chargesExceptionnelles, P.chargesExceptionnelles)}
+      ${row('Résultat exceptionnel', r.resultatExceptionnel, P.resultatExceptionnel, 'sub')}${row('Impôt sur les bénéfices', r.is, P.is)}
+      ${row('<strong>RÉSULTAT NET</strong>', r.resultatNet, P.resultatNet, 'total')}
+    </tbody></table>`;
+  }
+
+  function balanceHTML(b) {
+    const A = b.actif, P = b.passif;
+    return `<div class="grid grid-2">
+      <div><table class="statement"><thead><tr><th>Actif</th><th class="num">Brut</th><th class="num">Amort.</th><th class="num">Net</th></tr></thead><tbody>
+        <tr class="section"><td colspan="4">Actif immobilisé</td></tr>
+        <tr><td>Immobilisations incorporelles</td><td class="num">${eur(A.immoIncorp.brut)}</td><td class="num">${eur(A.immoIncorp.amort)}</td><td class="num">${eur(A.immoIncorp.net)}</td></tr>
+        <tr><td>Immobilisations corporelles</td><td class="num">${eur(A.immoCorp.brut)}</td><td class="num">${eur(A.immoCorp.amort)}</td><td class="num">${eur(A.immoCorp.net)}</td></tr>
+        <tr><td>Immobilisations financières</td><td class="num">${eur(A.immoFin.brut)}</td><td class="num"></td><td class="num">${eur(A.immoFin.net)}</td></tr>
+        <tr class="total"><td colspan="3">Total actif immobilisé</td><td class="num">${eur(A.totalImmo)}</td></tr>
+        <tr class="section"><td colspan="4">Actif circulant</td></tr>
+        <tr><td colspan="3">Stocks</td><td class="num">${eur(A.stocks)}</td></tr>
+        <tr><td colspan="3">Créances clients</td><td class="num">${eur(A.clients)}</td></tr>
+        <tr><td colspan="3">Autres créances (dont TVA)</td><td class="num">${eur(A.autresCreances)}</td></tr>
+        <tr><td colspan="3">Disponibilités</td><td class="num">${eur(A.disponibilites)}</td></tr>
+        <tr><td colspan="3">Charges constatées d'avance</td><td class="num">${eur(A.chargesConstatees)}</td></tr>
+        <tr class="total"><td colspan="3">Total actif circulant</td><td class="num">${eur(A.totalCirculant)}</td></tr>
+        <tr class="total"><td colspan="3"><strong>TOTAL ACTIF</strong></td><td class="num">${eur(A.total)}</td></tr>
+      </tbody></table></div>
+      <div><table class="statement"><thead><tr><th>Passif</th><th class="num">Montant</th></tr></thead><tbody>
+        <tr class="section"><td colspan="2">Capitaux propres</td></tr>
+        <tr><td>Capital / compte de l'exploitant</td><td class="num">${eur(P.capital)}</td></tr>
+        <tr><td>Réserves</td><td class="num">${eur(P.reserves)}</td></tr>
+        <tr><td>Report à nouveau</td><td class="num">${eur(P.reportANouveau)}</td></tr>
+        <tr><td>Résultat de l'exercice</td><td class="num ${P.resultat >= 0 ? 'pos' : 'neg'}">${eur(P.resultat)}</td></tr>
+        <tr class="total"><td>Total capitaux propres</td><td class="num">${eur(P.capitauxPropres)}</td></tr>
+        <tr><td>Provisions</td><td class="num">${eur(P.provisions)}</td></tr>
+        <tr class="section"><td colspan="2">Dettes</td></tr>
+        <tr><td>Emprunts et dettes financières</td><td class="num">${eur(P.emprunts)}</td></tr>
+        <tr><td>Dettes fournisseurs</td><td class="num">${eur(P.fournisseurs)}</td></tr>
+        <tr><td>Dettes fiscales et sociales (dont TVA)</td><td class="num">${eur(P.dettesFiscales)}</td></tr>
+        <tr><td>Autres dettes (comptes courants…)</td><td class="num">${eur(P.autresDettes)}</td></tr>
+        <tr><td>Produits constatés d'avance</td><td class="num">${eur(P.produitsConstates)}</td></tr>
+        <tr class="total"><td>Total dettes</td><td class="num">${eur(P.dettes)}</td></tr>
+        <tr class="total"><td><strong>TOTAL PASSIF</strong></td><td class="num">${eur(P.total)}</td></tr>
+      </tbody></table></div></div>
+      ${b.equilibre ? '<div class="alert success" style="margin-top:14px">✓ Bilan équilibré</div>' : `<div class="alert danger" style="margin-top:14px">Écart actif / passif : ${eur(b.ecart)}. Vérifiez vos écritures manuelles.</div>`}`;
+  }
+
+  function sig(r) {
+    const ca = r.chiffreAffaires || 1;
+    const rows = [['Chiffre d\'affaires', r.chiffreAffaires], ['Valeur ajoutée', r.valeurAjoutee], ['Excédent brut d\'exploitation (EBE)', r.ebe], ['Résultat d\'exploitation', r.resultatExploitation], ['Résultat courant avant impôt', r.resultatCourant], ['Résultat net', r.resultatNet], ['Capacité d\'autofinancement (approx.)', round2(r.resultatNet + r.dotations)]];
+    return `<table><thead><tr><th>Soldes intermédiaires de gestion</th><th class="num">Montant</th><th class="num">% CA</th></tr></thead><tbody>${rows.map(([l, v]) => `<tr><td>${l}</td><td class="num">${eur(v)}</td><td class="num">${App.pct((v / ca) * 100)}</td></tr>`).join('')}</tbody></table>`;
+  }
+
+  V.etats = (el) => {
+    const y = App.getYear();
+    let tab = sessionStorage.getItem('et-tab') || 'resultat';
+    const j = App.buildJournal();
+    const r = App.incomeStatement(y, j), prev = App.incomeStatement(y - 1, j), b = App.balanceSheet(y, j);
+    el.innerHTML = head('Bilan & compte de résultat', `Exercice ${r.fy.label} — états établis selon le PCG (modèle simplifié type 2033).`,
+      `<select id="year">${App.yearOptions(y)}</select>${App.isArtifact ? '' : '<button class="btn" id="print">Imprimer / PDF</button>'}`) +
+      `<div class="card"><div class="tabs no-print"><button data-t="resultat">Compte de résultat</button><button data-t="bilan">Bilan</button><button data-t="sig">Soldes de gestion</button></div><div id="tc"></div></div>`;
+    const draw = () => {
+      $$('.tabs button', el).forEach((x) => x.classList.toggle('active', x.dataset.t === tab));
+      $('#tc', el).innerHTML = `<div class="table-wrap">${tab === 'resultat' ? incomeHTML(r, prev) : tab === 'bilan' ? balanceHTML(b) : sig(r)}</div>`;
+    };
+    $$('.tabs button', el).forEach((x) => (x.onclick = () => { tab = x.dataset.t; sessionStorage.setItem('et-tab', tab); draw(); }));
+    $('#year', el).onchange = (e) => { App.setYear(e.target.value); V.etats(el); };
+    if ($('#print', el)) $('#print', el).onclick = () => window.print();
+    draw();
+  };
+
+  /* ============ CLÔTURE ANNUELLE ============ */
+  V.cloture = (el) => {
+    const s = App.state, c = s.settings.company;
+    const y = App.getYear(), fy = App.fiscalYear(y);
+    const j = App.buildJournal();
+    const r = App.incomeStatement(y, j), b = App.balanceSheet(y, j);
+    const closing = s.closings.find((x) => x.year === y);
+    const inFy = (d) => d >= fy.start && d <= fy.end;
+    const bankTodo = s.bank.filter((x) => inFy(x.date) && !x.matched).length;
+    const drafts = s.invoices.filter((i) => inFy(i.date) && i.type === 'facture' && i.status === 'brouillon').length;
+    const unpaid = s.invoices.filter((i) => inFy(i.date) && i.type === 'facture' && i.status === 'envoyee');
+    const noReceipt = s.expenses.filter((e) => inFy(e.date) && !e.receipt).length;
+    const periods = c.regimeTva === 'franchise' ? [] : App.tvaPeriods(y);
+    const tvaTodo = periods.filter((p) => p.end < App.today() && !s.tvaDeclarations.some((d) => d.start === p.start)).length;
+    const suspense = App.trialBalance(null, fy.end, j).filter((a) => a.account.startsWith('471') && Math.abs(a.solde) > 0.01);
+    const isEstimate = c.impot === 'IS' ? App.estimateIS(r.resultatAvantImpot) : 0;
+    const checks = [
+      { ok: !bankTodo, t: 'Rapprochement bancaire', d: bankTodo ? `${bankTodo} opération(s) non rapprochée(s) — <a href="#/banque">rapprocher</a>` : 'Toutes les opérations sont rapprochées' },
+      { ok: !drafts, t: 'Factures en brouillon', d: drafts ? `${drafts} facture(s) en brouillon non comptabilisée(s) — <a href="#/factures">vérifier</a>` : 'Aucune' },
+      { ok: !unpaid.length, t: 'Créances clients', d: unpaid.length ? `${unpaid.length} facture(s) non réglée(s) (${eur(unpaid.reduce((x, i) => x + App.invoiceTotals(i).ttc, 0))}). Évaluez le risque d'impayé : provision pour créance douteuse (compte 491/6817) si nécessaire.` : 'Toutes les factures sont réglées' },
+      { ok: !noReceipt, t: 'Justificatifs', d: noReceipt ? `${noReceipt} dépense(s) sans justificatif — à conserver 10 ans` : 'Tous les justificatifs sont joints' },
+      { ok: !tvaTodo, t: 'Déclarations de TVA', d: tvaTodo ? `${tvaTodo} période(s) échue(s) non déclarée(s) — <a href="#/tva">déclarer</a>` : c.regimeTva === 'franchise' ? 'Franchise en base' : 'À jour' },
+      { ok: true, t: 'Amortissements', d: `Dotations ${y} calculées automatiquement : ${eur(r.dotations)}` },
+      { ok: !suspense.length, t: 'Compte d\'attente 471', d: suspense.length ? `Solde de ${eur(suspense.reduce((x, a) => x + a.solde, 0))} à reclasser via une écriture manuelle` : 'Soldé' },
+      { ok: b.equilibre, t: 'Équilibre du bilan', d: b.equilibre ? 'Actif = passif' : 'Écart ' + eur(b.ecart) },
+      { ok: !!closing, t: 'Impôt et clôture', d: closing ? `Exercice clôturé le ${fdate(closing.date)}${closing.isAmount ? ' — IS comptabilisé : ' + eur(closing.isAmount) : ''}` : 'À enregistrer ci-dessous' },
+    ];
+    const done = checks.filter((x) => x.ok).length;
+    el.innerHTML = head('Clôture annuelle', `Exercice ${fy.label} — du ${fdate(fy.start)} au ${fdate(fy.end)}`, `<select id="year">${App.yearOptions(y)}</select>`) +
+      `<div class="grid grid-2">
+        <div class="card"><h2>Check-list de clôture (${done}/${checks.length})</h2><ul class="checklist">${checks.map((x) => `<li><span class="st ${x.ok ? 'ok' : 'ko'}">${x.ok ? '✓' : '!'}</span><div><strong>${x.t}</strong><div class="small muted">${x.d}</div></div></li>`).join('')}</ul></div>
+        <div class="card"><h2>Synthèse</h2><table><tbody>
+          <tr><td>Chiffre d'affaires</td><td class="num">${eur(r.chiffreAffaires)}</td></tr>
+          <tr><td>Résultat avant impôt</td><td class="num">${eur(r.resultatAvantImpot)}</td></tr>
+          <tr><td>${c.impot === 'IS' ? 'IS estimé (15 % / 25 %)' : 'Résultat imposable à l\'IR (BIC/BNC)'}</td><td class="num">${eur(c.impot === 'IS' ? isEstimate : r.resultatAvantImpot)}</td></tr>
+          <tr class="total"><td>Résultat net ${closing ? '' : '(prévisionnel)'}</td><td class="num">${eur(c.impot === 'IS' && !closing ? r.resultatAvantImpot - isEstimate : r.resultatNet)}</td></tr>
+          <tr><td>Total du bilan</td><td class="num">${eur(b.actif.total)}</td></tr>
+          <tr><td>Capitaux propres</td><td class="num">${eur(b.passif.capitauxPropres)}</td></tr>
+          <tr><td>Trésorerie</td><td class="num">${eur(b.actif.disponibilites)}</td></tr></tbody></table>
+          ${closing ? `<div class="alert success" style="margin-top:14px">Exercice clôturé. Le résultat sera reporté automatiquement en « report à nouveau » à l'ouverture de l'exercice suivant.</div><button class="btn danger" id="reopen">Rouvrir l'exercice</button>`
+            : `<div class="form-grid" style="margin-top:14px">${c.impot === 'IS' ? `<label class="field">Montant de l'IS à comptabiliser <input type="number" step="1" id="isamt" value="${Math.round(isEstimate)}"></label>` : ''}</div>
+               <div class="actions" style="margin-top:12px"><button class="btn primary" id="close">Clôturer l'exercice ${y}</button></div>`}
+        </div></div>
+      <div class="card"><h2>Documents de fin d'exercice</h2><div class="actions">
+        <a class="btn" href="#/etats">Bilan & compte de résultat</a>
+        <button class="btn" id="fec">Fichier des écritures comptables (FEC)</button>
+        <button class="btn" id="liasse">Tableau de reprise liasse 2033</button>
+        <button class="btn" id="ai-close" ${App.ai.isReady() ? '' : 'disabled title="Activez l\'IA dans les paramètres"'}>✦ Revue de clôture par l'IA</button>
+      </div><div id="ai-out" class="report" style="margin-top:14px"></div></div>
+      <div class="card"><h2>Échéances après clôture</h2><ul>
+        <li>Liasse fiscale (2033 ou 2050) et ${c.impot === 'IS' ? 'relevé de solde d\'IS (2572)' : 'déclaration de résultat (2031 BIC / 2035 BNC)'} : en général le 2e jour ouvré suivant le 1er mai pour une clôture au 31/12 (délai supplémentaire de 15 jours en ligne).</li>
+        ${c.regimeTva === 'reel_simplifie' ? '<li>Déclaration annuelle de TVA CA12 : début mai pour une clôture au 31/12.</li>' : ''}
+        ${c.legalForm !== 'EI' && c.legalForm !== 'Micro' ? '<li>Approbation des comptes par l\'assemblée dans les 6 mois, puis dépôt au greffe dans le mois suivant.</li>' : ''}
+        <li>Déclaration des revenus du dirigeant / DSI selon le statut.</li></ul></div>`;
+    $('#year', el).onchange = (e) => { App.setYear(e.target.value); V.cloture(el); };
+    $('#fec', el).onclick = () => { const f = App.exportFEC(y); App.download(f.filename, f.content); };
+    $('#liasse', el).onclick = () => liasse(r, b);
+    const cl = $('#close', el);
+    if (cl) cl.onclick = () => App.confirmBox(`Clôturer l'exercice ${y} ? ${checks.some((x) => !x.ok && x.t !== 'Impôt et clôture') ? '<br><strong>Certains contrôles ne sont pas validés.</strong>' : ''}`, () => {
+      s.closings.push({ year: y, date: App.today(), isAmount: c.impot === 'IS' ? Number(($('#isamt', el) || {}).value) || 0 : 0 });
+      App.save(); App.toast('Exercice clôturé', 'success'); App.render();
+    }, 'Clôturer');
+    const ro = $('#reopen', el);
+    if (ro) ro.onclick = () => App.confirmBox('Rouvrir l\'exercice ? L\'écriture d\'IS sera supprimée.', () => { s.closings = s.closings.filter((x) => x.year !== y); App.save(); App.render(); });
+    const aiBtn = $('#ai-close', el);
+    if (aiBtn) aiBtn.onclick = async () => {
+      aiBtn.disabled = true; const out = $('#ai-out', el); out.innerHTML = '<span class="spinner"></span> Revue en cours…';
+      try {
+        await App.ai.chat([{ role: 'user', content: `Fais la revue de clôture de l'exercice ${fy.label}. Check-list : ${JSON.stringify(checks.map((x) => ({ point: x.t, ok: x.ok, detail: x.d.replace(/<[^>]+>/g, '') })))}. Liste les écritures d'inventaire à passer (charges à payer, produits à recevoir, charges et produits constatés d'avance, provisions), les risques fiscaux, l'optimisation possible du résultat (légale), et le montant d'IS/IR. Termine par un plan d'action numéroté.` }], (t) => (out.innerHTML = App.ai.md(t)));
+      } catch (e) { out.innerHTML = `<div class="alert danger">${esc(e.message)}</div>`; }
+      aiBtn.disabled = false;
+    };
+  };
+
+  function liasse(r, b) {
+    const rows = [
+      ['2033-A', 'Immobilisations incorporelles (net)', b.actif.immoIncorp.net], ['2033-A', 'Immobilisations corporelles (net)', b.actif.immoCorp.net],
+      ['2033-A', 'Créances clients', b.actif.clients], ['2033-A', 'Autres créances', b.actif.autresCreances], ['2033-A', 'Disponibilités', b.actif.disponibilites], ['2033-A', 'TOTAL ACTIF', b.actif.total],
+      ['2033-A', 'Capital social ou individuel', b.passif.capital], ['2033-A', 'Report à nouveau', b.passif.reportANouveau], ['2033-A', 'Résultat de l\'exercice', b.passif.resultat],
+      ['2033-A', 'Emprunts et dettes assimilées', b.passif.emprunts], ['2033-A', 'Fournisseurs et comptes rattachés', b.passif.fournisseurs], ['2033-A', 'Autres dettes (fiscales, sociales…)', round2(b.passif.dettesFiscales + b.passif.autresDettes)], ['2033-A', 'TOTAL PASSIF', b.passif.total],
+      ['2033-B', 'Ventes de marchandises', r.ventesMarchandises], ['2033-B', 'Production vendue (services)', r.production], ['2033-B', 'Subventions d\'exploitation', r.subventions],
+      ['2033-B', 'Achats de marchandises', r.achatsMarchandises], ['2033-B', 'Achats de matières premières et approvisionnements', r.achatsMatieres], ['2033-B', 'Autres charges externes', r.chargesExternes],
+      ['2033-B', 'Impôts, taxes', r.impotsTaxes], ['2033-B', 'Rémunérations du personnel', r.salaires], ['2033-B', 'Charges sociales', r.chargesSociales], ['2033-B', 'Dotations aux amortissements', r.dotations],
+      ['2033-B', 'Résultat d\'exploitation', r.resultatExploitation], ['2033-B', 'Produits financiers', r.produitsFinanciers], ['2033-B', 'Charges financières', r.chargesFinancieres],
+      ['2033-B', 'Produits exceptionnels', r.produitsExceptionnels], ['2033-B', 'Charges exceptionnelles', r.chargesExceptionnelles], ['2033-B', 'Impôt sur les bénéfices', r.is], ['2033-B', 'Bénéfice ou perte', r.resultatNet],
+    ];
+    App.modal({
+      title: 'Tableau de reprise — liasse 2033', wide: true,
+      body: `<p class="muted small">Montants à reporter sur les formulaires 2033-A (bilan simplifié) et 2033-B (compte de résultat simplifié). Les retraitements fiscaux (2033-B cadre B : réintégrations, déductions) restent à apprécier — demandez à l'assistant IA.</p><table><thead><tr><th>Formulaire</th><th>Rubrique</th><th class="num">Montant</th></tr></thead><tbody>${rows.map((x) => `<tr><td>${x[0]}</td><td>${x[1]}</td><td class="num">${eur(x[2])}</td></tr>`).join('')}</tbody></table>`,
+      footer: '<button class="btn" data-close>Fermer</button><button class="btn primary" id="csv">Exporter CSV</button>',
+      onMount: (m) => ($('#csv', m).onclick = () => App.download(`liasse_2033_${r.fy.end.slice(0, 4)}.csv`, App.toCSV([['Formulaire', 'Rubrique', 'Montant'], ...rows]), 'text/csv')),
+    });
+  }
+})(window.App);
+
+/* ComptaPro — Assistant IA et paramètres */
+(function (App) {
+  const { $, $$, esc, eur, fdate, round2, head } = App;
+  const V = App.views;
+
+  const SUGGESTIONS = [
+    'Combien de TVA vais-je devoir payer ce mois-ci ?',
+    'Quel est mon résultat prévisionnel et l\'impôt associé ?',
+    'Quelles dépenses puis-je encore déduire avant la clôture ?',
+    'Ai-je intérêt à passer de l\'IR à l\'IS ?',
+    'Quels clients me paient le plus en retard ?',
+    'Explique-moi mon bilan simplement',
+    'Quelles sont mes prochaines échéances fiscales et sociales ?',
+    'Comment comptabiliser un leasing de véhicule ?',
+  ];
+
+  V.ia = (el, params) => {
+    const s = App.state;
+    let tab = params[0] || sessionStorage.getItem('ia-tab') || 'chat';
+    el.innerHTML = head('Assistant IA', 'Votre expert-comptable disponible 24 h/24 : il connaît toute votre comptabilité, répond à vos questions, scanne vos justificatifs, trie vos opérations et analyse vos chiffres.') +
+      (App.ai.isReady() ? (App.ai.builtin ? '<div class="alert success">✦ Claude est intégré : aucune clé API nécessaire.</div>' : '') : `<div class="alert warning">Pour activer l'assistant, ajoutez votre clé API Claude dans <a href="#/parametres">Paramètres</a>. Elle reste stockée uniquement dans ce navigateur.</div>`) +
+      `<div class="card"><div class="tabs"><button data-t="chat">💬 Questions</button><button data-t="scan">📷 Scanner & trier</button><button data-t="analyse">📈 Analyse financière</button></div><div id="tc"></div></div>`;
+    const draw = () => {
+      $$('.tabs button', el).forEach((b) => b.classList.toggle('active', b.dataset.t === tab));
+      ({ chat: chatTab, scan: scanTab, analyse: analyseTab })[tab]($('#tc', el));
+    };
+    $$('.tabs button', el).forEach((b) => (b.onclick = () => { tab = b.dataset.t; sessionStorage.setItem('ia-tab', tab); draw(); }));
+    draw();
+  };
+
+  function chatTab(tc) {
+    const s = App.state;
+    const render = () => {
+      const log = $('#log', tc);
+      log.innerHTML = s.aiChat.length ? s.aiChat.map((m) => `<div class="msg ${m.role}">${m.role === 'assistant' ? App.ai.md(m.content) : esc(m.content)}</div>`).join('')
+        : `<div class="empty">Posez n'importe quelle question sur votre comptabilité, la TVA, la fiscalité ou la gestion.<br>L'assistant a accès à vos chiffres en temps réel.</div>`;
+      log.scrollTop = log.scrollHeight;
+    };
+    tc.innerHTML = `<div class="chat"><div class="suggestions">${SUGGESTIONS.map((q) => `<button>${esc(q)}</button>`).join('')}</div>
+      <div class="chat-log" id="log"></div>
+      <div class="chat-input"><textarea id="q" placeholder="Votre question… (Entrée pour envoyer, Maj+Entrée pour un saut de ligne)"></textarea><button class="btn primary" id="send">Envoyer</button><button class="btn" id="clear" title="Effacer la conversation">↺</button></div></div>`;
+    render();
+    const send = async (text) => {
+      text = (text || '').trim(); if (!text) return;
+      s.aiChat.push({ role: 'user', content: text });
+      const log = $('#log', tc);
+      render();
+      const bubble = document.createElement('div'); bubble.className = 'msg assistant'; bubble.innerHTML = '<span class="spinner"></span>';
+      log.appendChild(bubble); log.scrollTop = log.scrollHeight;
+      $('#send', tc).disabled = true;
+      try {
+        const answer = await App.ai.chat(s.aiChat.slice(-20), (t) => { bubble.innerHTML = App.ai.md(t); log.scrollTop = log.scrollHeight; });
+        s.aiChat.push({ role: 'assistant', content: answer });
+      } catch (e) {
+        s.aiChat.pop();
+        bubble.innerHTML = `<div class="neg">${esc(e.message)}</div>`;
+        $('#send', tc).disabled = false; return;
+      }
+      App.save(); render(); $('#send', tc).disabled = false;
+    };
+    const q = $('#q', tc);
+    $('#send', tc).onclick = () => { const v = q.value; q.value = ''; send(v); };
+    q.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#send', tc).click(); } };
+    $$('.suggestions button', tc).forEach((b) => (b.onclick = () => send(b.textContent)));
+    $('#clear', tc).onclick = () => { s.aiChat = []; App.save(); render(); };
+  }
+
+  function scanTab(tc) {
+    const s = App.state;
+    const results = [];
+    tc.innerHTML = `<div class="grid grid-2">
+      <div><h2>Scanner des justificatifs</h2><p class="muted">Photos de tickets, factures PDF, notes de frais : l'IA lit le document, détermine la catégorie comptable, la TVA récupérable, détecte les immobilisations et prépare la saisie.</p>
+        <label class="dropzone" id="dz"><input type="file" id="files" accept="image/*,application/pdf" multiple hidden><div style="font-size:28px">📄</div><strong>Glissez vos justificatifs ici</strong><div class="small">ou cliquez pour choisir / prendre une photo — JPG, PNG, PDF</div></label></div>
+      <div><h2>Trier la banque</h2><p class="muted">L'IA rapproche les encaissements de vos factures, les débits de vos dépenses et classe le reste dans le bon compte avec le bon taux de TVA.</p>
+        <p><strong>${s.bank.filter((b) => !b.matched).length}</strong> opération(s) en attente.</p><a class="btn" href="#/banque">Aller à la banque →</a></div></div>
+      <div id="res" style="margin-top:18px"></div>`;
+    const dz = $('#dz', tc);
+    ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
+    dz.addEventListener('drop', (e) => handle([...e.dataTransfer.files]));
+    $('#files', tc).onchange = (e) => handle([...e.target.files]);
+
+    const draw = () => {
+      $('#res', tc).innerHTML = results.length ? `<h2>Documents analysés</h2><div class="table-wrap"><table><thead><tr><th></th><th>Document</th><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th><th></th></tr></thead><tbody>
+        ${results.map((r, k) => `<tr><td>${r.thumb ? `<img class="receipt-thumb" src="${r.thumb}" alt="">` : '📄'}</td><td>${esc(r.file.name)}${r.data ? `<div class="small muted">${esc(r.data.document_type)} · confiance ${Math.round(r.data.confidence * 100)} %${r.data.remarks ? ' · ' + esc(r.data.remarks) : ''}</div>` : ''}</td>
+          ${r.status === 'loading' ? '<td colspan="7"><span class="spinner"></span> Analyse…</td>' : r.status === 'error' ? `<td colspan="7" class="neg">${esc(r.error)}</td>` :
+          `<td>${fdate(r.data.date)}</td><td>${esc(r.data.supplier)}</td><td>${r.data.is_asset ? '<span class="badge primary">Immobilisation</span>' : esc(App.accountLabel(r.data.account))}</td><td class="num">${eur(r.data.total_ht)}</td><td class="num">${eur(r.data.total_tva)}</td><td class="num">${eur(r.data.total_ttc)}</td>
+          <td class="num">${r.saved ? '<span class="badge success">Enregistré</span>' : `<button class="btn sm" data-edit="${k}">Vérifier</button> <button class="btn sm primary" data-save="${k}">Enregistrer</button>`}</td>`}</tr>`).join('')}
+        </tbody></table></div>${results.some((r) => r.status === 'ok' && !r.saved) ? '<div class="actions" style="margin-top:10px"><button class="btn primary" id="saveall">Tout enregistrer</button></div>' : ''}` : '';
+      $$('[data-save]', tc).forEach((b) => (b.onclick = () => { saveResult(results[b.dataset.save]); draw(); }));
+      $$('[data-edit]', tc).forEach((b) => (b.onclick = () => {
+        const r = results[b.dataset.edit];
+        r.saved = true; draw();
+        App.editExpense(null, toExpense(r));
+      }));
+      const sa = $('#saveall', tc);
+      if (sa) sa.onclick = () => { results.filter((r) => r.status === 'ok' && !r.saved).forEach(saveResult); App.toast('Justificatifs enregistrés', 'success'); draw(); };
+    };
+
+    const toExpense = (r) => {
+      const d = r.data;
+      return {
+        date: d.date || App.today(), supplier: d.supplier, description: d.description || d.number,
+        account: App.EXPENSE_CATEGORIES.some((c) => c.account === d.account) ? d.account : '471000',
+        ht: round2(d.total_ht), tva: round2(d.total_tva), ttc: round2(d.total_ttc), tvaRate: App.TVA_RATES.includes(Number(d.tva_rate)) ? Number(d.tva_rate) : 20,
+        paymentMethod: ['carte', 'virement', 'prelevement', 'cheque', 'especes'].includes(d.payment_method) ? d.payment_method : 'carte',
+        paid: d.payment_method !== 'inconnu', paidDate: d.date, receipt: r.thumb, ref: d.number,
+      };
+    };
+    const saveResult = (r) => {
+      const d = r.data;
+      if (d.document_type === 'facture_vente') { App.toast(`${r.file.name} est une facture de vente : créez-la dans Factures.`, 'error'); return; }
+      if (d.is_asset && App.ASSET_CATEGORIES.some((c) => c.account === d.asset_account)) {
+        s.assets.push({ id: App.uid(), label: d.description || d.supplier, account: d.asset_account, date: d.date || App.today(), value: round2(d.total_ht), tvaRate: Number(d.tva_rate) || 0, duration: Number(d.asset_duration_years) || App.ASSET_CATEGORIES.find((c) => c.account === d.asset_account).duration, supplier: d.supplier, paid: true });
+      } else {
+        s.expenses.push(Object.assign({ id: App.uid() }, toExpense(r)));
+      }
+      r.saved = true; App.save();
+    };
+
+    async function handle(files) {
+      if (!App.ai.isReady()) return App.toast('Ajoutez votre clé API dans les paramètres', 'error');
+      for (const file of files) {
+        const r = { file, status: 'loading', thumb: await App.compressImage(file, 800) };
+        results.push(r); draw();
+        App.ai.scanDocument(file).then((data) => { r.data = data; r.status = 'ok'; draw(); }).catch((e) => { r.status = 'error'; r.error = e.message; draw(); });
+      }
+    }
+    draw();
+  }
+
+  function analyseTab(tc) {
+    const last = App.state.lastAnalysis;
+    tc.innerHTML = `<div class="actions" style="margin-bottom:14px"><button class="btn primary" id="go">✦ Lancer une analyse complète</button>${last ? `<span class="muted small">Dernière analyse : ${fdate(last.date)}</span>${App.isArtifact ? '' : '<button class="btn" id="print">Imprimer</button>'}` : ''}</div>
+      <div class="report" id="out">${last ? App.ai.md(last.text) : '<div class="empty">L\'IA examine votre rentabilité, vos charges, votre trésorerie, la TVA, les anomalies de saisie et les optimisations possibles.</div>'}</div>`;
+    $('#go', tc).onclick = async (e) => {
+      const btn = e.currentTarget; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Analyse en cours…';
+      const out = $('#out', tc);
+      try {
+        const text = await App.ai.analyze((t) => (out.innerHTML = App.ai.md(t)));
+        App.state.lastAnalysis = { date: App.today(), text }; App.save();
+      } catch (err) { out.innerHTML = `<div class="alert danger">${esc(err.message)}</div>`; }
+      btn.disabled = false; btn.textContent = '✦ Relancer l\'analyse';
+    };
+    const p = $('#print', tc); if (p) p.onclick = () => window.print();
+  }
+
+  /* ============ PARAMÈTRES ============ */
+  V.parametres = (el) => {
+    const s = App.state, c = s.settings.company, ai = s.settings.ai, o = s.settings.opening;
+    el.innerHTML = head('Paramètres', 'Entreprise, fiscalité, assistant IA et sauvegardes.') +
+      `<form id="pf">
+      <div class="card"><h2>Entreprise</h2><div class="form-grid">
+        <label class="field">Raison sociale <input name="name" value="${esc(c.name)}"></label>
+        <label class="field">Forme juridique <select name="legalForm">${App.options(['EI', 'Micro', 'EURL', 'SARL', 'SASU', 'SAS', 'SA', 'SCI', 'Association'], c.legalForm)}</select></label>
+        <label class="field">SIRET <input name="siret" value="${esc(c.siret)}"></label>
+        <label class="field">N° TVA intracommunautaire <input name="tvaNumber" value="${esc(c.tvaNumber)}"></label>
+        <label class="field">E-mail <input name="email" value="${esc(c.email)}"></label>
+        <label class="field">Téléphone <input name="phone" value="${esc(c.phone)}"></label>
+        <label class="field full">Adresse <textarea name="address">${esc(c.address)}</textarea></label>
+        <label class="field">IBAN <input name="iban" value="${esc(c.iban)}"></label>
+        <label class="field">BIC <input name="bic" value="${esc(c.bic)}"></label>
+      </div></div>
+      <div class="card"><h2>Fiscalité</h2><div class="form-grid">
+        <label class="field">Régime de TVA <select name="regimeTva">${App.options([['franchise', 'Franchise en base (293 B)'], ['reel_simplifie', 'Réel simplifié'], ['reel_normal', 'Réel normal']], c.regimeTva)}</select></label>
+        <label class="field">Périodicité <select name="tvaPeriod">${App.options([['mensuelle', 'Mensuelle (CA3)'], ['trimestrielle', 'Trimestrielle (CA3)'], ['annuelle', 'Annuelle (CA12)']], c.tvaPeriod)}</select></label>
+        <label class="field">Exigibilité de la TVA collectée <select name="exigibilite">${App.options([['debits', 'Sur les débits (ventes de biens)'], ['encaissements', 'Sur les encaissements (services)']], c.exigibilite)}</select></label>
+        <label class="field">Imposition des bénéfices <select name="impot">${App.options([['IS', 'Impôt sur les sociétés'], ['IR', 'Impôt sur le revenu']], c.impot)}</select></label>
+        <label class="field">Début d'exercice (MM-JJ) <input name="fiscalYearStart" value="${esc(c.fiscalYearStart)}" pattern="\\d{2}-\\d{2}"></label>
+      </div></div>
+      <div class="card"><h2>Facturation</h2><div class="form-grid">
+        <label class="field">Préfixe factures <input name="invoicePrefix" value="${esc(c.invoicePrefix)}"></label>
+        <label class="field">Préfixe devis <input name="quotePrefix" value="${esc(c.quotePrefix)}"></label>
+        <label class="field">Préfixe avoirs <input name="creditPrefix" value="${esc(c.creditPrefix)}"></label>
+        <label class="field">Délai de paiement (jours) <input type="number" name="paymentTerms" value="${c.paymentTerms}"></label>
+        <label class="field full">Mentions légales en pied de facture <textarea name="legalMentions">${esc(c.legalMentions)}</textarea></label>
+      </div></div>
+      <div class="card"><h2>Bilan d'ouverture</h2><p class="muted small">Soldes au premier jour de votre premier exercice suivi dans ComptaPro (reprise de l'ancien bilan).</p><div class="form-grid">
+        <label class="field">Capital social <input type="number" step="0.01" data-o="capital" value="${o.capital}"></label>
+        <label class="field">Report à nouveau <input type="number" step="0.01" data-o="reportANouveau" value="${o.reportANouveau}"></label>
+        <label class="field">Emprunts restant dus <input type="number" step="0.01" data-o="emprunts" value="${o.emprunts}"></label>
+        <label class="field">Comptes courants d'associés <input type="number" step="0.01" data-o="comptesCourants" value="${o.comptesCourants}"></label>
+        <label class="field">Solde bancaire d'ouverture <input type="number" step="0.01" data-o="banque" value="${o.banque}"></label>
+      </div></div>
+      </form>
+      ${App.ai.builtin ? '<div class="card"><h2>Assistant IA (Claude)</h2><p>✦ Claude est intégré à cette version : aucune clé API à fournir. La première utilisation vous demande simplement l\'autorisation.</p></div><div hidden>' : ''}<div class="card"><h2>Assistant IA (Claude)</h2><div class="form-grid">
+        <label class="field full">Clé API Anthropic <input type="password" id="apikey" value="${esc(ai.apiKey)}" placeholder="sk-ant-…" autocomplete="off"></label>
+        <label class="field">Modèle <select id="model">${App.options([['claude-opus-5-5', 'Claude Opus 5.5 (recommandé)'], ['claude-sonnet-5-5', 'Claude Sonnet 5.5 (plus rapide)'], ['claude-haiku-5-5', 'Claude Haiku 5.5 (économique)']], ai.model)}</select></label>
+        <label class="field">Niveau de réflexion <select id="effort">${App.options([['low', 'Rapide'], ['medium', 'Équilibré'], ['high', 'Approfondi'], ['xhigh', 'Très approfondi']], ai.effort)}</select></label>
+      </div><p class="muted small">Obtenez une clé sur console.anthropic.com. Elle est conservée uniquement dans ce navigateur et les requêtes partent directement de votre appareil vers l'API Anthropic, avec un résumé de vos données comptables pour contextualiser les réponses.</p></div>${App.ai.builtin ? '</div>' : ''}
+      <div class="card"><h2>Données & sauvegardes</h2><p class="muted small">Toutes vos données restent sur cet appareil (stockage local du navigateur). Exportez régulièrement une sauvegarde.</p><div class="actions">
+        <button class="btn" id="backup">Exporter une sauvegarde (.json)</button>
+        <label class="btn">Restaurer une sauvegarde<input type="file" id="restore" accept=".json,application/json" hidden></label>
+        <button class="btn" id="demo">Charger la démo</button>
+        <button class="btn danger" id="wipe">Tout effacer</button>
+        <button class="btn" id="theme">Thème : ${document.documentElement.dataset.theme === 'dark' ? 'sombre' : document.documentElement.dataset.theme === 'light' ? 'clair' : 'automatique'}</button>
+      </div></div>
+      <div class="actions" style="margin-top:16px;justify-content:flex-end"><button class="btn primary" id="save">Enregistrer les paramètres</button></div>`;
+    $('#save', el).onclick = () => {
+      const d = App.formData($('#pf', el));
+      Object.keys(c).forEach((k) => { if (k in d) c[k] = d[k]; });
+      if (c.regimeTva === 'reel_simplifie' && c.tvaPeriod === 'mensuelle') c.tvaPeriod = 'annuelle';
+      $$('[data-o]', el).forEach((i) => (o[i.dataset.o] = Number(i.value) || 0));
+      ai.apiKey = $('#apikey', el).value.trim(); ai.model = $('#model', el).value; ai.effort = $('#effort', el).value;
+      App.save(); App.toast('Paramètres enregistrés', 'success'); App.render();
+    };
+    $('#backup', el).onclick = () => {
+      const copy = JSON.parse(JSON.stringify(s)); copy.settings.ai.apiKey = '';
+      App.download(`comptapro_sauvegarde_${App.today()}.json`, JSON.stringify(copy, null, 1), 'application/json');
+    };
+    $('#restore', el).onchange = (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { try { const data = JSON.parse(r.result); const key = ai.apiKey; App.replace(data); App.state.settings.ai.apiKey = App.state.settings.ai.apiKey || key; App.save(); App.toast('Sauvegarde restaurée', 'success'); App.render(); } catch (err) { App.toast('Fichier invalide', 'error'); } };
+      r.readAsText(f);
+    };
+    $('#demo', el).onclick = () => App.confirmBox('Remplacer vos données par la démonstration ?', () => { const key = ai.apiKey; App.loadDemo(); App.state.settings.ai.apiKey = key; App.save(); App.render(); });
+    $('#wipe', el).onclick = () => App.confirmBox('Effacer définitivement toutes les données de cet appareil ?', () => { App.reset(); App.render(); }, 'Tout effacer');
+    $('#theme', el).onclick = () => {
+      const cur = document.documentElement.dataset.theme || 'auto';
+      const next = { auto: 'dark', dark: 'light', light: 'auto' }[cur];
+      try { localStorage.setItem('comptapro.theme', next); } catch (e) { /* ignore */ }
+      App.applyTheme(); V.parametres(el);
+    };
+  };
+})(window.App);
+
+/* ComptaPro — routeur et démarrage */
+(function (App) {
+  const { $, $$ } = App;
+  const strip = (h) => String(h || '').replace(/^#\/?/, '');
+  let current = strip(location.hash) || 'dashboard';
+
+  App.applyTheme = () => {
+    let t = 'auto';
+    try { t = localStorage.getItem('comptapro.theme') || 'auto'; } catch (e) { /* ignore */ }
+    if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  };
+
+  /* Navigation interne ; seul le nom de l'écran apparaît dans l'adresse (#factures, #tva…) */
+  App.go = (h) => {
+    current = strip(h) || 'dashboard';
+    const top = current.split('/')[0];
+    if (strip(location.hash) !== top) { try { history.replaceState(null, '', '#' + top); } catch (e) { /* ignore */ } }
+    App.render();
+    window.scrollTo(0, 0);
+  };
+
+  App.render = () => {
+    const parts = current.split('/');
+    const route = App.views[parts[0]] ? parts[0] : 'dashboard';
+    $$('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.route === route));
+    document.body.classList.remove('nav-open');
+    const view = $('#view');
+    try { App.views[route](view, parts.slice(1)); }
+    catch (e) { console.error(e); view.innerHTML = `<div class="alert danger">Erreur d'affichage : ${App.esc(e.message)}</div>`; }
+    const pending = App.state.bank.filter((b) => !b.matched).length;
+    const pill = $('#pill-bank'); pill.hidden = !pending; pill.textContent = pending;
+    $('#company-foot').innerHTML = `<strong>${App.esc(App.state.settings.company.name)}</strong><br>${App.esc(App.state.settings.company.legalForm)} · ${App.cloudStatus === 'ok' ? 'enregistré dans votre espace privé' : 'données stockées sur cet appareil'}`;
+  };
+
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    e.preventDefault();
+    if (a.getAttribute('href') !== '#') App.go(a.getAttribute('href'));
+  });
+  window.addEventListener('hashchange', () => {
+    const h = strip(location.hash);
+    if (h && h !== current.split('/')[0]) { current = h; App.render(); }
+  });
+  App.applyTheme();
+  $('#menu-btn').onclick = () => document.body.classList.toggle('nav-open');
+  App.render();
+  App.initCloud(() => App.render());
+  App.ai.init().then(() => App.render());
+})(window.App);
+
+</script>

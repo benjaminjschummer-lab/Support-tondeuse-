@@ -47,7 +47,7 @@
     $('#year', el).onchange = (e) => { selectedYear = Number(e.target.value); V.dashboard(el); };
     const demo = $('#demo', el);
     if (demo) demo.onclick = (e) => { e.preventDefault(); App.loadDemo(); App.toast('Données de démonstration chargées', 'success'); App.render(); };
-    $$('[data-href]', el).forEach((r) => (r.onclick = () => (location.hash = r.dataset.href)));
+    $$('[data-href]', el).forEach((r) => (r.onclick = () => App.go(r.dataset.href)));
   };
 
   function todo(d) {
@@ -61,7 +61,7 @@
       const declared = prev && s.tvaDeclarations.some((x) => x.start === prev.start);
       if (prev) items.push({ ok: declared, html: declared ? `TVA ${esc(prev.label)} déclarée` : `<a href="#/tva">Déclarer la TVA ${esc(prev.label)}</a>` });
     }
-    items.push({ ok: !!s.settings.ai.apiKey, html: s.settings.ai.apiKey ? 'Assistant IA activé' : '<a href="#/parametres">Activer l\'assistant IA</a> (clé API Claude)' });
+    items.push({ ok: App.ai.isReady(), html: App.ai.isReady() ? 'Assistant IA activé' : '<a href="#/parametres">Activer l\'assistant IA</a> (clé API Claude)' });
     return items;
   }
 
@@ -80,7 +80,7 @@
         ${list.map((i) => { const t = App.invoiceTotals(i); return `<tr class="clickable" data-id="${i.id}"><td><strong>${esc(i.number)}</strong></td><td>${esc(clientName(i.clientId))}</td><td>${fdate(i.date)}</td><td>${fdate(i.dueDate)}</td><td>${App.statusBadge(invStatus(i))}</td><td class="num">${eur(t.ht)}</td><td class="num">${eur(t.ttc)}</td></tr>`; }).join('')}
         <tr class="total"><td colspan="5">Total (${list.length})</td><td class="num">${eur(tot.ht)}</td><td class="num">${eur(tot.ttc)}</td></tr></tbody></table></div>`
         : `<div class="empty">Aucun document. <a href="#/factures/new/${filter}">Créer ${filter === 'devis' ? 'un devis' : filter === 'avoir' ? 'un avoir' : 'une facture'}</a></div>`;
-      $$('[data-id]', el).forEach((r) => (r.onclick = () => (location.hash = '#/factures/' + r.dataset.id)));
+      $$('[data-id]', el).forEach((r) => (r.onclick = () => App.go('#/factures/' + r.dataset.id)));
       $$('.tabs button', el).forEach((b) => b.classList.toggle('active', b.dataset.t === filter));
     };
     el.innerHTML = head('Factures & devis', 'Numérotation automatique, mentions légales, suivi des paiements et relances.',
@@ -160,23 +160,23 @@
         if (s.invoices.some((x) => x.number === inv.number && x.id !== inv.id)) return App.toast('Ce numéro existe déjà', 'error');
         const idx = s.invoices.findIndex((x) => x.id === inv.id);
         if (idx >= 0) s.invoices[idx] = inv; else s.invoices.push(inv);
-        App.save(); App.toast('Document enregistré', 'success'); location.hash = '#/factures';
+        App.save(); App.toast('Document enregistré', 'success'); App.go('#/factures');
       };
       $('#preview', el).onclick = () => { sync(); previewInvoice(inv); };
       const del = $('#del', el);
       if (del) del.onclick = () => App.confirmBox(inv.status !== 'brouillon' && inv.type === 'facture' ? 'Attention : une facture émise ne devrait pas être supprimée (obligation de numérotation continue). Préférez un avoir. Supprimer quand même ?' : 'Supprimer ce document ?', () => {
-        s.invoices = s.invoices.filter((x) => x.id !== inv.id); App.save(); location.hash = '#/factures';
+        s.invoices = s.invoices.filter((x) => x.id !== inv.id); App.save(); App.go('#/factures');
       }, 'Supprimer');
       const conv = $('#convert', el);
       if (conv) conv.onclick = () => {
         const f = Object.assign(JSON.parse(JSON.stringify(inv)), { id: App.uid(), type: 'facture', number: App.nextNumber('facture'), date: App.today(), dueDate: App.addDays(App.today(), s.settings.company.paymentTerms || 30), status: 'brouillon', quoteRef: inv.number });
         const q = s.invoices.find((x) => x.id === inv.id); if (q) q.status = 'accepte';
-        s.invoices.push(f); App.save(); App.toast('Facture créée depuis le devis', 'success'); location.hash = '#/factures/' + f.id;
+        s.invoices.push(f); App.save(); App.toast('Facture créée depuis le devis', 'success'); App.go('#/factures/' + f.id);
       };
       const cr = $('#credit', el);
       if (cr) cr.onclick = () => {
         const a = Object.assign(JSON.parse(JSON.stringify(inv)), { id: App.uid(), type: 'avoir', number: App.nextNumber('avoir'), date: App.today(), status: 'envoyee', paidDate: '', notes: `Avoir sur facture ${inv.number}` });
-        s.invoices.push(a); App.save(); location.hash = '#/factures/' + a.id;
+        s.invoices.push(a); App.save(); App.go('#/factures/' + a.id);
       };
       const rem = $('#remind', el);
       if (rem) rem.onclick = () => reminder(inv);
@@ -206,9 +206,9 @@
   function previewInvoice(inv) {
     App.modal({
       title: 'Aperçu', wide: true, body: invoiceHTML(inv),
-      footer: `<button class="btn" data-close>Fermer</button><button class="btn" id="mail">Envoyer par e-mail</button><button class="btn primary" id="print">Imprimer / PDF</button>`,
+      footer: `<button class="btn" data-close>Fermer</button><button class="btn" id="mail">Envoyer par e-mail</button><button class="btn primary" id="print">${App.isArtifact ? 'Télécharger (à imprimer en PDF)' : 'Imprimer / PDF'}</button>`,
       onMount: (m) => {
-        $('#print', m).onclick = () => { document.body.classList.add('printing-modal'); window.print(); setTimeout(() => document.body.classList.remove('printing-modal'), 500); };
+        $('#print', m).onclick = () => { if (App.isArtifact) return App.download(`${inv.number}.html`, `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(inv.number)}</title><style>body{font-family:Arial,sans-serif;margin:30px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}.num{text-align:right}.inv-head{display:flex;justify-content:space-between;margin-bottom:30px}h1{color:#2f5bea}.totals{margin-left:auto;width:280px;margin-top:16px}.totals div{display:flex;justify-content:space-between;padding:4px 0}.grand{font-weight:700;border-top:2px solid #111}.legal{margin-top:30px;font-size:11px;color:#666;white-space:pre-line}</style></head><body>${invoiceHTML(inv)}<script>window.print()<\/script></body></html>`); document.body.classList.add('printing-modal'); window.print(); setTimeout(() => document.body.classList.remove('printing-modal'), 500); };
         $('#mail', m).onclick = () => {
           const cl = App.state.clients.find((x) => x.id === inv.clientId) || {};
           const t = App.invoiceTotals(inv);
@@ -291,9 +291,9 @@
         <label class="check full"><input type="checkbox" name="paid" ${e.paid ? 'checked' : ''}> Dépense déjà payée</label>
         <label class="field full">Justificatif (photo ou PDF) <input type="file" id="rcpt" accept="image/*,application/pdf" capture="environment"></label>
         ${e.receipt ? `<div class="full"><img src="${e.receipt}" style="max-width:180px;border-radius:8px;border:1px solid var(--border)" alt="Justificatif"></div>` : ''}
-        <div class="full alert small" id="ai-hint" ${s.settings.ai.apiKey ? '' : 'hidden'}>✦ Ajoutez un justificatif puis cliquez sur « Remplir avec l'IA » pour extraire automatiquement les montants.</div>
+        <div class="full alert small" id="ai-hint" ${App.ai.isReady() ? '' : 'hidden'}>✦ Ajoutez un justificatif puis cliquez sur « Remplir avec l'IA » pour extraire automatiquement les montants.</div>
       </form>`,
-      footer: `${exp ? '<button class="btn danger" id="del">Supprimer</button>' : ''}<button class="btn" id="ai-fill" ${s.settings.ai.apiKey ? '' : 'hidden'}>✦ Remplir avec l'IA</button><button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Enregistrer</button>`,
+      footer: `${exp ? '<button class="btn danger" id="del">Supprimer</button>' : ''}<button class="btn" id="ai-fill" ${App.ai.isReady() ? '' : 'hidden'}>✦ Remplir avec l'IA</button><button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Enregistrer</button>`,
       onMount: (m, close) => {
         const f = $('#ef', m);
         const recalc = (src) => {
@@ -304,7 +304,7 @@
         };
         f.ttc.oninput = () => recalc('ttc'); f.tvaRate.onchange = () => recalc('ttc'); f.ht.oninput = () => recalc('ht'); f.tva.oninput = () => recalc('tva');
         let file = null;
-        $('#rcpt', m).onchange = async (ev) => { file = ev.target.files[0]; if (file) e.receipt = await App.compressImage(file, 900); };
+        $('#rcpt', m).onchange = async (ev) => { file = ev.target.files[0]; if (file) e.receipt = await App.compressImage(file, 800); };
         $('#ai-fill', m).onclick = async (ev) => {
           if (!file) return App.toast('Ajoutez d\'abord un justificatif', 'error');
           const btn = ev.currentTarget; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Analyse…';
@@ -343,7 +343,7 @@
 
   V.depenses = (el, params) => {
     const s = App.state;
-    if (params[0] === 'new') { location.hash = '#/depenses'; setTimeout(() => App.editExpense(null), 0); }
+    if (params[0] === 'new') setTimeout(() => App.editExpense(null), 0);
     const y = selectedYear, fy = App.fiscalYear(y);
     const draw = () => {
       const q = ($('#q', el).value || '').toLowerCase(), cat = $('#cat', el).value;

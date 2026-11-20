@@ -48,7 +48,14 @@
     return o;
   }
 
-  function download(filename, content, mime) {
+  async function download(filename, content, mime) {
+    if (App.isArtifact) {
+      const dl = await window.claude.use('downloads').catch(() => null);
+      if (!dl) return toast('Le téléchargement n\'est pas disponible ici.', 'error');
+      try { await dl.save({ filename, data: content }); toast('Fichier enregistré', 'success'); }
+      catch (e) { if (e && e.code !== 'declined') toast('Téléchargement impossible (' + (e.code || e.message) + ')', 'error'); }
+      return;
+    }
     const blob = content instanceof Blob ? content : new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = filename;
@@ -140,12 +147,13 @@
         const c = document.createElement('canvas');
         c.width = img.width * scale; c.height = img.height * scale;
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        resolve(c.toDataURL('image/jpeg', 0.7));
+        resolve(c.toDataURL('image/jpeg', 0.6));
       };
       img.onerror = () => resolve('');
       img.src = URL.createObjectURL(file);
     });
   }
 
+  App.isArtifact = !!(window.claude && window.claude.use);
   Object.assign(App, { $, $$, toast, modal, confirmBox, formData, download, toCSV, parseCSV, parseAmount, parseDate, barChart, statusBadge, options, tvaOptions, yearOptions, compressImage });
 })(window.App);

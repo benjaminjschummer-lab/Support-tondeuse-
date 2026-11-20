@@ -216,7 +216,7 @@
     const j = App.buildJournal();
     const r = App.incomeStatement(y, j), prev = App.incomeStatement(y - 1, j), b = App.balanceSheet(y, j);
     el.innerHTML = head('Bilan & compte de résultat', `Exercice ${r.fy.label} — états établis selon le PCG (modèle simplifié type 2033).`,
-      `<select id="year">${App.yearOptions(y)}</select><button class="btn" id="print">Imprimer / PDF</button>`) +
+      `<select id="year">${App.yearOptions(y)}</select>${App.isArtifact ? '' : '<button class="btn" id="print">Imprimer / PDF</button>'}`) +
       `<div class="card"><div class="tabs no-print"><button data-t="resultat">Compte de résultat</button><button data-t="bilan">Bilan</button><button data-t="sig">Soldes de gestion</button></div><div id="tc"></div></div>`;
     const draw = () => {
       $$('.tabs button', el).forEach((x) => x.classList.toggle('active', x.dataset.t === tab));
@@ -224,7 +224,7 @@
     };
     $$('.tabs button', el).forEach((x) => (x.onclick = () => { tab = x.dataset.t; sessionStorage.setItem('et-tab', tab); draw(); }));
     $('#year', el).onchange = (e) => { App.setYear(e.target.value); V.etats(el); };
-    $('#print', el).onclick = () => window.print();
+    if ($('#print', el)) $('#print', el).onclick = () => window.print();
     draw();
   };
 
@@ -275,7 +275,7 @@
         <a class="btn" href="#/etats">Bilan & compte de résultat</a>
         <button class="btn" id="fec">Fichier des écritures comptables (FEC)</button>
         <button class="btn" id="liasse">Tableau de reprise liasse 2033</button>
-        <button class="btn" id="ai-close" ${s.settings.ai.apiKey ? '' : 'disabled title="Activez l\'IA dans les paramètres"'}>✦ Revue de clôture par l'IA</button>
+        <button class="btn" id="ai-close" ${App.ai.isReady() ? '' : 'disabled title="Activez l\'IA dans les paramètres"'}>✦ Revue de clôture par l'IA</button>
       </div><div id="ai-out" class="report" style="margin-top:14px"></div></div>
       <div class="card"><h2>Échéances après clôture</h2><ul>
         <li>Liasse fiscale (2033 ou 2050) et ${c.impot === 'IS' ? 'relevé de solde d\'IS (2572)' : 'déclaration de résultat (2031 BIC / 2035 BNC)'} : en général le 2e jour ouvré suivant le 1er mai pour une clôture au 31/12 (délai supplémentaire de 15 jours en ligne).</li>
