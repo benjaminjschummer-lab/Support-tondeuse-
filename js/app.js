@@ -29,6 +29,8 @@
     catch (e) { console.error(e); view.innerHTML = `<div class="alert danger">Erreur d'affichage : ${App.esc(e.message)}</div>`; }
     const pending = App.state.bank.filter((b) => !b.matched).length;
     const pill = $('#pill-bank'); pill.hidden = !pending; pill.textContent = pending;
+    const toSend = App.peppolToSend ? App.peppolToSend().length : 0;
+    const pp = $('#pill-peppol'); if (pp) { pp.hidden = !toSend; pp.textContent = toSend; }
     $('#company-foot').innerHTML = `<strong>${App.esc(App.state.settings.company.name)}</strong><br>${App.esc(App.state.settings.company.legalForm)} · ${App.cloudStatus === 'ok' ? 'enregistré dans votre espace privé' : 'données stockées sur cet appareil'}`;
   };
 

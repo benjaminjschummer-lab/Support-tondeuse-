@@ -213,6 +213,7 @@ textarea { resize: vertical; min-height: 70px; }
         <a href="#/dashboard" data-route="dashboard"><span class="ico">◧</span>Tableau de bord</a>
         <div class="nav-section">Activité</div>
         <a href="#/factures" data-route="factures"><span class="ico">🧾</span>Factures</a>
+        <a href="#/peppol" data-route="peppol"><span class="ico">⇄</span>Peppol <span class="pill" id="pill-peppol" hidden></span></a>
         <a href="#/clients" data-route="clients"><span class="ico">👥</span>Clients</a>
         <a href="#/depenses" data-route="depenses"><span class="ico">💳</span>Dépenses</a>
         <a href="#/banque" data-route="banque"><span class="ico">🏦</span>Banque <span class="pill" id="pill-bank" hidden></span></a>
@@ -1230,10 +1231,101 @@ ${lines}
     };
   }
 
+  /* ---------- Peppol : réception (lecture UBL) et contrôle avant envoi ---------- */
+  function parseUbl(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('Fichier XML illisible');
+    const root = doc.documentElement;
+    const kind = root.localName;
+    if (!['Invoice', 'CreditNote'].includes(kind)) throw new Error('Ce fichier n\'est pas une facture UBL (Invoice / CreditNote)');
+    const all = (el, name) => Array.from(el.getElementsByTagNameNS('*', name));
+    const kid = (el, name) => (el ? Array.from(el.children).find((c) => c.localName === name) : null);
+    const path = (el, ...names) => names.reduce((e, n) => kid(e, n), el);
+    const txt = (el) => (el ? el.textContent.trim() : '');
+    const num = (el) => Number(txt(el)) || 0;
+    const sup = path(root, 'AccountingSupplierParty', 'Party');
+    const cus = path(root, 'AccountingCustomerParty', 'Party');
+    const partyInfo = (p) => {
+      if (!p) return {};
+      const endpoint = kid(p, 'EndpointID');
+      const vat = txt(path(p, 'PartyTaxScheme', 'CompanyID'));
+      const legal = txt(path(p, 'PartyLegalEntity', 'CompanyID'));
+      const name = txt(path(p, 'PartyLegalEntity', 'RegistrationName')) || txt(path(p, 'PartyName', 'Name'));
+      const addr = kid(p, 'PostalAddress');
+      return { name, vat, legal, endpoint: endpoint ? `${endpoint.getAttribute('schemeID')}:${txt(endpoint)}` : '', street: txt(kid(addr, 'StreetName')), city: txt(kid(addr, 'CityName')), postcode: txt(kid(addr, 'PostalZone')), country: txt(path(addr, 'Country', 'IdentificationCode')) };
+    };
+    const subtotals = all(root, 'TaxSubtotal').filter((s) => s.parentNode.parentNode === root).map((s) => {
+      const cat = kid(s, 'TaxCategory');
+      return { base: num(kid(s, 'TaxableAmount')), tax: num(kid(s, 'TaxAmount')), cat: txt(kid(cat, 'ID')), rate: num(kid(cat, 'Percent')), reason: txt(kid(cat, 'TaxExemptionReason')) || txt(kid(cat, 'TaxExemptionReasonCode')) };
+    });
+    const lineName = kind === 'Invoice' ? 'InvoiceLine' : 'CreditNoteLine';
+    const lines = Array.from(root.children).filter((c) => c.localName === lineName).map((l) => ({
+      name: txt(path(l, 'Item', 'Name')), qty: num(kid(l, kind === 'Invoice' ? 'InvoicedQuantity' : 'CreditedQuantity')), amount: num(kid(l, 'LineExtensionAmount')),
+      cat: txt(path(l, 'Item', 'ClassifiedTaxCategory', 'ID')), rate: num(path(l, 'Item', 'ClassifiedTaxCategory', 'Percent')),
+    }));
+    const totals = kid(root, 'LegalMonetaryTotal');
+    const means = kid(root, 'PaymentMeans');
+    const attachments = all(root, 'EmbeddedDocumentBinaryObject').map((a) => ({ filename: a.getAttribute('filename') || 'document', mime: a.getAttribute('mimeCode') || '', data: a.textContent.replace(/\s/g, '') }));
+    const typeCode = txt(kid(root, kind === 'Invoice' ? 'InvoiceTypeCode' : 'CreditNoteTypeCode'));
+    return {
+      kind, isCredit: kind === 'CreditNote' || typeCode === '381', number: txt(kid(root, 'ID')), date: txt(kid(root, 'IssueDate')), dueDate: txt(kid(root, 'DueDate')) || txt(path(means, 'PaymentDueDate')),
+      currency: txt(kid(root, 'DocumentCurrencyCode')) || 'EUR', note: txt(kid(root, 'Note')), buyerReference: txt(kid(root, 'BuyerReference')),
+      supplier: partyInfo(sup), customer: partyInfo(cus), subtotals, lines,
+      ht: num(kid(totals, 'TaxExclusiveAmount')) || num(kid(totals, 'LineExtensionAmount')), tva: num(path(root, 'TaxTotal', 'TaxAmount')),
+      ttc: num(kid(totals, 'TaxInclusiveAmount')), payable: num(kid(totals, 'PayableAmount')),
+      iban: txt(path(means, 'PayeeFinancialAccount', 'ID')), paymentId: txt(kid(means, 'PaymentID')), attachments,
+    };
+  }
+
+  /* Convertit une facture fournisseur Peppol en dépense */
+  function ublToExpense(u) {
+    const s = App.state;
+    const sign = u.isCredit ? -1 : 1;
+    const cats = u.subtotals.length ? u.subtotals : [{ base: u.ht, tax: u.tva, cat: 'S', rate: 21 }];
+    const supCountry = (u.supplier.country || App.vatParse(u.supplier.vat).country || 'BE').toUpperCase();
+    let vatRegime = 'normal';
+    if (cats.every((c) => c.cat === 'AE')) vatRegime = supCountry === 'BE' ? 'cocontractant' : 'intracom_services';
+    else if (cats.some((c) => c.cat === 'K')) vatRegime = 'intracom_biens';
+    const ht = round2(cats.reduce((x, c) => x + c.base, 0)) || u.ht;
+    const mainRate = Math.max(0, ...cats.map((c) => c.rate)) || (vatRegime === 'normal' ? 0 : 21);
+    const tva = vatRegime === 'normal' ? round2(cats.reduce((x, c) => x + c.tax, 0)) : round2(ht * mainRate / 100);
+    const known = s.expenses.slice().reverse().find((e) => e.supplierVat && e.supplierVat === App.vatParse(u.supplier.vat).formatted) || s.expenses.slice().reverse().find((e) => e.supplier && e.supplier.toLowerCase() === (u.supplier.name || '').toLowerCase());
+    const account = known ? known.account : '';
+    return {
+      date: u.date || App.today(), supplier: u.supplier.name, supplierVat: u.supplier.vat ? App.vatParse(u.supplier.vat).formatted : '', ref: u.number,
+      description: u.lines.map((l) => l.name).filter(Boolean).slice(0, 3).join(', ') || u.note || ('Facture ' + u.number),
+      account: account || '612300', accountGuessed: !account,
+      ht: round2(ht * sign), tva: round2(tva * sign), ttc: round2((vatRegime === 'normal' ? ht + tva : ht) * sign), tvaRate: App.TVA_RATES.includes(mainRate) ? mainRate : 21,
+      vatRegime, deductiblePct: App.VAT_DEDUCTIBILITY[account] ?? 100,
+      paid: false, paidDate: '', dueDate: u.dueDate, paymentMethod: 'virement', supplierIban: u.iban, paymentRef: u.paymentId,
+      receipt: '', source: 'peppol', attachmentNames: u.attachments.map((a) => a.filename),
+    };
+  }
+
+  /* Contrôles des règles Peppol BIS 3.0 / EN 16931 les plus courantes avant l'envoi */
+  function peppolCheck(inv) {
+    const s = App.state, c = s.settings.company, cl = s.clients.find((x) => x.id === inv.clientId) || {};
+    const errors = [], warnings = [];
+    if (!App.bceValid(c.enterpriseNumber)) errors.push('Votre numéro d\'entreprise est manquant ou invalide (Paramètres).');
+    if (!c.name || !c.city || !c.postcode) errors.push('Votre adresse (localité, code postal) est incomplète (Paramètres).');
+    const v = App.vatParse(cl.vatNumber);
+    if (!cl.vatNumber) errors.push('Le client n\'a pas de numéro de TVA / d\'entreprise : Peppol ne s\'applique pas aux particuliers.');
+    else if (!v.valid) errors.push('Le numéro de TVA du client est invalide.');
+    if (!inv.lines.length || inv.lines.some((l) => !l.desc)) errors.push('Chaque ligne doit avoir une description.');
+    if (inv.lines.some((l) => !Number(l.qty))) errors.push('Une ligne a une quantité nulle.');
+    if (inv.type === 'facture' && !c.iban) warnings.push('Aucun IBAN : le client ne saura pas où payer.');
+    if (inv.type === 'facture' && !inv.dueDate) warnings.push('Pas de date d\'échéance.');
+    if (['intracom_services', 'intracom_biens', 'cocontractant'].includes(inv.vatRegime) && !v.valid) errors.push('L\'autoliquidation exige le numéro de TVA valide du client.');
+    if (inv.status === 'brouillon') warnings.push('La facture est encore en brouillon.');
+    return { ok: !errors.length, errors, warnings };
+  }
+  const peppolId = (vatOrNumber) => { const v = App.vatParse(vatOrNumber); return v.country === 'BE' ? `0208:${App.digits(v.number).padStart(10, '0')}` : ''; };
+  const peppolDirectoryUrl = (vatOrNumber) => `https://directory.peppol.eu/public/locale-fr_FR/menuitem-search?q=${encodeURIComponent(peppolId(vatOrNumber) || App.vatParse(vatOrNumber).formatted)}`;
+
   Object.assign(App, {
     JOURNALS, GRID_LABELS, GRID_SECTIONS, buildJournal, trialBalance, incomeStatement, balanceSheet, tvaPeriods, computeTva,
     depreciationSchedule, amortAccount, expenseVat, assetVat, intervatXml, clientListing, intracomStatement, peppolUbl, parseCoda,
-    estimateISOC, estimateIPP, estimateSocial, taxEstimate, prepaymentDates, deadlines, exportJournalCsv, dashboard, aiContext,
+    parseUbl, ublToExpense, peppolCheck, peppolId, peppolDirectoryUrl, estimateISOC, estimateIPP, estimateSocial, taxEstimate, prepaymentDates, deadlines, exportJournalCsv, dashboard, aiContext,
   });
 })(window.App);
 
@@ -1585,6 +1677,12 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
     return structured(prompt, COMPANY_SCHEMA, null, image ? [image] : null);
   }
 
+  /* Catégorisation PCMN de factures fournisseurs (reçues par Peppol) */
+  async function classifyExpenses(items) {
+    const schema = { type: 'object', additionalProperties: false, required: ['results'], properties: { results: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'account', 'is_asset'], properties: { id: { type: 'string' }, account: { type: 'string' }, is_asset: { type: 'boolean' } } } } } };
+    return structured(`Pour chaque facture fournisseur reçue par une entreprise belge, choisis le compte de charge PCMN le plus adapté dans cette liste : ${App.EXPENSE_CATEGORIES.map((c) => c.account + ' ' + c.label).join(' | ')}. is_asset = vrai si c'est un investissement durable à amortir.\nFactures : ${JSON.stringify(items)}`, schema);
+  }
+
   /* Analyse financière complète */
   const ANALYSIS = `Rédige une analyse financière complète de l'entreprise belge : 1) synthèse en 3 phrases, 2) rentabilité et marges, 3) structure des charges et pistes d'économies, 4) trésorerie et BFR (délais clients), 5) TVA (grilles), versements anticipés et échéances fiscales et sociales à venir, 6) anomalies ou incohérences détectées dans la saisie, 7) optimisations fiscales légales à étudier, 8) prévisions pour la fin d'exercice. Sois concret et chiffré.`;
   async function analyze(onText) {
@@ -1632,7 +1730,7 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
     return html;
   }
 
-  const api = { extractCompany, init, isReady, builtin: false, ready: false, chat, scanDocument, categorizeBank, analyze, md, fileToBase64 };
+  const api = { classifyExpenses, extractCompany, init, isReady, builtin: false, ready: false, chat, scanDocument, categorizeBank, analyze, md, fileToBase64 };
   App.ai = api;
 })(window.App);
 
@@ -1830,7 +1928,7 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
       };
       $('#preview', el).onclick = () => { sync(); previewInvoice(inv); };
       const pp = $('#peppol', el);
-      if (pp) pp.onclick = () => { sync(); App.download(`${inv.number}.xml`, App.peppolUbl(inv)); };
+      if (pp) pp.onclick = () => { sync(); App.peppolExport(inv); };
       const del = $('#del', el);
       if (del) del.onclick = () => App.confirmBox(inv.status !== 'brouillon' && inv.type === 'facture' ? 'Une facture émise ne doit pas être supprimée (numérotation continue obligatoire). Établissez plutôt une note de crédit. Supprimer quand même ?' : 'Supprimer ce document ?', () => {
         s.invoices = s.invoices.filter((x) => x.id !== inv.id); App.save(); App.go('#/factures');
@@ -2068,6 +2166,7 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
         };
         $('#ok', m).onclick = () => {
           Object.assign(e, App.formData(f));
+          e.accountGuessed = false;
           e.ht = round2(e.ht); e.tva = round2(e.tva); e.ttc = round2(e.ttc);
           if (!e.ht && !e.ttc) return App.toast('Indiquez un montant', 'error');
           if (e.paid && !e.paidDate) e.paidDate = e.date;
@@ -2097,7 +2196,7 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
         .sort((a, b) => (a.date < b.date ? 1 : -1));
       const tot = list.reduce((x, e) => ({ ht: x.ht + e.ht, tva: x.tva + e.tva, ttc: x.ttc + e.ttc }), { ht: 0, tva: 0, ttc: 0 });
       $('#list', el).innerHTML = list.length ? `<div class="table-wrap"><table><thead><tr><th></th><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th>Statut</th><th class="num">HTVA</th><th class="num">TVA</th><th class="num">Payé</th></tr></thead><tbody>
-        ${list.map((e) => `<tr class="clickable" data-id="${e.id}"><td>${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" alt="">` : '<span class="badge warning" title="Justificatif manquant">!</span>'}</td><td>${fdate(e.date)}</td><td><strong>${esc(e.supplier)}</strong><div class="small muted">${esc(e.description)}</div></td><td>${esc(App.accountLabel(e.account))}${e.vatRegime && e.vatRegime !== 'normal' ? ' <span class="badge">autoliquidation</span>' : ''}${(e.deductiblePct ?? 100) < 100 ? ` <span class="badge">TVA ${e.deductiblePct} %</span>` : ''}</td><td>${e.paid ? '<span class="badge success">Payée</span>' : '<span class="badge warning">À payer</span>'}</td><td class="num">${eur(e.ht)}</td><td class="num">${eur(e.tva)}</td><td class="num">${eur(e.ttc)}</td></tr>`).join('')}
+        ${list.map((e) => `<tr class="clickable" data-id="${e.id}"><td>${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" alt="">` : '<span class="badge warning" title="Justificatif manquant">!</span>'}</td><td>${fdate(e.date)}</td><td><strong>${esc(e.supplier)}</strong><div class="small muted">${esc(e.description)}</div></td><td>${esc(App.accountLabel(e.account))}${e.vatRegime && e.vatRegime !== 'normal' ? ' <span class="badge">autoliquidation</span>' : ''}${(e.deductiblePct ?? 100) < 100 ? ` <span class="badge">TVA ${e.deductiblePct} %</span>` : ''}${e.source === 'peppol' ? ' <span class="badge primary">Peppol</span>' : ''}${e.accountGuessed ? ' <span class="badge warning">catégorie à vérifier</span>' : ''}</td><td>${e.paid ? '<span class="badge success">Payée</span>' : '<span class="badge warning">À payer</span>'}</td><td class="num">${eur(e.ht)}</td><td class="num">${eur(e.tva)}</td><td class="num">${eur(e.ttc)}</td></tr>`).join('')}
         <tr class="total"><td colspan="5">Total (${list.length})</td><td class="num">${eur(tot.ht)}</td><td class="num">${eur(tot.tva)}</td><td class="num">${eur(tot.ttc)}</td></tr></tbody></table></div>`
         : '<div class="empty">Aucune dépense sur cette période.</div>';
       $$('[data-id]', el).forEach((r) => (r.onclick = () => App.editExpense(s.expenses.find((e) => e.id === r.dataset.id))));
@@ -2135,6 +2234,7 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
        <div class="card" style="margin-top:16px">${list.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Libellé</th><th class="num">Montant</th><th>Rapprochement</th><th></th></tr></thead><tbody>
        ${list.map((b) => `<tr><td>${fdate(b.date)}</td><td>${esc(b.label)}${b.comm ? `<div class="small muted" style="font-family:var(--mono)">${esc(b.comm)}</div>` : ''}${b.aiReason ? `<div class="small muted">✦ ${esc(b.aiReason)}</div>` : ''}</td><td class="num ${b.amount < 0 ? 'neg' : 'pos'}">${eur(b.amount)}</td><td>${matchLabel(b)}</td><td class="num"><button class="btn sm" data-m="${b.id}">${b.matched ? 'Modifier' : 'Rapprocher'}</button> <button class="btn sm danger" data-d="${b.id}" aria-label="Supprimer">✕</button></td></tr>`).join('')}
        </tbody></table></div>` : '<div class="empty">Aucune opération. Téléchargez vos extraits CODA (format standard des banques belges : BNP Paribas Fortis, KBC, Belfius, ING…) ou un export CSV depuis votre banque en ligne.</div>'}</div>
+       ${codaGuide(!s.bank.length)}
        ${s.bankRules.length ? `<div class="card"><h2>Règles apprises</h2><p class="small muted">Créées automatiquement quand vous catégorisez une opération ; appliquées aux prochains imports.</p><div class="table-wrap"><table><tbody>${s.bankRules.map((r, k) => `<tr><td>Libellé contient « ${esc(r.pattern)} »</td><td>${esc(App.accountLabel(r.account))}</td><td>TVA ${r.tvaRate} %</td><td class="num"><button class="btn sm danger" data-rr="${k}">Supprimer</button></td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
     $('#csv', el).onchange = (e) => importFiles([...e.target.files]);
     $('#add', el).onclick = () => matchModal({ id: App.uid(), date: App.today(), label: '', amount: 0, matched: null }, true);
@@ -2144,6 +2244,24 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
     $$('[data-rr]', el).forEach((b) => (b.onclick = () => { s.bankRules.splice(Number(b.dataset.rr), 1); App.save(); App.render(); }));
     $('#ai', el).onclick = (ev) => aiSort(ev.currentTarget);
   };
+
+  /* Guide : obtenir ses extraits CODA auprès de sa banque */
+  function codaGuide(open) {
+    const banks = [
+      ['KBC / CBC', 'KBC-Online for Business (ou KBC@Isabel) → « Rapports et fichiers » → « Fichiers CODA » → choisir la période → télécharger. Activez d\'abord le service CODA (gratuit ou payant selon votre formule) auprès de votre agence ou dans l\'app.'],
+      ['BNP Paribas Fortis / Fintro / Hello bank!', 'Easy Banking Business (web) → Comptes → Extraits de compte → choisir le format CODA et la période. Le service CODA doit être activé sur le compte professionnel.'],
+      ['Belfius', 'Belfius Direct Net pour les professionnels → Comptes → Extraits / fichiers CODA. Également disponible via Isabel ou Belfius Secure EDI.'],
+      ['ING', 'ING Business\'Bank → fichiers de reporting CODA (ou via ING Accounting Connector, payant depuis août 2025). À défaut, export CSV depuis Business\'Bank ou l\'app ING Banking.'],
+      ['Argenta, Crelan, Beobank, Keytrade, autres', 'Cherchez « CODA » ou « extraits électroniques » dans la banque en ligne professionnelle, ou demandez l\'activation à votre agence. Sinon, exportez l\'historique en CSV : ComptaPro le lit aussi.'],
+      ['Isabel 6', 'Si vous utilisez Isabel, vous récupérez les CODA de toutes vos banques au même endroit (menu des rapports / extraits).'],
+    ];
+    return `<div class="card"><details ${open ? 'open' : ''}><summary><strong>Comment obtenir vos fichiers CODA ?</strong> <span class="muted small">— le format bancaire belge le plus complet (communication structurée, contrepartie, IBAN)</span></summary>
+      <ol style="margin-top:12px"><li>Activez le service <strong>CODA</strong> sur votre compte professionnel (dans la banque en ligne business ou auprès de votre agence). Certaines banques le facturent.</li>
+      <li>Téléchargez les fichiers (extension .cod, .coda ou .txt) pour la période voulue, idéalement chaque semaine ou chaque mois.</li>
+      <li>Ici, cliquez sur <strong>Importer CODA / CSV</strong> et sélectionnez un ou plusieurs fichiers à la fois. Les doublons sont ignorés : vous pouvez réimporter sans risque.</li></ol>
+      <div class="table-wrap"><table><tbody>${banks.map(([n, d]) => `<tr><td style="white-space:nowrap"><strong>${n}</strong></td><td>${d}</td></tr>`).join('')}</tbody></table></div>
+      <p class="small muted">Les noms de menus changent parfois : en cas de doute, cherchez « CODA » dans l'aide de votre banque. Pas de CODA disponible ? L'export CSV de la banque en ligne fonctionne aussi (un peu moins précis).</p></details></div>`;
+  }
 
   async function aiSort(btn) {
     const s = App.state;
@@ -2190,6 +2308,11 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
         if (pick) { applyMatch(b, { type: 'invoice', id: pick.id }); b.auto = 'montant'; n++; return; }
       } else {
         const unpaid = s.expenses.filter((e) => !e.paid);
+        // Facture fournisseur reçue par Peppol : même communication structurée, ou même IBAN et même montant
+        const byRef = commDigits.length === 12 && unpaid.find((e) => App.digits(e.paymentRef) === commDigits);
+        const byIban = !byRef && b.counterparty && unpaid.filter((e) => e.supplierIban && App.ibanClean(e.supplierIban) === App.ibanClean(b.counterparty) && Math.abs((e.vatRegime && e.vatRegime !== 'normal' ? e.ht : e.ttc) + b.amount) < 0.01);
+        const hit = byRef || (byIban && byIban.length === 1 ? byIban[0] : null);
+        if (hit) { applyMatch(b, { type: 'expense', id: hit.id }); b.auto = byRef ? 'communication' : 'IBAN'; n++; return; }
         const same = unpaid.filter((e) => Math.abs((e.vatRegime && e.vatRegime !== 'normal' ? e.ht : e.ttc) + b.amount) < 0.01);
         const named = same.filter((e) => norm(e.supplier).split(' ').some((w) => w.length > 3 && lbl.includes(w)));
         const pick = named.length === 1 ? named[0] : same.length === 1 ? same[0] : null;
@@ -2973,6 +3096,154 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
   };
 })(window.App);
 
+/* ComptaPro Belgique — Peppol : envoi (contrôle, export UBL, suivi), réception (import UBL → dépenses), mise en route */
+(function (App) {
+  const { $, $$, esc, eur, fdate, round2, head } = App;
+  const V = App.views;
+
+  const clientOf = (inv) => App.state.clients.find((c) => c.id === inv.clientId) || {};
+  const isB2B = (inv) => !!App.vatParse(clientOf(inv).vatNumber).valid;
+  /* Factures B2B émises pas encore transmises par Peppol */
+  App.peppolToSend = () => App.state.invoices.filter((i) => ['facture', 'avoir'].includes(i.type) && !['brouillon', 'annulee'].includes(i.status) && isB2B(i) && i.peppolStatus !== 'envoyee');
+
+  function markInvoice(inv, status) {
+    const stored = App.state.invoices.find((x) => x.id === inv.id);
+    [inv, stored].filter(Boolean).forEach((x) => { x.peppolStatus = status; x[status === 'envoyee' ? 'peppolSentAt' : 'peppolExportedAt'] = App.today(); });
+    App.save();
+  }
+
+  /* Export UBL après contrôle */
+  App.peppolExport = (inv, silent) => {
+    const chk = App.peppolCheck(inv);
+    const go = () => { App.download(`${inv.number}.xml`, App.peppolUbl(inv)); if (inv.peppolStatus !== 'envoyee') markInvoice(inv, 'exportee'); if (!silent) App.render(); };
+    if (chk.ok && !chk.warnings.length) return go();
+    App.modal({
+      title: `Contrôle Peppol — ${esc(inv.number)}`,
+      body: `${chk.errors.length ? `<div class="alert danger"><strong>À corriger avant l'envoi :</strong><ul>${chk.errors.map((e) => `<li>${esc(e)}</li>`).join('')}</ul></div>` : ''}${chk.warnings.length ? `<div class="alert warning"><ul>${chk.warnings.map((e) => `<li>${esc(e)}</li>`).join('')}</ul></div>` : ''}`,
+      footer: `<button class="btn" data-close>Fermer</button>${chk.ok ? '<button class="btn primary" id="anyway">Exporter quand même</button>' : ''}`,
+      onMount: (m, close) => { const a = $('#anyway', m); if (a) a.onclick = () => { close(); go(); }; },
+    });
+  };
+
+  V.peppol = (el, params) => {
+    const s = App.state, c = s.settings.company;
+    let tab = params[0] || 'envoi';
+    try { if (!params[0]) tab = sessionStorage.getItem('pp-tab') || (s.invoices.length ? 'envoi' : 'guide'); } catch (e) { /* ignore */ }
+    const myId = App.bceValid(c.enterpriseNumber) ? `0208:${App.digits(c.enterpriseNumber).padStart(10, '0')}` : '';
+    el.innerHTML = head('Peppol — factures électroniques', 'Obligatoires entre entreprises belges depuis le 1er janvier 2026 : vos factures sortantes partent en UBL via votre point d\'accès, vos factures fournisseurs reçues s\'importent ici et deviennent des dépenses automatiquement.') +
+      `<div class="card"><div class="tabs"><button data-t="envoi">Envoi</button><button data-t="reception">Réception</button><button data-t="guide">Mise en route</button></div><div id="tc"></div></div>`;
+    const draw = () => {
+      $$('.tabs button', el).forEach((b) => b.classList.toggle('active', b.dataset.t === tab));
+      ({ envoi: sendTab, reception: receiveTab, guide: guideTab })[tab]($('#tc', el), myId);
+    };
+    $$('.tabs button', el).forEach((b) => (b.onclick = () => { tab = b.dataset.t; try { sessionStorage.setItem('pp-tab', tab); } catch (e) { /* ignore */ } draw(); }));
+    draw();
+  };
+
+  /* ---------- Envoi ---------- */
+  function sendTab(tc) {
+    const s = App.state;
+    const docs = s.invoices.filter((i) => ['facture', 'avoir'].includes(i.type) && !['brouillon', 'annulee'].includes(i.status)).sort((a, b) => (a.date < b.date ? 1 : -1));
+    const b2b = docs.filter(isB2B), b2c = docs.filter((i) => !isB2B(i));
+    const pending = b2b.filter((i) => i.peppolStatus !== 'envoyee');
+    const status = (i) => i.peppolStatus === 'envoyee' ? `<span class="badge success">Envoyée ${fdate(i.peppolSentAt)}</span>` : i.peppolStatus === 'exportee' ? `<span class="badge primary">XML prêt ${fdate(i.peppolExportedAt)}</span>` : '<span class="badge warning">À envoyer</span>';
+    tc.innerHTML = `<div class="actions" style="margin-bottom:14px"><button class="btn primary" id="all" ${pending.length ? '' : 'disabled'}>Télécharger les ${pending.length} XML à envoyer</button><span class="small muted">Puis déposez-les dans votre point d'accès Peppol et marquez-les « envoyées ».</span></div>
+      ${b2b.length ? `<div class="table-wrap"><table><thead><tr><th>Document</th><th>Client</th><th>Identifiant Peppol</th><th class="num">TVAC</th><th>Contrôle</th><th>Statut</th><th></th></tr></thead><tbody>
+      ${b2b.map((i) => { const cl = clientOf(i); const chk = App.peppolCheck(i); const pid = App.peppolId(cl.vatNumber) || App.vatParse(cl.vatNumber).formatted; return `<tr><td><strong>${esc(i.number)}</strong><div class="small muted">${fdate(i.date)}${i.type === 'avoir' ? ' · note de crédit' : ''}</div></td><td>${esc(cl.name)}</td><td style="font-family:var(--mono);font-size:12px">${esc(pid)} <a class="small" href="${App.peppolDirectoryUrl(cl.vatNumber)}" target="_blank" rel="noopener" title="Vérifier dans l'annuaire Peppol">annuaire ↗</a></td><td class="num">${eur(App.invoiceTotals(i).ttc)}</td><td>${chk.ok ? (chk.warnings.length ? `<span class="badge warning" title="${esc(chk.warnings.join(' '))}">OK, ${chk.warnings.length} remarque(s)</span>` : '<span class="badge success">Conforme</span>') : `<span class="badge danger" title="${esc(chk.errors.join(' '))}">${chk.errors.length} erreur(s)</span>`}</td><td>${status(i)}</td><td class="num" style="white-space:nowrap"><button class="btn sm" data-x="${i.id}">XML</button> ${i.peppolStatus !== 'envoyee' ? `<button class="btn sm" data-sent="${i.id}">Marquer envoyée</button>` : `<button class="btn sm ghost" data-unsent="${i.id}">Annuler</button>`}</td></tr>`; }).join('')}
+      </tbody></table></div>` : '<div class="empty">Aucune facture émise à un client assujetti pour l\'instant.</div>'}
+      ${b2c.length ? `<p class="small muted" style="margin-top:12px">${b2c.length} facture(s) à des particuliers ou clients sans numéro de TVA : non concernées par Peppol (PDF classique).</p>` : ''}`;
+    $$('[data-x]', tc).forEach((b) => (b.onclick = () => App.peppolExport(s.invoices.find((i) => i.id === b.dataset.x))));
+    $$('[data-sent]', tc).forEach((b) => (b.onclick = () => { markInvoice(s.invoices.find((i) => i.id === b.dataset.sent), 'envoyee'); App.render(); }));
+    $$('[data-unsent]', tc).forEach((b) => (b.onclick = () => { const i = s.invoices.find((x) => x.id === b.dataset.unsent); i.peppolStatus = 'exportee'; App.save(); App.render(); }));
+    $('#all', tc).onclick = async () => {
+      const bad = pending.filter((i) => !App.peppolCheck(i).ok);
+      if (bad.length) App.toast(`${bad.length} facture(s) avec erreurs ignorée(s) : corrigez-les d'abord`, 'error');
+      for (const i of pending.filter((x) => App.peppolCheck(x).ok)) { await App.download(`${i.number}.xml`, App.peppolUbl(i)); markInvoice(i, i.peppolStatus === 'envoyee' ? 'envoyee' : 'exportee'); }
+      App.render();
+    };
+  }
+
+  /* ---------- Réception ---------- */
+  function receiveTab(tc) {
+    const s = App.state;
+    const received = s.expenses.filter((e) => e.source === 'peppol').sort((a, b) => (a.date < b.date ? 1 : -1));
+    tc.innerHTML = `<label class="dropzone" id="dz"><input type="file" id="ubl" accept=".xml,application/xml,text/xml" multiple hidden><div style="font-size:28px">⇩</div><strong>Déposez ici les factures reçues (XML UBL / Peppol)</strong><div class="small">Téléchargées depuis votre point d'accès Peppol ou reçues par e-mail — plusieurs fichiers à la fois</div></label>
+      <p class="small muted">Chaque facture devient une dépense : fournisseur, numéro, montants, TVA par taux, autoliquidation, échéance, IBAN et communication du fournisseur. La catégorie reprend celle déjà utilisée pour ce fournisseur, sinon l'IA la propose. Le paiement sera rapproché tout seul à l'import de vos extraits bancaires.</p>
+      <div id="res"></div>
+      ${received.length ? `<h2 style="margin-top:18px">Factures reçues (${received.length})</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Fournisseur</th><th>N°</th><th>Catégorie</th><th>Échéance</th><th class="num">Montant</th><th>Paiement</th></tr></thead><tbody>
+      ${received.map((e) => `<tr class="clickable" data-id="${e.id}"><td>${fdate(e.date)}</td><td><strong>${esc(e.supplier)}</strong><div class="small muted">${esc(e.supplierVat || '')}</div></td><td>${esc(e.ref)}</td><td>${esc(App.accountLabel(e.account))}${e.accountGuessed ? ' <span class="badge warning">à vérifier</span>' : ''}</td><td>${fdate(e.dueDate)}</td><td class="num">${eur(e.ttc)}</td><td>${e.paid ? '<span class="badge success">Payée</span>' : e.dueDate && e.dueDate < App.today() ? '<span class="badge danger">Échue</span>' : '<span class="badge warning">À payer</span>'}${!e.paid && e.supplierIban ? `<div class="small muted" style="font-family:var(--mono)">${esc(e.supplierIban)}${e.paymentRef ? '<br>' + esc(e.paymentRef) : ''}</div>` : ''}</td></tr>`).join('')}
+      </tbody></table></div>` : ''}`;
+    const dz = $('#dz', tc);
+    ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
+    dz.addEventListener('drop', (e) => importUbl([...e.dataTransfer.files], tc));
+    $('#ubl', tc).onchange = (e) => importUbl([...e.target.files], tc);
+    $$('[data-id]', tc).forEach((r) => (r.onclick = () => App.editExpense(s.expenses.find((e) => e.id === r.dataset.id))));
+  }
+
+  async function importUbl(files, tc) {
+    const s = App.state, c = s.settings.company;
+    const report = [], created = [];
+    for (const f of files) {
+      try {
+        const u = App.parseUbl(await f.text());
+        const myNum = App.digits(c.enterpriseNumber).padStart(10, '0');
+        const custNum = App.digits(u.customer.legal || u.customer.vat || u.customer.endpoint).slice(-10);
+        if (myNum !== '0000000000' && App.digits(u.supplier.vat || u.supplier.legal).slice(-10) === myNum) { report.push([f.name, 'warning', 'C\'est une facture émise par vous (vente) : ignorée.']); continue; }
+        const e = App.ublToExpense(u);
+        if (s.expenses.some((x) => x.ref === e.ref && (x.supplierVat === e.supplierVat || x.supplier === e.supplier))) { report.push([f.name, '', `Déjà importée (${e.supplier} ${e.ref}).`]); continue; }
+        e.id = App.uid();
+        s.expenses.push(e); created.push(e);
+        const notMe = custNum && myNum !== '0000000000' && custNum !== myNum;
+        report.push([f.name, notMe ? 'warning' : 'success', `${e.supplier} — ${e.ref} — ${eur(e.ttc)}${u.currency !== 'EUR' ? ` (devise ${u.currency} : vérifiez)` : ''}${notMe ? ' — attention : adressée à un autre numéro d\'entreprise' : ''}${u.attachments.length ? ` — ${u.attachments.length} pièce(s) jointe(s)` : ''}`]);
+      } catch (err) { report.push([f.name, 'danger', err.message]); }
+    }
+    const guessed = created.filter((e) => e.accountGuessed);
+    if (guessed.length && App.ai.isReady()) {
+      try {
+        const res = await App.ai.classifyExpenses(guessed.map((e) => ({ id: e.id, fournisseur: e.supplier, description: e.description, montant_htva: e.ht })));
+        (res.results || []).forEach((r) => {
+          const e = s.expenses.find((x) => x.id === r.id);
+          if (e && App.EXPENSE_CATEGORIES.some((cat) => cat.account === r.account)) { e.account = r.account; e.deductiblePct = App.VAT_DEDUCTIBILITY[r.account] ?? 100; e.accountGuessed = false; e.aiCategorized = true; }
+          if (e && r.is_asset) e.description = '⚠ Investissement à amortir ? ' + e.description;
+        });
+      } catch (err) { App.toast('Catégorisation IA indisponible : ' + err.message, 'error'); }
+    }
+    const matched = App.autoReconcile();
+    App.save();
+    App.toast(`${created.length} facture(s) fournisseur importée(s)${matched ? ` · ${matched} paiement(s) rapproché(s)` : ''}`, created.length ? 'success' : '');
+    App.render();
+    const res = document.getElementById('res');
+    if (res) res.innerHTML = report.map(([n, cls, msg]) => `<div class="alert ${cls} small"><strong>${esc(n)}</strong> : ${esc(msg)}</div>`).join('');
+  }
+
+  /* ---------- Mise en route ---------- */
+  function guideTab(tc, myId) {
+    const c = App.state.settings.company;
+    tc.innerHTML = `<div class="grid grid-2">
+      <div style="min-width:0"><h2>Votre identité Peppol</h2>
+        ${myId ? `<p>Identifiant : <strong style="font-family:var(--mono)">${myId}</strong> (schéma 0208 = numéro d'entreprise belge).</p><p><a class="btn sm" href="${App.peppolDirectoryUrl(c.enterpriseNumber)}" target="_blank" rel="noopener">Vérifier mon inscription dans l'annuaire Peppol ↗</a></p>` : '<div class="alert warning">Indiquez d\'abord votre numéro d\'entreprise dans <a href="#/parametres">Paramètres</a>.</div>'}
+        <h2 style="margin-top:18px">Comment ça marche</h2>
+        <ol><li><strong>Choisissez un point d'accès Peppol certifié</strong> (prestataire agréé). Aucune application ne peut envoyer sur le réseau sans passer par l'un d'eux, et la plateforme gratuite de l'État (Hermes) a été arrêtée fin 2025.</li>
+        <li><strong>Inscrivez votre numéro d'entreprise</strong> chez ce prestataire : vous devenez joignable sur Peppol et vos fournisseurs peuvent vous envoyer leurs factures.</li>
+        <li><strong>Envoi</strong> : ComptaPro crée vos factures au format Peppol BIS 3.0 (onglet Envoi). Déposez les fichiers XML dans votre point d'accès (import UBL), puis marquez-les « envoyées ».</li>
+        <li><strong>Réception</strong> : téléchargez les factures reçues (XML/UBL) depuis votre point d'accès et déposez-les dans l'onglet Réception : elles deviennent des dépenses, et leur paiement est rapproché automatiquement avec vos extraits CODA.</li></ol>
+      </div>
+      <div style="min-width:0"><h2>Choisir un point d'accès</h2>
+        <p class="small">Critères : import et export de fichiers UBL (indispensable pour travailler avec ComptaPro), réception incluse, prix selon votre volume.</p>
+        <ul class="small"><li>Plusieurs éditeurs belges annoncent une formule gratuite ou d'entrée de gamme (par exemple Billit, Odoo) ; les conditions changent : vérifiez-les sur leur site.</li>
+        <li>Votre banque ou votre fiduciaire propose parfois un service Peppol intégré.</li>
+        <li>Abonnements payants courants : de l'ordre de 15 à 50 € par mois selon les volumes.</li>
+        <li>Liste officielle des prestataires certifiés : site de l'OpenPeppol et page e-facturation du SPF BOSA / SPF Finances.</li></ul>
+        <p><a class="btn sm" href="https://peppol.org/members/peppol-certified-service-providers/" target="_blank" rel="noopener">Prestataires certifiés OpenPeppol ↗</a> <a class="btn sm" href="https://efacture.belgium.be/fr" target="_blank" rel="noopener">efacture.belgium.be ↗</a></p>
+        <h2 style="margin-top:18px">Bon à savoir</h2>
+        <ul class="small"><li>Obligation B2B entre assujettis belges ; les factures aux particuliers restent en PDF.</li>
+        <li>Pour les pouvoirs publics belges, le portail Mercurius s'utilise aussi via Peppol.</li>
+        <li>La facture électronique est la facture originale : conservez les XML 10 ans (ComptaPro garde les données, gardez aussi les fichiers).</li></ul>
+      </div></div>`;
+  }
+})(window.App);
+
 /* ComptaPro — routeur et démarrage */
 (function (App) {
   const { $, $$ } = App;
@@ -3004,6 +3275,8 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
     catch (e) { console.error(e); view.innerHTML = `<div class="alert danger">Erreur d'affichage : ${App.esc(e.message)}</div>`; }
     const pending = App.state.bank.filter((b) => !b.matched).length;
     const pill = $('#pill-bank'); pill.hidden = !pending; pill.textContent = pending;
+    const toSend = App.peppolToSend ? App.peppolToSend().length : 0;
+    const pp = $('#pill-peppol'); if (pp) { pp.hidden = !toSend; pp.textContent = toSend; }
     $('#company-foot').innerHTML = `<strong>${App.esc(App.state.settings.company.name)}</strong><br>${App.esc(App.state.settings.company.legalForm)} · ${App.cloudStatus === 'ok' ? 'enregistré dans votre espace privé' : 'données stockées sur cet appareil'}`;
   };
 

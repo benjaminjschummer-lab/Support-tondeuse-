@@ -172,6 +172,12 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
     return structured(prompt, COMPANY_SCHEMA, null, image ? [image] : null);
   }
 
+  /* Catégorisation PCMN de factures fournisseurs (reçues par Peppol) */
+  async function classifyExpenses(items) {
+    const schema = { type: 'object', additionalProperties: false, required: ['results'], properties: { results: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'account', 'is_asset'], properties: { id: { type: 'string' }, account: { type: 'string' }, is_asset: { type: 'boolean' } } } } } };
+    return structured(`Pour chaque facture fournisseur reçue par une entreprise belge, choisis le compte de charge PCMN le plus adapté dans cette liste : ${App.EXPENSE_CATEGORIES.map((c) => c.account + ' ' + c.label).join(' | ')}. is_asset = vrai si c'est un investissement durable à amortir.\nFactures : ${JSON.stringify(items)}`, schema);
+  }
+
   /* Analyse financière complète */
   const ANALYSIS = `Rédige une analyse financière complète de l'entreprise belge : 1) synthèse en 3 phrases, 2) rentabilité et marges, 3) structure des charges et pistes d'économies, 4) trésorerie et BFR (délais clients), 5) TVA (grilles), versements anticipés et échéances fiscales et sociales à venir, 6) anomalies ou incohérences détectées dans la saisie, 7) optimisations fiscales légales à étudier, 8) prévisions pour la fin d'exercice. Sois concret et chiffré.`;
   async function analyze(onText) {
@@ -219,6 +225,6 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
     return html;
   }
 
-  const api = { extractCompany, init, isReady, builtin: false, ready: false, chat, scanDocument, categorizeBank, analyze, md, fileToBase64 };
+  const api = { classifyExpenses, extractCompany, init, isReady, builtin: false, ready: false, chat, scanDocument, categorizeBank, analyze, md, fileToBase64 };
   App.ai = api;
 })(window.App);

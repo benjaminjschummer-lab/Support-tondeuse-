@@ -603,9 +603,100 @@ ${lines}
     };
   }
 
+  /* ---------- Peppol : réception (lecture UBL) et contrôle avant envoi ---------- */
+  function parseUbl(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('Fichier XML illisible');
+    const root = doc.documentElement;
+    const kind = root.localName;
+    if (!['Invoice', 'CreditNote'].includes(kind)) throw new Error('Ce fichier n\'est pas une facture UBL (Invoice / CreditNote)');
+    const all = (el, name) => Array.from(el.getElementsByTagNameNS('*', name));
+    const kid = (el, name) => (el ? Array.from(el.children).find((c) => c.localName === name) : null);
+    const path = (el, ...names) => names.reduce((e, n) => kid(e, n), el);
+    const txt = (el) => (el ? el.textContent.trim() : '');
+    const num = (el) => Number(txt(el)) || 0;
+    const sup = path(root, 'AccountingSupplierParty', 'Party');
+    const cus = path(root, 'AccountingCustomerParty', 'Party');
+    const partyInfo = (p) => {
+      if (!p) return {};
+      const endpoint = kid(p, 'EndpointID');
+      const vat = txt(path(p, 'PartyTaxScheme', 'CompanyID'));
+      const legal = txt(path(p, 'PartyLegalEntity', 'CompanyID'));
+      const name = txt(path(p, 'PartyLegalEntity', 'RegistrationName')) || txt(path(p, 'PartyName', 'Name'));
+      const addr = kid(p, 'PostalAddress');
+      return { name, vat, legal, endpoint: endpoint ? `${endpoint.getAttribute('schemeID')}:${txt(endpoint)}` : '', street: txt(kid(addr, 'StreetName')), city: txt(kid(addr, 'CityName')), postcode: txt(kid(addr, 'PostalZone')), country: txt(path(addr, 'Country', 'IdentificationCode')) };
+    };
+    const subtotals = all(root, 'TaxSubtotal').filter((s) => s.parentNode.parentNode === root).map((s) => {
+      const cat = kid(s, 'TaxCategory');
+      return { base: num(kid(s, 'TaxableAmount')), tax: num(kid(s, 'TaxAmount')), cat: txt(kid(cat, 'ID')), rate: num(kid(cat, 'Percent')), reason: txt(kid(cat, 'TaxExemptionReason')) || txt(kid(cat, 'TaxExemptionReasonCode')) };
+    });
+    const lineName = kind === 'Invoice' ? 'InvoiceLine' : 'CreditNoteLine';
+    const lines = Array.from(root.children).filter((c) => c.localName === lineName).map((l) => ({
+      name: txt(path(l, 'Item', 'Name')), qty: num(kid(l, kind === 'Invoice' ? 'InvoicedQuantity' : 'CreditedQuantity')), amount: num(kid(l, 'LineExtensionAmount')),
+      cat: txt(path(l, 'Item', 'ClassifiedTaxCategory', 'ID')), rate: num(path(l, 'Item', 'ClassifiedTaxCategory', 'Percent')),
+    }));
+    const totals = kid(root, 'LegalMonetaryTotal');
+    const means = kid(root, 'PaymentMeans');
+    const attachments = all(root, 'EmbeddedDocumentBinaryObject').map((a) => ({ filename: a.getAttribute('filename') || 'document', mime: a.getAttribute('mimeCode') || '', data: a.textContent.replace(/\s/g, '') }));
+    const typeCode = txt(kid(root, kind === 'Invoice' ? 'InvoiceTypeCode' : 'CreditNoteTypeCode'));
+    return {
+      kind, isCredit: kind === 'CreditNote' || typeCode === '381', number: txt(kid(root, 'ID')), date: txt(kid(root, 'IssueDate')), dueDate: txt(kid(root, 'DueDate')) || txt(path(means, 'PaymentDueDate')),
+      currency: txt(kid(root, 'DocumentCurrencyCode')) || 'EUR', note: txt(kid(root, 'Note')), buyerReference: txt(kid(root, 'BuyerReference')),
+      supplier: partyInfo(sup), customer: partyInfo(cus), subtotals, lines,
+      ht: num(kid(totals, 'TaxExclusiveAmount')) || num(kid(totals, 'LineExtensionAmount')), tva: num(path(root, 'TaxTotal', 'TaxAmount')),
+      ttc: num(kid(totals, 'TaxInclusiveAmount')), payable: num(kid(totals, 'PayableAmount')),
+      iban: txt(path(means, 'PayeeFinancialAccount', 'ID')), paymentId: txt(kid(means, 'PaymentID')), attachments,
+    };
+  }
+
+  /* Convertit une facture fournisseur Peppol en dépense */
+  function ublToExpense(u) {
+    const s = App.state;
+    const sign = u.isCredit ? -1 : 1;
+    const cats = u.subtotals.length ? u.subtotals : [{ base: u.ht, tax: u.tva, cat: 'S', rate: 21 }];
+    const supCountry = (u.supplier.country || App.vatParse(u.supplier.vat).country || 'BE').toUpperCase();
+    let vatRegime = 'normal';
+    if (cats.every((c) => c.cat === 'AE')) vatRegime = supCountry === 'BE' ? 'cocontractant' : 'intracom_services';
+    else if (cats.some((c) => c.cat === 'K')) vatRegime = 'intracom_biens';
+    const ht = round2(cats.reduce((x, c) => x + c.base, 0)) || u.ht;
+    const mainRate = Math.max(0, ...cats.map((c) => c.rate)) || (vatRegime === 'normal' ? 0 : 21);
+    const tva = vatRegime === 'normal' ? round2(cats.reduce((x, c) => x + c.tax, 0)) : round2(ht * mainRate / 100);
+    const known = s.expenses.slice().reverse().find((e) => e.supplierVat && e.supplierVat === App.vatParse(u.supplier.vat).formatted) || s.expenses.slice().reverse().find((e) => e.supplier && e.supplier.toLowerCase() === (u.supplier.name || '').toLowerCase());
+    const account = known ? known.account : '';
+    return {
+      date: u.date || App.today(), supplier: u.supplier.name, supplierVat: u.supplier.vat ? App.vatParse(u.supplier.vat).formatted : '', ref: u.number,
+      description: u.lines.map((l) => l.name).filter(Boolean).slice(0, 3).join(', ') || u.note || ('Facture ' + u.number),
+      account: account || '612300', accountGuessed: !account,
+      ht: round2(ht * sign), tva: round2(tva * sign), ttc: round2((vatRegime === 'normal' ? ht + tva : ht) * sign), tvaRate: App.TVA_RATES.includes(mainRate) ? mainRate : 21,
+      vatRegime, deductiblePct: App.VAT_DEDUCTIBILITY[account] ?? 100,
+      paid: false, paidDate: '', dueDate: u.dueDate, paymentMethod: 'virement', supplierIban: u.iban, paymentRef: u.paymentId,
+      receipt: '', source: 'peppol', attachmentNames: u.attachments.map((a) => a.filename),
+    };
+  }
+
+  /* Contrôles des règles Peppol BIS 3.0 / EN 16931 les plus courantes avant l'envoi */
+  function peppolCheck(inv) {
+    const s = App.state, c = s.settings.company, cl = s.clients.find((x) => x.id === inv.clientId) || {};
+    const errors = [], warnings = [];
+    if (!App.bceValid(c.enterpriseNumber)) errors.push('Votre numéro d\'entreprise est manquant ou invalide (Paramètres).');
+    if (!c.name || !c.city || !c.postcode) errors.push('Votre adresse (localité, code postal) est incomplète (Paramètres).');
+    const v = App.vatParse(cl.vatNumber);
+    if (!cl.vatNumber) errors.push('Le client n\'a pas de numéro de TVA / d\'entreprise : Peppol ne s\'applique pas aux particuliers.');
+    else if (!v.valid) errors.push('Le numéro de TVA du client est invalide.');
+    if (!inv.lines.length || inv.lines.some((l) => !l.desc)) errors.push('Chaque ligne doit avoir une description.');
+    if (inv.lines.some((l) => !Number(l.qty))) errors.push('Une ligne a une quantité nulle.');
+    if (inv.type === 'facture' && !c.iban) warnings.push('Aucun IBAN : le client ne saura pas où payer.');
+    if (inv.type === 'facture' && !inv.dueDate) warnings.push('Pas de date d\'échéance.');
+    if (['intracom_services', 'intracom_biens', 'cocontractant'].includes(inv.vatRegime) && !v.valid) errors.push('L\'autoliquidation exige le numéro de TVA valide du client.');
+    if (inv.status === 'brouillon') warnings.push('La facture est encore en brouillon.');
+    return { ok: !errors.length, errors, warnings };
+  }
+  const peppolId = (vatOrNumber) => { const v = App.vatParse(vatOrNumber); return v.country === 'BE' ? `0208:${App.digits(v.number).padStart(10, '0')}` : ''; };
+  const peppolDirectoryUrl = (vatOrNumber) => `https://directory.peppol.eu/public/locale-fr_FR/menuitem-search?q=${encodeURIComponent(peppolId(vatOrNumber) || App.vatParse(vatOrNumber).formatted)}`;
+
   Object.assign(App, {
     JOURNALS, GRID_LABELS, GRID_SECTIONS, buildJournal, trialBalance, incomeStatement, balanceSheet, tvaPeriods, computeTva,
     depreciationSchedule, amortAccount, expenseVat, assetVat, intervatXml, clientListing, intracomStatement, peppolUbl, parseCoda,
-    estimateISOC, estimateIPP, estimateSocial, taxEstimate, prepaymentDates, deadlines, exportJournalCsv, dashboard, aiContext,
+    parseUbl, ublToExpense, peppolCheck, peppolId, peppolDirectoryUrl, estimateISOC, estimateIPP, estimateSocial, taxEstimate, prepaymentDates, deadlines, exportJournalCsv, dashboard, aiContext,
   });
 })(window.App);

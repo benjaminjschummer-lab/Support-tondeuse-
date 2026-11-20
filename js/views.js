@@ -192,7 +192,7 @@
       };
       $('#preview', el).onclick = () => { sync(); previewInvoice(inv); };
       const pp = $('#peppol', el);
-      if (pp) pp.onclick = () => { sync(); App.download(`${inv.number}.xml`, App.peppolUbl(inv)); };
+      if (pp) pp.onclick = () => { sync(); App.peppolExport(inv); };
       const del = $('#del', el);
       if (del) del.onclick = () => App.confirmBox(inv.status !== 'brouillon' && inv.type === 'facture' ? 'Une facture émise ne doit pas être supprimée (numérotation continue obligatoire). Établissez plutôt une note de crédit. Supprimer quand même ?' : 'Supprimer ce document ?', () => {
         s.invoices = s.invoices.filter((x) => x.id !== inv.id); App.save(); App.go('#/factures');
@@ -430,6 +430,7 @@
         };
         $('#ok', m).onclick = () => {
           Object.assign(e, App.formData(f));
+          e.accountGuessed = false;
           e.ht = round2(e.ht); e.tva = round2(e.tva); e.ttc = round2(e.ttc);
           if (!e.ht && !e.ttc) return App.toast('Indiquez un montant', 'error');
           if (e.paid && !e.paidDate) e.paidDate = e.date;
@@ -459,7 +460,7 @@
         .sort((a, b) => (a.date < b.date ? 1 : -1));
       const tot = list.reduce((x, e) => ({ ht: x.ht + e.ht, tva: x.tva + e.tva, ttc: x.ttc + e.ttc }), { ht: 0, tva: 0, ttc: 0 });
       $('#list', el).innerHTML = list.length ? `<div class="table-wrap"><table><thead><tr><th></th><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th>Statut</th><th class="num">HTVA</th><th class="num">TVA</th><th class="num">Payé</th></tr></thead><tbody>
-        ${list.map((e) => `<tr class="clickable" data-id="${e.id}"><td>${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" alt="">` : '<span class="badge warning" title="Justificatif manquant">!</span>'}</td><td>${fdate(e.date)}</td><td><strong>${esc(e.supplier)}</strong><div class="small muted">${esc(e.description)}</div></td><td>${esc(App.accountLabel(e.account))}${e.vatRegime && e.vatRegime !== 'normal' ? ' <span class="badge">autoliquidation</span>' : ''}${(e.deductiblePct ?? 100) < 100 ? ` <span class="badge">TVA ${e.deductiblePct} %</span>` : ''}</td><td>${e.paid ? '<span class="badge success">Payée</span>' : '<span class="badge warning">À payer</span>'}</td><td class="num">${eur(e.ht)}</td><td class="num">${eur(e.tva)}</td><td class="num">${eur(e.ttc)}</td></tr>`).join('')}
+        ${list.map((e) => `<tr class="clickable" data-id="${e.id}"><td>${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" alt="">` : '<span class="badge warning" title="Justificatif manquant">!</span>'}</td><td>${fdate(e.date)}</td><td><strong>${esc(e.supplier)}</strong><div class="small muted">${esc(e.description)}</div></td><td>${esc(App.accountLabel(e.account))}${e.vatRegime && e.vatRegime !== 'normal' ? ' <span class="badge">autoliquidation</span>' : ''}${(e.deductiblePct ?? 100) < 100 ? ` <span class="badge">TVA ${e.deductiblePct} %</span>` : ''}${e.source === 'peppol' ? ' <span class="badge primary">Peppol</span>' : ''}${e.accountGuessed ? ' <span class="badge warning">catégorie à vérifier</span>' : ''}</td><td>${e.paid ? '<span class="badge success">Payée</span>' : '<span class="badge warning">À payer</span>'}</td><td class="num">${eur(e.ht)}</td><td class="num">${eur(e.tva)}</td><td class="num">${eur(e.ttc)}</td></tr>`).join('')}
         <tr class="total"><td colspan="5">Total (${list.length})</td><td class="num">${eur(tot.ht)}</td><td class="num">${eur(tot.tva)}</td><td class="num">${eur(tot.ttc)}</td></tr></tbody></table></div>`
         : '<div class="empty">Aucune dépense sur cette période.</div>';
       $$('[data-id]', el).forEach((r) => (r.onclick = () => App.editExpense(s.expenses.find((e) => e.id === r.dataset.id))));
@@ -497,6 +498,7 @@
        <div class="card" style="margin-top:16px">${list.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Libellé</th><th class="num">Montant</th><th>Rapprochement</th><th></th></tr></thead><tbody>
        ${list.map((b) => `<tr><td>${fdate(b.date)}</td><td>${esc(b.label)}${b.comm ? `<div class="small muted" style="font-family:var(--mono)">${esc(b.comm)}</div>` : ''}${b.aiReason ? `<div class="small muted">✦ ${esc(b.aiReason)}</div>` : ''}</td><td class="num ${b.amount < 0 ? 'neg' : 'pos'}">${eur(b.amount)}</td><td>${matchLabel(b)}</td><td class="num"><button class="btn sm" data-m="${b.id}">${b.matched ? 'Modifier' : 'Rapprocher'}</button> <button class="btn sm danger" data-d="${b.id}" aria-label="Supprimer">✕</button></td></tr>`).join('')}
        </tbody></table></div>` : '<div class="empty">Aucune opération. Téléchargez vos extraits CODA (format standard des banques belges : BNP Paribas Fortis, KBC, Belfius, ING…) ou un export CSV depuis votre banque en ligne.</div>'}</div>
+       ${codaGuide(!s.bank.length)}
        ${s.bankRules.length ? `<div class="card"><h2>Règles apprises</h2><p class="small muted">Créées automatiquement quand vous catégorisez une opération ; appliquées aux prochains imports.</p><div class="table-wrap"><table><tbody>${s.bankRules.map((r, k) => `<tr><td>Libellé contient « ${esc(r.pattern)} »</td><td>${esc(App.accountLabel(r.account))}</td><td>TVA ${r.tvaRate} %</td><td class="num"><button class="btn sm danger" data-rr="${k}">Supprimer</button></td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
     $('#csv', el).onchange = (e) => importFiles([...e.target.files]);
     $('#add', el).onclick = () => matchModal({ id: App.uid(), date: App.today(), label: '', amount: 0, matched: null }, true);
@@ -506,6 +508,24 @@
     $$('[data-rr]', el).forEach((b) => (b.onclick = () => { s.bankRules.splice(Number(b.dataset.rr), 1); App.save(); App.render(); }));
     $('#ai', el).onclick = (ev) => aiSort(ev.currentTarget);
   };
+
+  /* Guide : obtenir ses extraits CODA auprès de sa banque */
+  function codaGuide(open) {
+    const banks = [
+      ['KBC / CBC', 'KBC-Online for Business (ou KBC@Isabel) → « Rapports et fichiers » → « Fichiers CODA » → choisir la période → télécharger. Activez d\'abord le service CODA (gratuit ou payant selon votre formule) auprès de votre agence ou dans l\'app.'],
+      ['BNP Paribas Fortis / Fintro / Hello bank!', 'Easy Banking Business (web) → Comptes → Extraits de compte → choisir le format CODA et la période. Le service CODA doit être activé sur le compte professionnel.'],
+      ['Belfius', 'Belfius Direct Net pour les professionnels → Comptes → Extraits / fichiers CODA. Également disponible via Isabel ou Belfius Secure EDI.'],
+      ['ING', 'ING Business\'Bank → fichiers de reporting CODA (ou via ING Accounting Connector, payant depuis août 2025). À défaut, export CSV depuis Business\'Bank ou l\'app ING Banking.'],
+      ['Argenta, Crelan, Beobank, Keytrade, autres', 'Cherchez « CODA » ou « extraits électroniques » dans la banque en ligne professionnelle, ou demandez l\'activation à votre agence. Sinon, exportez l\'historique en CSV : ComptaPro le lit aussi.'],
+      ['Isabel 6', 'Si vous utilisez Isabel, vous récupérez les CODA de toutes vos banques au même endroit (menu des rapports / extraits).'],
+    ];
+    return `<div class="card"><details ${open ? 'open' : ''}><summary><strong>Comment obtenir vos fichiers CODA ?</strong> <span class="muted small">— le format bancaire belge le plus complet (communication structurée, contrepartie, IBAN)</span></summary>
+      <ol style="margin-top:12px"><li>Activez le service <strong>CODA</strong> sur votre compte professionnel (dans la banque en ligne business ou auprès de votre agence). Certaines banques le facturent.</li>
+      <li>Téléchargez les fichiers (extension .cod, .coda ou .txt) pour la période voulue, idéalement chaque semaine ou chaque mois.</li>
+      <li>Ici, cliquez sur <strong>Importer CODA / CSV</strong> et sélectionnez un ou plusieurs fichiers à la fois. Les doublons sont ignorés : vous pouvez réimporter sans risque.</li></ol>
+      <div class="table-wrap"><table><tbody>${banks.map(([n, d]) => `<tr><td style="white-space:nowrap"><strong>${n}</strong></td><td>${d}</td></tr>`).join('')}</tbody></table></div>
+      <p class="small muted">Les noms de menus changent parfois : en cas de doute, cherchez « CODA » dans l'aide de votre banque. Pas de CODA disponible ? L'export CSV de la banque en ligne fonctionne aussi (un peu moins précis).</p></details></div>`;
+  }
 
   async function aiSort(btn) {
     const s = App.state;
@@ -552,6 +572,11 @@
         if (pick) { applyMatch(b, { type: 'invoice', id: pick.id }); b.auto = 'montant'; n++; return; }
       } else {
         const unpaid = s.expenses.filter((e) => !e.paid);
+        // Facture fournisseur reçue par Peppol : même communication structurée, ou même IBAN et même montant
+        const byRef = commDigits.length === 12 && unpaid.find((e) => App.digits(e.paymentRef) === commDigits);
+        const byIban = !byRef && b.counterparty && unpaid.filter((e) => e.supplierIban && App.ibanClean(e.supplierIban) === App.ibanClean(b.counterparty) && Math.abs((e.vatRegime && e.vatRegime !== 'normal' ? e.ht : e.ttc) + b.amount) < 0.01);
+        const hit = byRef || (byIban && byIban.length === 1 ? byIban[0] : null);
+        if (hit) { applyMatch(b, { type: 'expense', id: hit.id }); b.auto = byRef ? 'communication' : 'IBAN'; n++; return; }
         const same = unpaid.filter((e) => Math.abs((e.vatRegime && e.vatRegime !== 'normal' ? e.ht : e.ttc) + b.amount) < 0.01);
         const named = same.filter((e) => norm(e.supplier).split(' ').some((w) => w.length > 3 && lbl.includes(w)));
         const pick = named.length === 1 ? named[0] : same.length === 1 ? same[0] : null;
