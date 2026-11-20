@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7FCB5B"/>
+      <stop offset="0.55" stop-color="#3E9A45"/>
+      <stop offset="1" stop-color="#1F6B3A"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.2" r="0.8">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.5" stop-color="#F4FBEF"/>
+      <stop offset="1" stop-color="#DCEFD3"/>
+    </linearGradient>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0B3A1C" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <!-- plate ring -->
+  <circle cx="256" cy="262" r="172" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="14"/>
+  <circle cx="256" cy="262" r="128" fill="#ffffff" fill-opacity="0.08"/>
+  <g filter="url(#sh)" fill="url(#metal)">
+    <!-- fork -->
+    <g transform="translate(186 0)">
+      <rect x="-42" y="92" width="16" height="104" rx="8"/>
+      <rect x="-8"  y="92" width="16" height="104" rx="8"/>
+      <rect x="26"  y="92" width="16" height="104" rx="8"/>
+      <path d="M-42 180 H42 V200 C42 236 22 252 13 260 L16 410 C16 426 -16 426 -16 410 L-13 260 C-22 252 -42 236 -42 200 Z"/>
+    </g>
+    <!-- knife -->
+    <g transform="translate(326 0)">
+      <path d="M-14 92 C30 104 46 168 42 252 L14 262 L16 410 C16 426 -16 426 -16 410 L-14 262 Z"/>
+    </g>
+  </g>
+</svg>
