@@ -28,6 +28,8 @@
     --abdos: #32ade6;
     --green: #34c759;
     --red: #ff3b30;
+    --heart: #ff2d55;
+    --orange: #ff9500;
     --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
     --rounded: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
     color-scheme: light;
@@ -37,7 +39,7 @@
       --bg: #000000; --card: #1c1c1e; --fill: rgba(118,118,128,.24);
       --label: #ffffff; --label2: rgba(235,235,245,.6); --sep: rgba(84,84,88,.6);
       --bar: rgba(22,22,24,.82); --seg-on: #636366;
-      --pompes: #ff9f0a; --abdos: #64d2ff; --green: #30d158; --red: #ff453a;
+      --pompes: #ff9f0a; --abdos: #64d2ff; --green: #30d158; --red: #ff453a; --heart: #ff375f; --orange: #ff9f0a;
       color-scheme: dark;
     }
   }
@@ -82,6 +84,25 @@
   .hint { align-self: flex-start; color: #fff; background: rgba(40,40,40,.55); padding: 7px 13px; border-radius: 999px;
     font-size: 15px; font-weight: 600; -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); }
   .hint.bad { background: rgba(255,59,48,.75); }
+  .top { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .tempo { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tempo span { color: #fff; background: rgba(40,40,40,.55); padding: 5px 11px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); font-variant-numeric: tabular-nums; }
+  .tempo .ok { background: rgba(52,199,89,.85); } .tempo .mid { background: rgba(255,149,0,.9); } .tempo .high { background: rgba(255,59,48,.85); }
+  input { -webkit-user-select: text; user-select: text; }
+  .hr-now { display: flex; align-items: center; gap: 12px; }
+  .hr-now svg { width: 30px; height: 30px; color: var(--heart); flex: none; }
+  .hr-now .v { font: 700 24px/1.1 var(--rounded); color: var(--heart); font-variant-numeric: tabular-nums; }
+  .hr-now .k { font-size: 13px; color: var(--label2); }
+  .hr-inputs { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 15px; color: var(--label2); }
+  .hr-inputs input { width: 72px; height: 36px; border: 0; border-radius: 8px; background: var(--fill); color: var(--label);
+    font: 17px var(--rounded); text-align: center; }
+  .hr-inputs button { color: var(--heart); font-weight: 600; margin-left: auto; }
+  .list-btn.heart { color: var(--heart); }
+  ol.tips { padding-left: 22px; }
+  .chart-sub { font-size: 13px; color: var(--label2); margin: -4px 0 8px; }
+  .chart-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .line-chart { width: 100%; height: 170px; display: block; }
   .meter { position: absolute; right: 14px; top: 64px; bottom: 18px; width: 6px; border-radius: 3px; background: rgba(255,255,255,.25); overflow: hidden; }
   .meter i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--ex); border-radius: 3px; transition: height .08s; }
   .placeholder { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 28px;
@@ -147,6 +168,7 @@
   th:first-child, td:first-child { text-align: left; }
   tr + tr td, tbody tr:first-child td { border-top: .5px solid var(--sep); }
   th { font-size: 13px; color: var(--label2); font-weight: 400; padding-block: 8px; }
+  td.h { color: var(--heart); font-weight: 600; } td.h small { font-weight: 400; color: var(--label2); }
   td.p { color: var(--pompes); font-weight: 600; } td.a { color: var(--abdos); font-weight: 600; }
   .empty { color: var(--label2); text-align: center !important; padding: 22px 16px; }
   .list-btn { width: 100%; text-align: left; color: var(--pompes); }
@@ -186,7 +208,10 @@
       </div>
       <div class="meter" id="meter" hidden><i id="meter-fill"></i></div>
       <div class="overlay" id="overlay" hidden>
-        <div class="hint" id="hint">Mets-toi en place</div>
+        <div class="top">
+          <div class="hint" id="hint">Mets-toi en place</div>
+          <div class="tempo" id="tempo" hidden><span id="tempo-pace"></span><span id="tempo-fat"></span></div>
+        </div>
         <div>
           <div class="count" id="count">0</div>
           <div class="count-label" id="count-label">pompes · cette série</div>
@@ -206,6 +231,28 @@
         <div><div class="k">Pompes</div><div class="v" style="color:var(--pompes)"><span id="t-pompes">0</span><small> / <span id="g-pompes">30</span></small></div></div></div>
       <div class="ring-cell"><div class="ring" id="b-abdos" style="--c:var(--abdos)"></div>
         <div><div class="k">Abdos</div><div class="v" style="color:var(--abdos)"><span id="t-abdos">0</span><small> / <span id="g-abdos">30</span></small></div></div></div>
+    </div>
+
+    <p class="group-title">Cœur · Apple Watch</p>
+    <div class="list">
+      <div class="hr-now"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.5 1.1 4.3 2.4.8-1.3 2.2-2.4 4.3-2.4 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg><div><div class="v" id="hr-today">–</div><div class="k" id="hr-today-k">Pas encore de mesure aujourd'hui</div></div></div>
+      <button class="list-btn heart" id="btn-hr-paste">Coller depuis le Raccourci</button>
+      <div class="hr-inputs"><label for="hr-avg">Moy.</label><input type="number" inputmode="numeric" id="hr-avg" min="35" max="230" placeholder="—">
+        <label for="hr-max">Max</label><input type="number" inputmode="numeric" id="hr-max" min="35" max="230" placeholder="—">
+        <button id="btn-hr-save">Enregistrer</button></div>
+      <details>
+        <summary>Créer le Raccourci « Fin de séance »</summary>
+        <ol class="tips">
+          <li>Ouvre l'app <b>Raccourcis</b>, touche <b>+</b> et nomme le raccourci <b>Fin de séance</b>.</li>
+          <li>Ajoute <b>Rechercher des échantillons de santé</b> : type <b>Fréquence cardiaque</b>, puis ajoute le filtre <b>Date de début</b> « dans les dernières » <b>45 minutes</b>.</li>
+          <li>Ajoute <b>Obtenir les détails des échantillons de santé</b> et choisis <b>Valeur</b>.</li>
+          <li>Ajoute <b>Calculer les statistiques</b> : <b>Moyenne</b> de <b>Valeur</b>. Puis <b>Arrondir le nombre</b>.</li>
+          <li>Ajoute encore <b>Calculer les statistiques</b> : <b>Maximum</b> de <b>Valeur</b> (touche la variable et choisis Valeur).</li>
+          <li>Ajoute <b>Texte</b> et écris : <b>FC</b>, puis la variable <b>Nombre arrondi</b>, un espace, et la variable <b>Statistiques</b> du maximum.</li>
+          <li>Ajoute <b>Copier dans le presse-papiers</b>, puis <b>Afficher la notification</b> avec « Copié, ouvre Pompes ».</li>
+        </ol>
+        <p class="tips" style="padding:0">Le soir : lance un entraînement « Renforcement musculaire » sur ta Watch, fais tes séries, arrête l'entraînement, dis « Dis Siri, Fin de séance », puis touche « Coller depuis le Raccourci » ici.</p>
+      </details>
     </div>
 
     <p class="group-title">Aide</p>
@@ -251,10 +298,22 @@
       <div class="legend"><span style="--c:var(--pompes)">Pompes</span><span style="--c:var(--abdos)">Abdos</span></div>
       <canvas id="chart"></canvas>
     </div>
+    <div class="chart-card">
+      <div class="chart-title">Fatigue en fin de série</div>
+      <p class="chart-sub">De combien tu ralentis entre le début et la fin de ta plus longue série. Plus c'est bas, plus tu es endurant.</p>
+      <div class="legend"><span style="--c:var(--pompes)">Pompes</span><span style="--c:var(--abdos)">Abdos</span></div>
+      <canvas class="line-chart" id="chart-fat"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Cœur</div>
+      <p class="chart-sub">Fréquence cardiaque pendant la séance, en battements par minute.</p>
+      <div class="legend"><span style="--c:var(--heart)">Moyenne</span><span style="--c:var(--orange)">Maximum</span></div>
+      <canvas class="line-chart" id="chart-hr"></canvas>
+    </div>
     <p class="group-title">Historique</p>
     <div class="list" style="padding:0">
       <table>
-        <thead><tr><th>Jour</th><th>Pompes</th><th>Abdos</th></tr></thead>
+        <thead><tr><th>Jour</th><th>Pompes</th><th>Abdos</th><th>Cœur</th></tr></thead>
         <tbody id="hist"></tbody>
       </table>
     </div>
@@ -324,7 +383,7 @@ const JOINTS = {
   abdos:  { L: [11, 23, 25], R: [12, 24, 26], countOn: "flex", label: "abdos" },
 };
 function setEx(next) {
-  if (running && next !== ex) { session = 0; }
+  if (running && next !== ex) { finishSet(); session = 0; openSet(); }
   ex = next;
   document.body.style.setProperty("--ex", `var(--${ex})`);
   for (const b of document.querySelectorAll("[data-ex]")) b.setAttribute("aria-pressed", b.dataset.ex === ex);
@@ -391,10 +450,10 @@ function processPose(lm, w, h) {
   const now = performance.now();
   if (phase === "ext" && smooth < flex) {
     phase = "flex";
-    if (J.countOn === "flex" && now - lastRep > 500) { lastRep = now; addRep(1); }
+    if (J.countOn === "flex" && now - lastRep > 500) { lastRep = now; addRep(1); markRep(now); }
   } else if (phase === "flex" && smooth > ext) {
     phase = "ext";
-    if (J.countOn === "ext" && now - lastRep > 500) { lastRep = now; addRep(1); }
+    if (J.countOn === "ext" && now - lastRep > 500) { lastRep = now; addRep(1); markRep(now); }
   }
   if (ex === "pompes") hint(phase === "ext" ? "Descends ⬇" : "Pousse ⬆");
   else hint(phase === "ext" ? "Monte ⬆" : "Redescends ⬇");
@@ -417,6 +476,45 @@ function drawSkeleton(lm, side, w, h, v) {
   ctx.fillStyle = color;
   for (const i of side) { ctx.beginPath(); ctx.arc(X(lm[i]), Y(lm[i]), Math.max(6, w / 60), 0, 7); ctx.fill(); }
 }
+/* ---------- Rythme et fatigue (mesurés par la caméra) ---------- */
+let repTimes = [], setIsOpen = false;
+function openSet() { repTimes = []; setIsOpen = true; $("tempo").hidden = true; }
+function repDurations() {
+  const d = [];
+  for (let i = 1; i < repTimes.length; i++) { const x = repTimes[i] - repTimes[i - 1]; if (x < 15000) d.push(x / 1000); }
+  return d;
+}
+const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+function setStats() {
+  const d = repDurations();
+  if (!d.length) return { pace: null, slow: null };
+  const pace = mean(d.slice(-3));
+  const slow = d.length >= 4 ? pace / mean(d.slice(0, 3)) - 1 : null;
+  return { pace, slow, avg: mean(d) };
+}
+const fmtS = x => x.toFixed(1).replace(".", ",");
+function markRep(now) {
+  repTimes.push(now);
+  const { pace, slow } = setStats();
+  if (pace == null) return;
+  $("tempo").hidden = false;
+  $("tempo-pace").textContent = `${fmtS(pace)} s / rép.`;
+  const f = $("tempo-fat");
+  if (slow == null) { f.textContent = "Mesure de la fatigue…"; f.className = ""; return; }
+  const pct = Math.round(slow * 100);
+  if (pct < 15) { f.textContent = pct <= 0 ? "En forme" : `En forme · +${pct} %`; f.className = "ok"; }
+  else if (pct < 35) { f.textContent = `Ça ralentit · +${pct} %`; f.className = "mid"; }
+  else { f.textContent = `Fatigue · +${pct} %`; f.className = "high"; }
+}
+function finishSet() {
+  if (!setIsOpen) return null; setIsOpen = false;
+  if (session <= 0) return null;
+  const { avg, slow } = setStats();
+  const set = { ex, reps: session, pace: avg != null ? +avg.toFixed(2) : null, slow: slow != null ? +slow.toFixed(3) : null, t: Date.now() };
+  (todayEntry().sets ||= []).push(set); save();
+  return set;
+}
+
 function hint(text, bad = false) { const el = $("hint"); el.textContent = text; el.classList.toggle("bad", bad); }
 
 /* ---------- Caméra + détection ---------- */
@@ -441,7 +539,7 @@ async function start() {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
     video.srcObject = stream; await video.play();
     landmarker ||= await initLandmarker();
-    running = true; session = 0; resetRep(); renderCount();
+    running = true; session = 0; resetRep(); openSet(); renderCount();
     $("placeholder").hidden = true; $("overlay").hidden = false; $("meter").hidden = false;
     btn.textContent = "Arrêter"; btn.classList.add("stop");
     try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
@@ -459,8 +557,12 @@ function stop() {
   $("overlay").hidden = true; $("meter").hidden = true; $("placeholder").hidden = false;
   $("btn-start").textContent = "Démarrer"; $("btn-start").classList.remove("stop");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (session > 0) {
-    $("placeholder").innerHTML = `<div><strong>${session} ${JOINTS[ex].label}</strong>Bien joué, c'est enregistré. Change d'exercice ou relance une série.</div>`;
+  const set = finishSet();
+  if (set) {
+    let extra = "";
+    if (set.pace != null) extra += `<br>Rythme moyen : ${fmtS(set.pace)} s par répétition.`;
+    if (set.slow != null) extra += `<br>Ralentissement en fin de série : ${set.slow > 0 ? "+" : ""}${Math.round(set.slow * 100)} %.`;
+    $("placeholder").innerHTML = `<div><strong>${set.reps} ${JOINTS[ex].label}</strong>Bien joué, c'est enregistré.${extra}</div>`;
   }
 }
 // pointerdown réagit dès le contact du doigt, sans attendre la fin du « clic »
@@ -531,13 +633,14 @@ function renderProgress() {
   $("st-rp").textContent = Math.max(0, ...vals.map(v => v.pompes));
   $("st-ra").textContent = Math.max(0, ...vals.map(v => v.abdos));
 
-  const keys = Object.keys(H).filter(k => H[k].pompes + H[k].abdos > 0).sort().reverse();
+  const keys = Object.keys(H).filter(k => H[k].pompes + H[k].abdos > 0 || H[k].hr).sort().reverse();
   const fmt = k => new Date(k + "T12:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
   $("hist").innerHTML = keys.length ? keys.slice(0, 60).map(k =>
-    `<tr><td>${fmt(k)}</td><td class="p">${H[k].pompes}</td><td class="a">${H[k].abdos}</td></tr>`).join("")
-    : `<tr><td colspan="3" class="empty">Aucune séance encore. Ta première ligne apparaîtra ce soir !</td></tr>`;
-  drawChart();
+    `<tr><td>${fmt(k)}</td><td class="p">${H[k].pompes}</td><td class="a">${H[k].abdos}</td><td class="h">${H[k].hr ? H[k].hr.avg + "<small>/" + H[k].hr.max + "</small>" : "–"}</td></tr>`).join("")
+    : `<tr><td colspan="4" class="empty">Aucune séance encore. Ta première ligne apparaîtra ce soir !</td></tr>`;
+  drawAll();
 }
+function drawAll() { drawChart(); drawFatigue(); drawHR(); }
 function drawChart() {
   const c = $("chart"), dpr = window.devicePixelRatio || 1;
   const W = c.clientWidth, Hh = c.clientHeight;
@@ -577,9 +680,9 @@ function drawChart() {
 document.querySelectorAll(".range button").forEach(b => b.onclick = () => {
   rangeDays = +b.dataset.days;
   document.querySelectorAll(".range button").forEach(x => x.setAttribute("aria-pressed", x === b));
-  drawChart();
+  drawAll();
 });
-window.addEventListener("resize", () => { if (!$("view-progres").hidden) drawChart(); });
+window.addEventListener("resize", () => { if (!$("view-progres").hidden) drawAll(); });
 
 /* ---------- Sauvegarde ---------- */
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2200); }
@@ -596,11 +699,101 @@ $("btn-import").onclick = async () => {
     if (!d.history) throw 0;
     for (const [k, v] of Object.entries(d.history)) {
       const cur = data.history[k] || { pompes: 0, abdos: 0 };
-      data.history[k] = { pompes: Math.max(cur.pompes, v.pompes || 0), abdos: Math.max(cur.abdos, v.abdos || 0) };
+      data.history[k] = { ...v, ...cur, pompes: Math.max(cur.pompes, v.pompes || 0), abdos: Math.max(cur.abdos, v.abdos || 0) };
     }
     save(); renderProgress(); renderCount(); toast("Historique restauré");
   } catch { toast("Ce texte n'est pas une sauvegarde valide"); }
 };
+
+/* ---------- Cœur (Apple Watch via le Raccourci) ---------- */
+function setHR(avg, max) {
+  avg = Math.round(avg); max = Math.round(max ?? avg);
+  if (!(avg >= 35 && avg <= 230 && max >= 35 && max <= 230)) { toast("Valeurs de cœur invalides"); return false; }
+  if (max < avg) [avg, max] = [max, avg];
+  todayEntry().hr = { avg, max }; save(); renderHR();
+  if (!$("view-progres").hidden) renderProgress();
+  toast(`Cœur enregistré : ${avg} moy. · ${max} max`);
+  return true;
+}
+function parseHR(text) {
+  const nums = (String(text || "").match(/\d+(?:[.,]\d+)?/g) || []).map(x => parseFloat(x.replace(",", "."))).filter(x => x >= 35 && x <= 230);
+  return nums.length ? [nums[0], nums[1] ?? nums[0]] : null;
+}
+function renderHR() {
+  const hr = todayEntry().hr;
+  $("hr-today").textContent = hr ? `${hr.avg} bpm` : "–";
+  $("hr-today-k").textContent = hr ? `moyenne aujourd'hui · max ${hr.max} bpm` : "Pas encore de mesure aujourd'hui";
+  if (hr) { $("hr-avg").value = hr.avg; $("hr-max").value = hr.max; }
+}
+$("btn-hr-paste").onclick = async () => {
+  let txt = null;
+  try { txt = await navigator.clipboard.readText(); } catch {}
+  const v = parseHR(txt);
+  if (v) setHR(...v);
+  else { toast("Rien trouvé : lance d'abord le Raccourci, ou tape les valeurs"); $("hr-avg").focus(); }
+};
+$("btn-hr-save").onclick = () => {
+  const a = parseFloat($("hr-avg").value), m = parseFloat($("hr-max").value);
+  if (!a) { toast("Entre au moins la moyenne"); return; }
+  setHR(a, m || a); document.activeElement?.blur();
+};
+// Le Raccourci peut aussi ouvrir l'appli avec ?fc_moy=120&fc_max=155
+(() => {
+  const q = new URLSearchParams(location.search);
+  if (q.has("fc_moy") || q.has("fc")) {
+    const v = parseHR(`${q.get("fc_moy") ?? q.get("fc")} ${q.get("fc_max") ?? ""}`);
+    if (v) setHR(...v);
+    try { history.replaceState(null, "", location.pathname); } catch {}
+  }
+})();
+
+/* ---------- Courbes ---------- */
+function drawLines(id, series, { unit = "", minTop = 10, floor = 0, empty = "Pas encore de données" } = {}) {
+  const c = $(id), dpr = window.devicePixelRatio || 1;
+  const W = c.clientWidth, Hh = c.clientHeight; if (!W) return;
+  c.width = W * dpr; c.height = Hh * dpr;
+  const g = c.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0, 0, W, Hh);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const days = lastDays(rangeDays);
+  const vals = series.map(s => days.map(d => s.get(data.history[dayKey(d)])));
+  const all = vals.flat().filter(v => v != null);
+  g.font = `12px ${css("--font")}`;
+  if (!all.length) { g.fillStyle = css("--label2"); g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(empty, W / 2, Hh / 2); return; }
+  const lo = Math.min(floor, ...all), hiRaw = Math.max(minTop, ...all);
+  const span = hiRaw - lo, step = span <= 20 ? 5 : span <= 50 ? 10 : span <= 100 ? 20 : 50;
+  const bottom = Math.floor(lo / step) * step, top = Math.ceil(hiRaw / step) * step;
+  const L = 36, R = 8, T = 8, B = 22, cw = W - L - R, ch = Hh - T - B;
+  const Y = v => T + ch - ((v - bottom) / (top - bottom)) * ch;
+  const slot = cw / days.length, X = i => L + slot * i + slot / 2;
+  g.fillStyle = css("--label2"); g.strokeStyle = css("--sep"); g.lineWidth = 1; g.textAlign = "right"; g.textBaseline = "middle";
+  for (let v = bottom; v <= top; v += step) { g.beginPath(); g.moveTo(L, Y(v) + .5); g.lineTo(W - R, Y(v) + .5); g.stroke(); g.fillText(v + unit, L - 6, Y(v)); }
+  g.textAlign = "center"; g.textBaseline = "top";
+  const labelEvery = rangeDays <= 7 ? 1 : rangeDays <= 14 ? 2 : 5;
+  days.forEach((d, i) => { if ((rangeDays - 1 - i) % labelEvery === 0) g.fillText(i === days.length - 1 ? "auj." : d.getDate(), X(i), T + ch + 6); });
+  series.forEach((s, si) => {
+    const col = css(s.color), pts = vals[si].map((v, i) => v == null ? null : [X(i), Y(v)]).filter(Boolean);
+    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 2.5; g.lineJoin = "round"; g.lineCap = "round";
+    g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
+    pts.forEach(([x, y], i) => { g.beginPath(); g.arc(x, y, i === pts.length - 1 ? 4.5 : 3, 0, 7); g.fill(); });
+  });
+}
+function mainSet(day, k) {
+  const sets = (day?.sets || []).filter(s => s.ex === k && s.slow != null);
+  if (!sets.length) return null;
+  return Math.round(sets.reduce((a, b) => (b.reps > a.reps ? b : a)).slow * 100);
+}
+function drawFatigue() {
+  drawLines("chart-fat", [
+    { color: "--pompes", get: d => mainSet(d, "pompes") },
+    { color: "--abdos", get: d => mainSet(d, "abdos") },
+  ], { unit: " %", minTop: 20, empty: "Fais une série d'au moins 5 répétitions avec la caméra" });
+}
+function drawHR() {
+  drawLines("chart-hr", [
+    { color: "--heart", get: d => d?.hr?.avg ?? null },
+    { color: "--orange", get: d => d?.hr?.max ?? null },
+  ], { minTop: 100, floor: 60, empty: "Ajoute ton cœur après une séance (onglet Séance)" });
+}
 
 /* ---------- Onglets ---------- */
 function showTab(name) {
@@ -615,6 +808,7 @@ $("tab-seance").onclick = () => showTab("seance");
 $("tab-progres").onclick = () => showTab("progres");
 
 setEx("pompes");
+renderHR();
 </script>
 </body>
 </html>
