@@ -1,39 +1,36 @@
-# ComptaPro — comptabilité complète avec assistant IA
+# ComptaPro Belgique
 
-Application web de comptabilité pour indépendants et petites entreprises françaises : facturation, dépenses, banque, TVA, bilan de fin d'année et assistant IA (Claude).
+Application de comptabilité pour indépendants et sociétés établis en Belgique : facturation (Peppol), dépenses, banque (CODA), TVA (Intervat), comptes annuels (schéma BNB), clôture et assistant IA (Claude).
 
-Aucune installation : ouvrez `index.html` dans un navigateur (ou publiez le dossier sur GitHub Pages). Installable comme application (PWA). Toutes les données restent sur l'appareil (stockage local) ; exportez des sauvegardes depuis **Paramètres**.
+Aucune installation : ouvrez `index.html` dans un navigateur, ou utilisez la version en un seul fichier `dist/comptapro.html` (générée par `python3 build.py`).
 
-## Fonctionnalités
+## Règles belges intégrées
 
-| Module | Contenu |
+| Domaine | Ce que fait l'application |
 |---|---|
-| Tableau de bord | CA, charges, résultat, trésorerie, TVA de la période, IS estimé, graphique mensuel, liste de tâches |
-| Factures & devis | Numérotation automatique, avoirs, conversion devis → facture, multi-taux de TVA, remises, aperçu/PDF, envoi par e-mail, relances, mentions légales |
-| Clients | Fiche client, CA et reste dû par client |
-| Dépenses | Catégories PCG, TVA déductible, justificatifs (photo/PDF), remplissage automatique par l'IA, export CSV |
-| Banque | Import de relevés CSV (toutes banques), rapprochement factures / dépenses / catégories, tri automatique par l'IA |
-| Immobilisations | Amortissement linéaire prorata temporis, plan d'amortissement, dotations passées automatiquement |
-| TVA | Franchise, réel simplifié (CA12) ou réel normal (CA3), débits ou encaissements, calcul des cases CA3, crédit reporté, écritures de liquidation et de paiement |
-| Journal & grand livre | Partie double générée automatiquement, écritures manuelles (OD), balance, grand livre, **export FEC** |
-| Bilan & résultat | Compte de résultat comparatif N / N-1, bilan actif / passif, soldes intermédiaires de gestion |
-| Clôture annuelle | Check-list de clôture, IS (15 % / 25 %), tableau de reprise liasse 2033, revue de clôture par l'IA, échéances |
-| Assistant IA | Questions-réponses sur vos chiffres, scan et tri de justificatifs, tri bancaire, analyse financière complète |
+| Identification | Numéro d'entreprise BCE et TVA contrôlés (modulo 97), IBAN contrôlé, lien direct vers la fiche BCE, remplissage automatique d'une fiche à partir du texte ou d'une capture de la BCE (IA) |
+| Plan comptable | PCMN (classes 1 à 7), écritures en partie double générées automatiquement |
+| Factures | Numérotation continue, notes de crédit, communication structurée +++xxx/xxxx/xxxxx+++, QR code de paiement EPC, mentions légales selon le régime (autoliquidation, intracom, export, franchise 56bis), régime proposé automatiquement selon le client, export Peppol BIS 3.0 (UBL) |
+| Dépenses | Taux 21/12/6/0 %, déductibilité de la TVA (restaurant 0 %, voiture 50 %…), autoliquidation (grilles 86/87/88), lecture des tickets par l'IA |
+| Banque | Import CODA et CSV des banques belges, rapprochement automatique (communication structurée, montant + nom, règles apprises), tri IA du reste |
+| TVA | Déclaration périodique mensuelle ou trimestrielle avec toutes les grilles (00-03, 44-49, 81-88, 54-64, 71/72), fichier XML pour Intervat, listing annuel des clients (XML), relevé intracommunautaire, régime de franchise |
+| Immobilisations | Amortissement linéaire avec prorata temporis, TVA non déductible incorporée |
+| Comptes annuels | Bilan et compte de résultats au schéma abrégé BNB (codes), indicateurs (marge, EBITDA, liquidité, solvabilité) |
+| Clôture | Check-list, estimation ISOC (taux réduit PME) ou IPP + cotisations sociales, versements anticipés, obligations (AG, dépôt BNB, Biztax / Tax-on-web) |
+| Échéancier | TVA, listing, versements anticipés, cotisations sociales, AG et dépôt BNB sur le tableau de bord |
 
-## Assistant IA
-
-Dans **Paramètres → Assistant IA**, collez une clé API Anthropic (console.anthropic.com). La clé est stockée uniquement dans le navigateur et les requêtes partent directement de l'appareil vers l'API, accompagnées d'un résumé des données comptables. Modèle par défaut : Claude Opus 5.5.
+Les paramètres fiscaux (taux, plafonds, barème IPP, cotisations sociales) sont indicatifs et modifiables dans **Paramètres** : vérifiez-les chaque année. Les fichiers XML (Intervat, listing, Peppol) suivent les formats publics ; contrôlez l'aperçu avant de les déposer. Pour l'envoi Peppol, le fichier UBL doit passer par un point d'accès Peppol.
 
 ## Structure
 
 ```
-index.html            coquille de l'application
+index.html            application
 css/style.css         styles (clair / sombre, mobile)
-js/store.js           données, persistance, plan comptable
-js/compta.js          moteur comptable : écritures, TVA, amortissements, bilan, FEC
-js/ui.js              composants (modales, CSV, graphiques)
+js/store.js           données, PCMN, identifiants belges, synchronisation
+js/compta.js          moteur : écritures, TVA, Intervat, listing, Peppol, CODA, impôts, échéancier
+js/ui.js              composants, QR EPC
 js/views*.js          écrans
 js/ai.js              intégration Claude
+vendor/qrcode.js      générateur de QR (MIT)
+build.py              assemble dist/comptapro.html
 ```
-
-> Les calculs fiscaux sont fournis à titre d'aide ; faites valider vos comptes annuels et déclarations par un professionnel si nécessaire.

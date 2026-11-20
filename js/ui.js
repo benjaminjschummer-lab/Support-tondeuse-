@@ -155,5 +155,19 @@
   }
 
   App.isArtifact = !!(window.claude && window.claude.use);
-  Object.assign(App, { $, $$, toast, modal, confirmBox, formData, download, toCSV, parseCSV, parseAmount, parseDate, barChart, statusBadge, options, tvaOptions, yearOptions, compressImage });
+  /* QR code de paiement européen (EPC / SEPA) lisible par les apps bancaires belges */
+  function epcQr(inv) {
+    const c = App.state.settings.company;
+    if (!window.qrcode || !c.iban || inv.type !== 'facture') return '';
+    const t = App.invoiceTotals(inv);
+    if (t.ttc <= 0) return '';
+    const payload = ['BCD', '002', '1', 'SCT', (c.bic || '').replace(/\s/g, ''), (c.name || '').slice(0, 70), App.ibanClean(c.iban), 'EUR' + t.ttc.toFixed(2), '', '', App.invoiceComm(inv)].join('\n');
+    try {
+      window.qrcode.stringToBytes = window.qrcode.stringToBytesFuncs['UTF-8'];
+      const qr = window.qrcode(0, 'M'); qr.addData(payload); qr.make();
+      return qr.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
+    } catch (e) { return ''; }
+  }
+
+  Object.assign(App, { epcQr, $, $$, toast, modal, confirmBox, formData, download, toCSV, parseCSV, parseAmount, parseDate, barChart, statusBadge, options, tvaOptions, yearOptions, compressImage });
 })(window.App);

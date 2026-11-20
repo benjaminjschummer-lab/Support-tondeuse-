@@ -23,10 +23,11 @@
     return new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
   }
 
-  const SYSTEM = `Tu es l'expert-comptable intégré à ComptaPro, une application de comptabilité française.
-Tu maîtrises le Plan comptable général (PCG), la TVA française (CA3, CA12, exigibilité, autoliquidation, franchise en base), les régimes fiscaux (micro, réel simplifié, réel normal, IS, IR), les amortissements, la clôture annuelle, la liasse fiscale (2033 / 2050), le FEC, les cotisations sociales des dirigeants et les obligations déclaratives.
-Réponds en français, de façon claire, concrète et chiffrée à partir des données de l'entreprise fournies. Cite les comptes PCG utiles et les échéances.
-Quand une donnée manque, dis-le et explique comment la saisir dans l'application. Signale quand une situation mérite la validation d'un expert-comptable.
+  const SYSTEM = `Tu es l'expert-comptable et conseiller fiscal intégré à ComptaPro, une application de comptabilité pour indépendants et sociétés établis en BELGIQUE.
+Tu appliques exclusivement le droit belge : plan comptable minimum normalisé (PCMN), Code de la TVA (taux 21/12/6/0 %, grilles de la déclaration périodique, Intervat, listing clients, relevé intracommunautaire, régime de franchise art. 56bis, autoliquidation, cocontractant), facturation électronique Peppol obligatoire en B2B depuis 2026, impôt des sociétés (taux réduit PME, versements anticipés, dépenses non admises), impôt des personnes physiques et cotisations sociales des indépendants, comptes annuels BNB, communication structurée.
+Réponds en français, de façon claire, concrète et chiffrée à partir des données de l'entreprise fournies. Cite les comptes PCMN et les grilles TVA utiles, ainsi que les échéances.
+Les taux et seuils fiscaux changent chaque année : donne les montants que tu connais en précisant l'année et invite à vérifier sur finances.belgium.be quand l'enjeu est important.
+Quand une donnée manque, dis-le et explique comment la saisir dans l'application. Signale quand une situation mérite la validation d'un comptable ou d'un conseiller fiscal agréé (ITAA).
 Utilise du Markdown simple (titres ####, listes, tableaux, gras).`;
 
   function base(extra) {
@@ -97,18 +98,20 @@ Utilise du Markdown simple (titres ####, listes, tableaux, gras).`;
 
   const DOC_SCHEMA = {
     type: 'object', additionalProperties: false,
-    required: ['document_type', 'supplier', 'customer', 'date', 'number', 'description', 'total_ht', 'total_tva', 'total_ttc', 'tva_rate', 'account', 'is_asset', 'asset_account', 'asset_duration_years', 'payment_method', 'confidence', 'remarks'],
+    required: ['vat_regime', 'vat_deductible_pct', 'document_type', 'supplier', 'customer', 'date', 'number', 'description', 'total_ht', 'total_tva', 'total_ttc', 'tva_rate', 'account', 'is_asset', 'asset_account', 'asset_duration_years', 'payment_method', 'confidence', 'remarks'],
     properties: {
       document_type: { type: 'string', enum: ['facture_achat', 'ticket_caisse', 'facture_vente', 'note_de_frais', 'releve_bancaire', 'autre'] },
       supplier: { type: 'string' }, customer: { type: 'string' },
       date: { type: 'string', description: 'AAAA-MM-JJ' }, number: { type: 'string' },
       description: { type: 'string' },
       total_ht: { type: 'number' }, total_tva: { type: 'number' }, total_ttc: { type: 'number' },
-      tva_rate: { type: 'number', description: 'Taux principal : 20, 10, 5.5, 2.1 ou 0' },
-      account: { type: 'string', description: 'Compte de charge PCG à 6 chiffres' },
-      is_asset: { type: 'boolean', description: 'Vrai si immobilisation (bien durable > 500 € HT)' },
+      tva_rate: { type: 'number', description: 'Taux belge principal : 21, 12, 6 ou 0' },
+      account: { type: 'string', description: 'Compte de charge PCMN à 6 chiffres, choisi dans la liste' },
+      vat_regime: { type: 'string', enum: ['normal', 'intracom_biens', 'intracom_services', 'cocontractant'], description: 'autoliquidation si la facture ne contient pas de TVA belge et mentionne l\'autoliquidation' },
+      vat_deductible_pct: { type: 'number', description: 'Pourcentage de TVA déductible selon le CTVA : restaurant 0, cadeaux 0, voiture 50, sinon 100' },
+      is_asset: { type: 'boolean', description: 'Vrai si investissement durable à amortir (matériel, véhicule, mobilier, logiciel d\'une valeur significative)' },
       asset_account: { type: 'string' }, asset_duration_years: { type: 'number' },
-      payment_method: { type: 'string', enum: ['carte', 'virement', 'especes', 'prelevement', 'cheque', 'inconnu'] },
+      payment_method: { type: 'string', enum: ['carte', 'virement', 'domiciliation', 'especes', 'inconnu'] },
       confidence: { type: 'number', description: '0 à 1' },
       remarks: { type: 'string', description: 'Points d\'attention : TVA non récupérable, mentions manquantes, etc.' },
     },
@@ -124,8 +127,9 @@ Utilise du Markdown simple (titres ####, listes, tableaux, gras).`;
     const cats = App.EXPENSE_CATEGORIES.map((c) => `${c.account} ${c.label}`).join('\n');
     const assets = App.ASSET_CATEGORIES.map((c) => `${c.account} ${c.label} (${c.duration} ans)`).join('\n');
     return structured([media, { type: 'text', text: `Analyse ce justificatif et extrais les données comptables. Entreprise : ${App.state.settings.company.name}.
-Comptes de charges disponibles :\n${cats}\nComptes d'immobilisations :\n${assets}
-Si un montant est absent, calcule-le à partir des autres. Si la TVA n'est pas récupérable (ex. carburant essence, cadeaux > 73 €), mets total_tva à 0 et explique dans remarks. Laisse asset_account vide et asset_duration_years à 0 si ce n'est pas une immobilisation.` }], DOC_SCHEMA, null, sampleFn ? [file] : null);
+Entreprise belge.
+Comptes de charges PCMN disponibles :\n${cats}\nComptes d'immobilisations :\n${assets}
+Si un montant est absent, calcule-le à partir des autres. total_tva = TVA figurant sur le document (même si elle n'est pas déductible) ; vat_deductible_pct selon le CTVA (restaurant et réception 0, cadeaux 0, frais de voiture 50, sinon 100). Pour une facture étrangère sans TVA avec autoliquidation, total_tva = 0, total_ttc = total_ht et vat_regime adapté. Signale dans remarks les mentions obligatoires manquantes. Laisse asset_account vide et asset_duration_years à 0 si ce n'est pas un investissement.` }], DOC_SCHEMA, null, sampleFn ? [file] : null);
   }
 
   /* Tri automatique des opérations bancaires */
@@ -133,7 +137,7 @@ Si un montant est absent, calcule-le à partir des autres. Si la TVA n'est pas r
     const s = App.state;
     const openInvoices = s.invoices.filter((i) => i.type === 'facture' && i.status === 'envoyee').map((i) => ({ id: i.id, numero: i.number, client: (s.clients.find((c) => c.id === i.clientId) || {}).name, ttc: App.invoiceTotals(i).ttc }));
     const unpaidExpenses = s.expenses.filter((e) => !e.paid).map((e) => ({ id: e.id, fournisseur: e.supplier, ttc: e.ttc, date: e.date }));
-    const accounts = [...App.EXPENSE_CATEGORIES, { account: '706000', label: 'Prestations de services' }, { account: '707000', label: 'Ventes de marchandises' }, { account: '758000', label: 'Produits divers' }, { account: '108000', label: 'Apport / prélèvement de l\'exploitant' }, { account: '455000', label: 'Compte courant d\'associé' }, { account: '164000', label: 'Emprunt (capital remboursé)' }, { account: '445510', label: 'Paiement de TVA' }, { account: '444000', label: 'Paiement impôt sur les sociétés' }, { account: '471000', label: 'Compte d\'attente' }];
+    const accounts = [...App.EXPENSE_CATEGORIES, ...App.REVENUE_ACCOUNTS.map(([a, l]) => ({ account: a, label: l })), { account: '750000', label: 'Intérêts reçus' }, { account: '100000', label: 'Apport de l\'exploitant / capital' }, { account: '489100', label: 'Compte courant dirigeant (prélèvement ou apport privé)' }, { account: '173000', label: 'Remboursement d\'emprunt (capital)' }, { account: '451800', label: 'Paiement de TVA au SPF Finances' }, { account: '411800', label: 'Remboursement de TVA reçu' }, { account: '412000', label: 'Versement anticipé d\'impôt' }, { account: '450000', label: 'Paiement d\'impôt (avertissement-extrait de rôle)' }, { account: '453000', label: 'Précompte professionnel' }, { account: '454000', label: 'ONSS' }, { account: '455000', label: 'Salaires nets' }, { account: '456000', label: 'Caisse d\'assurances sociales (cotisations sociales indépendant à payer)' }, { account: '499000', label: 'Compte d\'attente' }];
     const schema = {
       type: 'object', additionalProperties: false, required: ['results'],
       properties: { results: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'match_type', 'match_id', 'account', 'tva_rate', 'confidence', 'reason'], properties: {
@@ -141,15 +145,35 @@ Si un montant est absent, calcule-le à partir des autres. Si la TVA n'est pas r
         account: { type: 'string' }, tva_rate: { type: 'number' }, confidence: { type: 'number' }, reason: { type: 'string' },
       } } } },
     };
-    return structured(`Classe chaque opération bancaire. Si un encaissement correspond à une facture client ouverte (montant et nom), utilise match_type "invoice" avec son id. Si un débit correspond à une dépense non payée, "expense". Sinon "category" avec le compte PCG le plus adapté et le taux de TVA probable (0 pour URSSAF, impôts, banque, assurance, salaires, emprunts).
+    return structured(`Classe chaque opération bancaire. Si un encaissement correspond à une facture client ouverte (montant et nom), utilise match_type "invoice" avec son id. Si un débit correspond à une dépense non payée, "expense". Sinon "category" avec le compte PCMN le plus adapté et le taux de TVA belge probable inclus dans le montant (0 pour caisse d'assurances sociales, ONSS, SPF Finances, banque, assurances, salaires, emprunts, loyers non soumis ; 21 par défaut pour les achats courants ; 6 pour transports en commun ; 12 pour restaurant). Pour les cotisations sociales d'un indépendant personne physique, utilise 623000. Confiance basse si tu hésites.
 Opérations : ${JSON.stringify(lines.map((b) => ({ id: b.id, date: b.date, libelle: b.label, montant: b.amount })))}
 Factures clients ouvertes : ${JSON.stringify(openInvoices)}
 Dépenses non payées : ${JSON.stringify(unpaidExpenses)}
 Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | ')}`, schema);
   }
 
+  /* Lecture d'une fiche BCE (texte copié depuis kbopub ou capture d'écran) */
+  const COMPANY_SCHEMA = {
+    type: 'object', additionalProperties: false,
+    required: ['name', 'enterprise_number', 'legal_form', 'street', 'postcode', 'city', 'nace', 'start_date', 'vat_registered', 'status'],
+    properties: {
+      name: { type: 'string' }, enterprise_number: { type: 'string', description: '10 chiffres' }, legal_form: { type: 'string' },
+      street: { type: 'string', description: 'Rue et numéro' }, postcode: { type: 'string' }, city: { type: 'string' },
+      nace: { type: 'string', description: 'Code NACE principal (activité TVA si présente)' }, start_date: { type: 'string' },
+      vat_registered: { type: 'boolean', description: 'Assujetti à la TVA selon la fiche' }, status: { type: 'string', description: 'Actif, radié…' },
+    },
+  };
+  async function extractCompany(text, image) {
+    const prompt = `Voici une fiche d'entreprise de la Banque-Carrefour des Entreprises (BCE, Belgique)${image ? ' (capture d\'écran jointe)' : ''}. Extrais les données d'identification de l'entreprise. N'invente rien : laisse vide ce qui n'apparaît pas.\n\n${text || ''}`;
+    if (image && !sampleFn) {
+      const data = await fileToBase64(image);
+      return structured([{ type: 'image', source: { type: 'base64', media_type: image.type || 'image/png', data } }, { type: 'text', text: prompt }], COMPANY_SCHEMA);
+    }
+    return structured(prompt, COMPANY_SCHEMA, null, image ? [image] : null);
+  }
+
   /* Analyse financière complète */
-  const ANALYSIS = `Rédige une analyse financière complète de l'entreprise : 1) synthèse en 3 phrases, 2) rentabilité et marges, 3) structure des charges et pistes d'économies, 4) trésorerie et BFR (délais clients), 5) TVA et échéances fiscales à venir, 6) anomalies ou incohérences détectées dans la saisie, 7) optimisations fiscales légales à étudier, 8) prévisions pour la fin d'exercice. Sois concret et chiffré.`;
+  const ANALYSIS = `Rédige une analyse financière complète de l'entreprise belge : 1) synthèse en 3 phrases, 2) rentabilité et marges, 3) structure des charges et pistes d'économies, 4) trésorerie et BFR (délais clients), 5) TVA (grilles), versements anticipés et échéances fiscales et sociales à venir, 6) anomalies ou incohérences détectées dans la saisie, 7) optimisations fiscales légales à étudier, 8) prévisions pour la fin d'exercice. Sois concret et chiffré.`;
   async function analyze(onText) {
     if (sampleFn) {
       try { const r = await sampleFn(`${SYSTEM}\n\n${contextBlock()}\n\n${ANALYSIS}`, { cache: false, modelTier: 'complex', onText: ({ text }) => onText && onText(text) }); return r.text; }
@@ -158,7 +182,7 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
     const c = await client();
     const stream = c.beta.messages.stream(base({
       system: SYSTEM, max_tokens: 32000,
-      messages: [{ role: 'user', content: `${contextBlock()}\n\nRédige une analyse financière complète de l'entreprise : 1) synthèse en 3 phrases, 2) rentabilité et marges, 3) structure des charges et pistes d'économies, 4) trésorerie et BFR (délais clients), 5) TVA et échéances fiscales à venir, 6) anomalies ou incohérences détectées dans la saisie, 7) optimisations fiscales légales à étudier, 8) prévisions pour la fin d'exercice. Sois concret et chiffré.` }],
+      messages: [{ role: 'user', content: `${contextBlock()}\n\nRédige une analyse financière complète de l'entreprise belge : 1) synthèse en 3 phrases, 2) rentabilité et marges, 3) structure des charges et pistes d'économies, 4) trésorerie et BFR (délais clients), 5) TVA (grilles), versements anticipés et échéances fiscales et sociales à venir, 6) anomalies ou incohérences détectées dans la saisie, 7) optimisations fiscales légales à étudier, 8) prévisions pour la fin d'exercice. Sois concret et chiffré.` }],
     }));
     let acc = '';
     stream.on('text', (t) => { acc += t; onText && onText(acc); });
@@ -195,6 +219,6 @@ Comptes disponibles : ${accounts.map((a) => a.account + ' ' + a.label).join(' | 
     return html;
   }
 
-  const api = { init, isReady, builtin: false, ready: false, chat, scanDocument, categorizeBank, analyze, md, fileToBase64 };
+  const api = { extractCompany, init, isReady, builtin: false, ready: false, chat, scanDocument, categorizeBank, analyze, md, fileToBase64 };
   App.ai = api;
 })(window.App);

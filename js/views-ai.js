@@ -4,14 +4,14 @@
   const V = App.views;
 
   const SUGGESTIONS = [
-    'Combien de TVA vais-je devoir payer ce mois-ci ?',
+    'Combien de TVA vais-je payer pour cette période ?',
     'Quel est mon résultat prévisionnel et l\'impôt associé ?',
-    'Quelles dépenses puis-je encore déduire avant la clôture ?',
-    'Ai-je intérêt à passer de l\'IR à l\'IS ?',
-    'Quels clients me paient le plus en retard ?',
+    'Quels frais puis-je encore déduire avant la clôture ?',
+    'Ai-je intérêt à passer en société ?',
+    'Combien dois-je verser en versements anticipés ?',
     'Explique-moi mon bilan simplement',
-    'Quelles sont mes prochaines échéances fiscales et sociales ?',
-    'Comment comptabiliser un leasing de véhicule ?',
+    'Quelles sont mes prochaines échéances TVA, sociales et fiscales ?',
+    'Comment déduire ma voiture de société ?',
   ];
 
   V.ia = (el, params) => {
@@ -69,8 +69,8 @@
     const s = App.state;
     const results = [];
     tc.innerHTML = `<div class="grid grid-2">
-      <div><h2>Scanner des justificatifs</h2><p class="muted">Photos de tickets, factures PDF, notes de frais : l'IA lit le document, détermine la catégorie comptable, la TVA récupérable, détecte les immobilisations et prépare la saisie.</p>
-        <label class="dropzone" id="dz"><input type="file" id="files" accept="image/*,application/pdf" multiple hidden><div style="font-size:28px">📄</div><strong>Glissez vos justificatifs ici</strong><div class="small">ou cliquez pour choisir / prendre une photo — JPG, PNG, PDF</div></label></div>
+      <div><h2>Scanner des justificatifs</h2><p class="muted">Photos de tickets, factures, notes de frais : l'IA lit le document, détermine la catégorie comptable, la TVA récupérable, détecte les immobilisations et prépare la saisie.</p>
+        <label class="dropzone" id="dz"><input type="file" id="files" accept="image/*,application/pdf" multiple hidden><div style="font-size:28px">📄</div><strong>Glissez vos justificatifs ici</strong><div class="small">ou cliquez pour choisir / prendre une photo — JPG, PNG${App.ai.builtin ? '' : ', PDF'}</div></label></div>
       <div><h2>Trier la banque</h2><p class="muted">L'IA rapproche les encaissements de vos factures, les débits de vos dépenses et classe le reste dans le bon compte avec le bon taux de TVA.</p>
         <p><strong>${s.bank.filter((b) => !b.matched).length}</strong> opération(s) en attente.</p><a class="btn" href="#/banque">Aller à la banque →</a></div></div>
       <div id="res" style="margin-top:18px"></div>`;
@@ -101,9 +101,11 @@
       const d = r.data;
       return {
         date: d.date || App.today(), supplier: d.supplier, description: d.description || d.number,
-        account: App.EXPENSE_CATEGORIES.some((c) => c.account === d.account) ? d.account : '471000',
-        ht: round2(d.total_ht), tva: round2(d.total_tva), ttc: round2(d.total_ttc), tvaRate: App.TVA_RATES.includes(Number(d.tva_rate)) ? Number(d.tva_rate) : 20,
-        paymentMethod: ['carte', 'virement', 'prelevement', 'cheque', 'especes'].includes(d.payment_method) ? d.payment_method : 'carte',
+        account: App.EXPENSE_CATEGORIES.some((c) => c.account === d.account) ? d.account : '612300',
+        ht: round2(d.total_ht), tva: round2(d.total_tva), ttc: round2(d.total_ttc), tvaRate: App.TVA_RATES.includes(Number(d.tva_rate)) ? Number(d.tva_rate) : 21,
+        vatRegime: App.PURCHASE_REGIMES.some(([k]) => k === d.vat_regime) ? d.vat_regime : 'normal',
+        deductiblePct: d.vat_deductible_pct ?? (App.VAT_DEDUCTIBILITY[d.account] ?? 100),
+        paymentMethod: ['carte', 'virement', 'domiciliation', 'especes'].includes(d.payment_method) ? d.payment_method : 'carte',
         paid: d.payment_method !== 'inconnu', paidDate: d.date, receipt: r.thumb, ref: d.number,
       };
     };
@@ -111,7 +113,7 @@
       const d = r.data;
       if (d.document_type === 'facture_vente') { App.toast(`${r.file.name} est une facture de vente : créez-la dans Factures.`, 'error'); return; }
       if (d.is_asset && App.ASSET_CATEGORIES.some((c) => c.account === d.asset_account)) {
-        s.assets.push({ id: App.uid(), label: d.description || d.supplier, account: d.asset_account, date: d.date || App.today(), value: round2(d.total_ht), tvaRate: Number(d.tva_rate) || 0, duration: Number(d.asset_duration_years) || App.ASSET_CATEGORIES.find((c) => c.account === d.asset_account).duration, supplier: d.supplier, paid: true });
+        s.assets.push({ id: App.uid(), label: d.description || d.supplier, account: d.asset_account, date: d.date || App.today(), value: round2(d.total_ht), tvaRate: Number(d.tva_rate) || 0, deductiblePct: d.asset_account === '245000' ? 50 : 100, receipt: r.thumb, duration: Number(d.asset_duration_years) || App.ASSET_CATEGORIES.find((c) => c.account === d.asset_account).duration, supplier: d.supplier, paid: true });
       } else {
         s.expenses.push(Object.assign({ id: App.uid() }, toExpense(r)));
       }
@@ -119,7 +121,7 @@
     };
 
     async function handle(files) {
-      if (!App.ai.isReady()) return App.toast('Ajoutez votre clé API dans les paramètres', 'error');
+      if (!App.ai.isReady()) return App.toast('Activez l\'assistant IA dans les paramètres', 'error');
       for (const file of files) {
         const r = { file, status: 'loading', thumb: await App.compressImage(file, 800) };
         results.push(r); draw();
@@ -147,39 +149,56 @@
 
   /* ============ PARAMÈTRES ============ */
   V.parametres = (el) => {
-    const s = App.state, c = s.settings.company, ai = s.settings.ai, o = s.settings.opening;
-    el.innerHTML = head('Paramètres', 'Entreprise, fiscalité, assistant IA et sauvegardes.') +
+    const s = App.state, c = s.settings.company, ai = s.settings.ai, o = s.settings.opening, f = s.settings.fiscal;
+    const num = (k, step) => `<input type="number" step="${step || 'any'}" data-f="${k}" value="${f[k]}">`;
+    el.innerHTML = head('Paramètres', 'Entreprise, régime TVA, fiscalité, assistant IA et sauvegardes.') +
       `<form id="pf">
       <div class="card"><h2>Entreprise</h2><div class="form-grid">
-        <label class="field">Raison sociale <input name="name" value="${esc(c.name)}"></label>
-        <label class="field">Forme juridique <select name="legalForm">${App.options(['EI', 'Micro', 'EURL', 'SARL', 'SASU', 'SAS', 'SA', 'SCI', 'Association'], c.legalForm)}</select></label>
-        <label class="field">SIRET <input name="siret" value="${esc(c.siret)}"></label>
-        <label class="field">N° TVA intracommunautaire <input name="tvaNumber" value="${esc(c.tvaNumber)}"></label>
+        <label class="field">Numéro d'entreprise (BCE) <input name="enterpriseNumber" id="ent" value="${esc(c.enterpriseNumber ? App.bceFormat(c.enterpriseNumber) : '')}" placeholder="0123.456.789"></label>
+        <div class="field"><span>Vérification</span><span id="entst" style="padding-top:8px"></span></div>
+        <div class="full actions"><a class="btn sm" id="kbo" target="_blank" rel="noopener">Ouvrir ma fiche BCE ↗</a>${App.ai.isReady() ? '<button type="button" class="btn sm" id="bcefill">✦ Remplir depuis la fiche BCE</button>' : ''}</div>
+        <label class="field">Dénomination <input name="name" value="${esc(c.name)}"></label>
+        <label class="field">Forme juridique <select name="legalForm">${App.options([['PP', 'Personne physique (indépendant)'], 'SRL', 'SA', 'SC', 'SNC', 'SComm', 'ASBL'], c.legalForm)}</select></label>
+        <label class="field">Rue et numéro <input name="address" value="${esc(c.address)}"></label>
+        <label class="field">Code postal <input name="postcode" value="${esc(c.postcode)}"></label>
+        <label class="field">Localité <input name="city" value="${esc(c.city)}"></label>
+        <label class="field">RPM (tribunal de l'entreprise) <input name="rpm" value="${esc(c.rpm || '')}" placeholder="ex. Bruxelles, francophone"></label>
+        <label class="field">Code NACE principal <input name="nace" value="${esc(c.nace)}"></label>
         <label class="field">E-mail <input name="email" value="${esc(c.email)}"></label>
         <label class="field">Téléphone <input name="phone" value="${esc(c.phone)}"></label>
-        <label class="field full">Adresse <textarea name="address">${esc(c.address)}</textarea></label>
-        <label class="field">IBAN <input name="iban" value="${esc(c.iban)}"></label>
+        <label class="field">IBAN <input name="iban" id="iban" value="${esc(c.iban)}"></label>
         <label class="field">BIC <input name="bic" value="${esc(c.bic)}"></label>
+        <div class="field"><span>IBAN</span><span id="ibanst" style="padding-top:8px"></span></div>
       </div></div>
-      <div class="card"><h2>Fiscalité</h2><div class="form-grid">
-        <label class="field">Régime de TVA <select name="regimeTva">${App.options([['franchise', 'Franchise en base (293 B)'], ['reel_simplifie', 'Réel simplifié'], ['reel_normal', 'Réel normal']], c.regimeTva)}</select></label>
-        <label class="field">Périodicité <select name="tvaPeriod">${App.options([['mensuelle', 'Mensuelle (CA3)'], ['trimestrielle', 'Trimestrielle (CA3)'], ['annuelle', 'Annuelle (CA12)']], c.tvaPeriod)}</select></label>
-        <label class="field">Exigibilité de la TVA collectée <select name="exigibilite">${App.options([['debits', 'Sur les débits (ventes de biens)'], ['encaissements', 'Sur les encaissements (services)']], c.exigibilite)}</select></label>
-        <label class="field">Imposition des bénéfices <select name="impot">${App.options([['IS', 'Impôt sur les sociétés'], ['IR', 'Impôt sur le revenu']], c.impot)}</select></label>
+      <div class="card"><h2>TVA et impôts</h2><div class="form-grid">
+        <label class="field">Régime de TVA <select name="regimeTva">${App.options([['normal', 'Assujetti normal (déclarations périodiques)'], ['franchise', 'Franchise des petites entreprises (art. 56bis)'], ['exempte', 'Exempté (art. 44)']], c.regimeTva)}</select></label>
+        <label class="field">Périodicité des déclarations <select name="tvaPeriod">${App.options([['trimestrielle', 'Trimestrielle'], ['mensuelle', 'Mensuelle']], c.tvaPeriod)}</select></label>
+        <label class="field">Imposition des bénéfices <select name="impot">${App.options([['ISOC', 'Impôt des sociétés (ISOC)'], ['IPP', 'Impôt des personnes physiques (indépendant)']], c.impot)}</select></label>
+        <label class="check"><input type="checkbox" name="isocReduit" ${c.isocReduit === false ? '' : 'checked'}> Taux réduit PME à l'ISOC (conditions remplies)</label>
         <label class="field">Début d'exercice (MM-JJ) <input name="fiscalYearStart" value="${esc(c.fiscalYearStart)}" pattern="\\d{2}-\\d{2}"></label>
-      </div></div>
+        <label class="check"><input type="checkbox" name="autoAI" ${c.autoAI ? 'checked' : ''}> Trier automatiquement avec l'IA les opérations bancaires non reconnues à l'import</label>
+      </div>
+      <details style="margin-top:14px"><summary><strong>Paramètres fiscaux indicatifs</strong> <span class="muted small">(à vérifier chaque année)</span></summary><div class="form-grid" style="margin-top:12px">
+        <label class="field">ISOC taux réduit (%) ${num('isocReduitTaux')}</label><label class="field">Plafond taux réduit (€) ${num('isocReduitPlafond')}</label><label class="field">ISOC taux normal (%) ${num('isocNormalTaux')}</label>
+        <label class="field">Quotité exemptée IPP (€) ${num('ippQuotiteExemptee')}</label><label class="field">Additionnels communaux (%) ${num('ippAdditionnelCommunal')}</label>
+        <label class="field full">Barème IPP (plafond:taux ; …) <input id="ippTranches" value="${esc(f.ippTranches.map(([l, r]) => `${l >= 999999999 ? '∞' : l}:${r}`).join(' ; '))}"></label>
+        <label class="field">Cotisations sociales taux 1 (%) ${num('socialTaux1')}</label><label class="field">Plafond tranche 1 (€) ${num('socialPlafond1')}</label><label class="field">Taux 2 (%) ${num('socialTaux2')}</label><label class="field">Plafond tranche 2 (€) ${num('socialPlafond2')}</label><label class="field">Cotisation minimale annuelle (€) ${num('socialMinimumAnnuel')}</label>
+        <label class="field">Seuil franchise TVA (€) ${num('franchiseSeuil')}</label><label class="field">Seuil listing clients (€) ${num('listingSeuil')}</label>
+        <div class="full"><button type="button" class="btn sm" id="fiscreset">Revenir aux valeurs par défaut</button></div>
+      </div></details></div>
       <div class="card"><h2>Facturation</h2><div class="form-grid">
         <label class="field">Préfixe factures <input name="invoicePrefix" value="${esc(c.invoicePrefix)}"></label>
         <label class="field">Préfixe devis <input name="quotePrefix" value="${esc(c.quotePrefix)}"></label>
-        <label class="field">Préfixe avoirs <input name="creditPrefix" value="${esc(c.creditPrefix)}"></label>
+        <label class="field">Préfixe notes de crédit <input name="creditPrefix" value="${esc(c.creditPrefix)}"></label>
         <label class="field">Délai de paiement (jours) <input type="number" name="paymentTerms" value="${c.paymentTerms}"></label>
-        <label class="field full">Mentions légales en pied de facture <textarea name="legalMentions">${esc(c.legalMentions)}</textarea></label>
+        <label class="field full">Conditions en pied de facture <textarea name="legalMentions">${esc(c.legalMentions)}</textarea></label>
       </div></div>
-      <div class="card"><h2>Bilan d'ouverture</h2><p class="muted small">Soldes au premier jour de votre premier exercice suivi dans ComptaPro (reprise de l'ancien bilan).</p><div class="form-grid">
-        <label class="field">Capital social <input type="number" step="0.01" data-o="capital" value="${o.capital}"></label>
-        <label class="field">Report à nouveau <input type="number" step="0.01" data-o="reportANouveau" value="${o.reportANouveau}"></label>
+      <div class="card"><h2>Bilan d'ouverture</h2><p class="muted small">Soldes au premier jour du premier exercice suivi dans ComptaPro (reprise du dernier bilan).</p><div class="form-grid">
+        <label class="field">Capital / apport <input type="number" step="0.01" data-o="capital" value="${o.capital}"></label>
+        <label class="field">Réserves <input type="number" step="0.01" data-o="reserves" value="${o.reserves}"></label>
+        <label class="field">Bénéfice (perte) reporté(e) <input type="number" step="0.01" data-o="resultatReporte" value="${o.resultatReporte}"></label>
         <label class="field">Emprunts restant dus <input type="number" step="0.01" data-o="emprunts" value="${o.emprunts}"></label>
-        <label class="field">Comptes courants d'associés <input type="number" step="0.01" data-o="comptesCourants" value="${o.comptesCourants}"></label>
+        <label class="field">Compte courant du dirigeant <input type="number" step="0.01" data-o="compteCourant" value="${o.compteCourant}"></label>
         <label class="field">Solde bancaire d'ouverture <input type="number" step="0.01" data-o="banque" value="${o.banque}"></label>
       </div></div>
       </form>
@@ -187,8 +206,8 @@
         <label class="field full">Clé API Anthropic <input type="password" id="apikey" value="${esc(ai.apiKey)}" placeholder="sk-ant-…" autocomplete="off"></label>
         <label class="field">Modèle <select id="model">${App.options([['claude-opus-5-5', 'Claude Opus 5.5 (recommandé)'], ['claude-sonnet-5-5', 'Claude Sonnet 5.5 (plus rapide)'], ['claude-haiku-5-5', 'Claude Haiku 5.5 (économique)']], ai.model)}</select></label>
         <label class="field">Niveau de réflexion <select id="effort">${App.options([['low', 'Rapide'], ['medium', 'Équilibré'], ['high', 'Approfondi'], ['xhigh', 'Très approfondi']], ai.effort)}</select></label>
-      </div><p class="muted small">Obtenez une clé sur console.anthropic.com. Elle est conservée uniquement dans ce navigateur et les requêtes partent directement de votre appareil vers l'API Anthropic, avec un résumé de vos données comptables pour contextualiser les réponses.</p></div>${App.ai.builtin ? '</div>' : ''}
-      <div class="card"><h2>Données & sauvegardes</h2><p class="muted small">Toutes vos données restent sur cet appareil (stockage local du navigateur). Exportez régulièrement une sauvegarde.</p><div class="actions">
+      </div><p class="muted small">Clé à créer sur console.anthropic.com, conservée uniquement dans ce navigateur.</p></div>${App.ai.builtin ? '</div>' : ''}
+      <div class="card"><h2>Données & sauvegardes</h2><p class="muted small">${App.cloudStatus === 'ok' ? 'Vos données sont enregistrées automatiquement dans votre espace privé, accessible depuis tous vos appareils.' : 'Vos données restent sur cet appareil.'} Exportez aussi régulièrement une sauvegarde.</p><div class="actions">
         <button class="btn" id="backup">Exporter une sauvegarde (.json)</button>
         <label class="btn">Restaurer une sauvegarde<input type="file" id="restore" accept=".json,application/json" hidden></label>
         <button class="btn" id="demo">Charger la démo</button>
@@ -196,26 +215,54 @@
         <button class="btn" id="theme">Thème : ${document.documentElement.dataset.theme === 'dark' ? 'sombre' : document.documentElement.dataset.theme === 'light' ? 'clair' : 'automatique'}</button>
       </div></div>
       <div class="actions" style="margin-top:16px;justify-content:flex-end"><button class="btn primary" id="save">Enregistrer les paramètres</button></div>`;
+    const ent = $('#ent', el), iban = $('#iban', el);
+    const check = () => {
+      const v = ent.value.trim();
+      $('#entst', el).innerHTML = !v ? '<span class="muted">—</span>' : App.bceValid(v) ? `<span class="pos">✓ ${App.bceFormat(v)} — TVA BE${App.digits(v).padStart(10, '0')}</span>` : '<span class="neg">Numéro invalide (contrôle modulo 97)</span>';
+      const k = $('#kbo', el); k.hidden = !App.bceValid(v); k.href = App.kboUrl(v);
+      $('#ibanst', el).innerHTML = !iban.value.trim() ? '<span class="muted">—</span>' : App.ibanValid(iban.value) ? '<span class="pos">✓ IBAN valide</span>' : '<span class="neg">IBAN invalide</span>';
+    };
+    ent.oninput = check; iban.oninput = check; check();
+    const bf = $('#bcefill', el);
+    if (bf) bf.onclick = () => App.companyFromBce((d) => {
+      const form = $('#pf', el);
+      if (d.name) form.name.value = d.name;
+      if (d.enterprise_number) form.enterpriseNumber.value = App.bceFormat(d.enterprise_number);
+      if (d.street) form.address.value = d.street;
+      if (d.postcode) form.postcode.value = d.postcode;
+      if (d.city) form.city.value = d.city;
+      if (d.nace) form.nace.value = d.nace;
+      const lf = { 'personne physique': 'PP', 'société à responsabilité limitée': 'SRL', 'société anonyme': 'SA', 'société coopérative': 'SC', 'association sans but lucratif': 'ASBL' }[String(d.legal_form || '').toLowerCase()] || (['SRL', 'SA', 'SC', 'SNC', 'SComm', 'ASBL'].includes(String(d.legal_form).toUpperCase()) ? String(d.legal_form).toUpperCase() : '');
+      if (lf) { form.legalForm.value = lf; form.impot.value = lf === 'PP' ? 'IPP' : 'ISOC'; }
+      if (d.vat_registered === false) form.regimeTva.value = 'franchise';
+      check();
+    });
+    $('#fiscreset', el).onclick = () => { s.settings.fiscal = Object.assign({}, App.DEFAULT_FISCAL); App.save(); V.parametres(el); };
     $('#save', el).onclick = () => {
       const d = App.formData($('#pf', el));
-      Object.keys(c).forEach((k) => { if (k in d) c[k] = d[k]; });
-      if (c.regimeTva === 'reel_simplifie' && c.tvaPeriod === 'mensuelle') c.tvaPeriod = 'annuelle';
+      if (d.enterpriseNumber && !App.bceValid(d.enterpriseNumber)) return App.toast('Numéro d\'entreprise invalide', 'error');
+      d.enterpriseNumber = d.enterpriseNumber ? App.digits(d.enterpriseNumber).padStart(10, '0') : '';
+      Object.assign(c, d);
       $$('[data-o]', el).forEach((i) => (o[i.dataset.o] = Number(i.value) || 0));
+      $$('[data-f]', el).forEach((i) => (f[i.dataset.f] = Number(i.value) || 0));
+      const tr = $('#ippTranches', el).value.split(';').map((x) => x.split(':').map((y) => y.trim())).filter((x) => x.length === 2).map(([l, r]) => [l === '∞' ? 999999999 : Number(l), Number(r)]).filter(([l, r]) => l > 0 && r >= 0);
+      if (tr.length) f.ippTranches = tr;
       ai.apiKey = $('#apikey', el).value.trim(); ai.model = $('#model', el).value; ai.effort = $('#effort', el).value;
+      App.ai.ready = App.ai.isReady();
       App.save(); App.toast('Paramètres enregistrés', 'success'); App.render();
     };
     $('#backup', el).onclick = () => {
       const copy = JSON.parse(JSON.stringify(s)); copy.settings.ai.apiKey = '';
-      App.download(`comptapro_sauvegarde_${App.today()}.json`, JSON.stringify(copy, null, 1), 'application/json');
+      App.download(`comptapro_sauvegarde_${App.today()}.json`, JSON.stringify(copy, null, 1));
     };
     $('#restore', el).onchange = (e) => {
-      const f = e.target.files[0]; if (!f) return;
+      const file = e.target.files[0]; if (!file) return;
       const r = new FileReader();
       r.onload = () => { try { const data = JSON.parse(r.result); const key = ai.apiKey; App.replace(data); App.state.settings.ai.apiKey = App.state.settings.ai.apiKey || key; App.save(); App.toast('Sauvegarde restaurée', 'success'); App.render(); } catch (err) { App.toast('Fichier invalide', 'error'); } };
-      r.readAsText(f);
+      r.readAsText(file);
     };
     $('#demo', el).onclick = () => App.confirmBox('Remplacer vos données par la démonstration ?', () => { const key = ai.apiKey; App.loadDemo(); App.state.settings.ai.apiKey = key; App.save(); App.render(); });
-    $('#wipe', el).onclick = () => App.confirmBox('Effacer définitivement toutes les données de cet appareil ?', () => { App.reset(); App.render(); }, 'Tout effacer');
+    $('#wipe', el).onclick = () => App.confirmBox('Effacer définitivement toutes vos données ?', () => { App.reset(); App.render(); }, 'Tout effacer');
     $('#theme', el).onclick = () => {
       const cur = document.documentElement.dataset.theme || 'auto';
       const next = { auto: 'dark', dark: 'light', light: 'auto' }[cur];

@@ -8,14 +8,15 @@ css = (root / "css/style.css").read_text(encoding="utf-8")
 
 body = re.search(r"<body>(.*)</body>", html, re.S).group(1)
 body = re.sub(r'\s*<script src="[^"]+"></script>', "", body)
-scripts = re.findall(r'<script src="([^"]+)"></script>', html)
+scripts = [x for x in re.findall(r'<script src="([^"]+)"></script>', html) if not x.startswith("vendor/")]
 js = "\n".join((root / s).read_text(encoding="utf-8") for s in scripts)
 
-out = f"""<title>ComptaPro</title>
+out = f"""<title>ComptaPro Belgique</title>
 <style>
 {css}
 </style>
 {body.strip()}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
 {js.replace('</script', '<\\/script')}
 </script>

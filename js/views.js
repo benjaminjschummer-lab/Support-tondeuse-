@@ -1,4 +1,4 @@
-/* ComptaPro — écrans d'activité */
+/* ComptaPro Belgique — écrans d'activité : tableau de bord, factures, clients, dépenses, banque, immobilisations */
 (function (App) {
   const { $, $$, esc, eur, fdate, round2 } = App;
   const V = (App.views = App.views || {});
@@ -10,172 +10,202 @@
   App.head = head;
   const clientName = (id) => (App.state.clients.find((c) => c.id === id) || {}).name || '—';
   const invStatus = (i) => (i.type === 'facture' && i.status === 'envoyee' && i.dueDate && i.dueDate < App.today() ? 'retard' : i.status);
+  const daysUntil = (d) => Math.round((new Date(d + 'T00:00:00') - new Date(App.today() + 'T00:00:00')) / 86400000);
 
   /* ============ TABLEAU DE BORD ============ */
   V.dashboard = (el) => {
-    const y = selectedYear;
-    const d = App.dashboard(y);
-    const is = d.is;
+    const y = selectedYear, s = App.state, c = s.settings.company;
+    const d = App.dashboard(y), is = d.is;
     const marge = is.chiffreAffaires ? (is.resultatExploitation / is.chiffreAffaires) * 100 : 0;
     const cats = Object.entries(d.byCategory).sort((a, b) => b[1] - a[1]).slice(0, 7);
-    const catMax = Math.max(1, ...cats.map((c) => c[1]));
-    const empty = !App.state.invoices.length && !App.state.expenses.length;
-    el.innerHTML = head('Tableau de bord', `${esc(App.state.settings.company.name)} · exercice ${is.fy.label}`,
+    const catMax = Math.max(1, ...cats.map((x) => x[1]));
+    const empty = !s.invoices.length && !s.expenses.length;
+    const tvaTile = c.regimeTva === 'franchise'
+      ? `<div class="card kpi"><div class="label">Seuil de franchise</div><div class="value">${eur(d.franchiseCA)}</div><div class="sub">sur ${eur(s.settings.fiscal.franchiseSeuil)} autorisés (${App.pct((d.franchiseCA / s.settings.fiscal.franchiseSeuil) * 100)})</div></div>`
+      : `<div class="card kpi"><div class="label">TVA ${d.currentPeriod ? esc(d.currentPeriod.label) : ''}</div><div class="value">${d.tvaCurrent ? eur(Math.abs(d.tvaCurrent.net)) : '—'}</div><div class="sub">${d.tvaCurrent ? (d.tvaCurrent.net >= 0 ? 'à payer (grille 71, estimation)' : 'à récupérer (grille 72)') : 'Non assujetti'}</div></div>`;
+    el.innerHTML = head('Tableau de bord', `${esc(c.name)} · exercice ${is.fy.label}`,
       `<select id="year">${App.yearOptions(y)}</select><a class="btn primary" href="#/factures/new">+ Facture</a><a class="btn" href="#/depenses/new">+ Dépense</a>`) +
-      (empty ? `<div class="alert">Bienvenue ! Commencez par renseigner votre entreprise dans <a href="#/parametres">Paramètres</a>, ou <a href="#" id="demo">chargez des données de démonstration</a> pour explorer l'application.</div>` : '') +
+      (empty ? `<div class="alert">Bienvenue ! Commencez par <a href="#/parametres">renseigner votre entreprise</a> (numéro d'entreprise, régime TVA), ou <a href="#" id="demo">chargez des données de démonstration</a> pour explorer l'application.</div>` : '') +
       `<div class="grid grid-4">
-        <div class="card kpi"><div class="label">Chiffre d'affaires HT</div><div class="value">${eur(is.chiffreAffaires)}</div><div class="sub">Exercice ${is.fy.label}</div></div>
-        <div class="card kpi"><div class="label">Charges d'exploitation</div><div class="value">${eur(is.chargesExploitation)}</div><div class="sub">dont amortissements ${eur(is.dotations)}</div></div>
-        <div class="card kpi"><div class="label">Résultat net</div><div class="value ${is.resultatNet >= 0 ? 'pos' : 'neg'}">${eur(is.resultatNet)}</div><div class="sub">Marge d'exploitation ${App.pct(marge)}</div></div>
+        <div class="card kpi"><div class="label">Chiffre d'affaires HTVA</div><div class="value">${eur(is.chiffreAffaires)}</div><div class="sub">Exercice ${is.fy.label}</div></div>
+        <div class="card kpi"><div class="label">Charges</div><div class="value">${eur(is.coutVentes + is.chargesFinancieres)}</div><div class="sub">dont amortissements ${eur(is.amortissements)}</div></div>
+        <div class="card kpi"><div class="label">Résultat avant impôt</div><div class="value ${is.resultatAvantImpot >= 0 ? 'pos' : 'neg'}">${eur(is.resultatAvantImpot)}</div><div class="sub">Marge d'exploitation ${App.pct(marge)}</div></div>
         <div class="card kpi"><div class="label">Trésorerie</div><div class="value ${d.treso >= 0 ? '' : 'neg'}">${eur(d.treso)}</div><div class="sub">Banque + caisse à ce jour</div></div>
       </div>
       <div class="grid grid-3" style="margin-top:16px">
         <div class="card kpi"><div class="label">À encaisser</div><div class="value">${eur(d.unpaidTotal)}</div><div class="sub">${d.unpaid.length} facture(s) ouverte(s)${d.overdue.length ? ` · <span class="neg">${d.overdue.length} en retard (${eur(d.overdueTotal)})</span>` : ''}</div></div>
-        <div class="card kpi"><div class="label">TVA ${d.currentPeriod ? esc(d.currentPeriod.label) : ''}</div><div class="value">${d.tvaCurrent ? eur(d.tvaCurrent.net) : '—'}</div><div class="sub">${d.tvaCurrent ? (d.tvaCurrent.net >= 0 ? 'à reverser (estimation)' : 'crédit de TVA') : 'Franchise ou non applicable'}</div></div>
-        <div class="card kpi"><div class="label">Impôt estimé (${App.state.settings.company.impot})</div><div class="value">${App.state.settings.company.impot === 'IS' ? eur(App.estimateIS(is.resultatAvantImpot)) : '—'}</div><div class="sub">${App.state.settings.company.impot === 'IS' ? 'Taux réduit 15 % jusqu\'à 42 500 €, puis 25 %' : 'Résultat imposable à l\'IR : ' + eur(is.resultatAvantImpot)}</div></div>
+        ${tvaTile}
+        <div class="card kpi"><div class="label">${esc(d.tax.label)}</div><div class="value">${eur(d.tax.tax)}</div><div class="sub">${esc(d.tax.detail)}${d.tax.social ? ` · cotisations sociales ${eur(d.tax.social)}` : ''}</div></div>
       </div>
       <div class="grid grid-2" style="margin-top:16px">
         <div class="card"><div class="page-head" style="margin:0 0 8px"><h2 style="margin:0">Produits et charges par mois</h2><div class="legend"><span><i style="background:var(--primary)"></i>Produits</span><span><i style="background:var(--warning)"></i>Charges</span></div></div>${App.barChart(d.monthly)}</div>
-        <div class="card"><h2>Principaux postes de charges</h2>${cats.length ? cats.map(([l, v]) => `<div class="bar-row"><span>${esc(l)}</span><div class="track"><div class="fill" style="width:${(v / catMax) * 100}%"></div></div><span class="num">${eur(v)}</span></div>`).join('') : '<div class="empty">Aucune charge enregistrée</div>'}</div>
+        <div class="card"><h2>Échéances à venir</h2>${d.deadlines.length ? `<ul class="checklist">${d.deadlines.slice(0, 7).map((x) => { const n = daysUntil(x.date); return `<li><span class="st ${n < 0 ? 'ko' : n <= 14 ? 'ko' : 'ok'}">${n < 0 ? '!' : n <= 14 ? n : '·'}</span><div><a href="${x.href}">${esc(x.label)}</a><div class="small muted">${fdate(x.date)} · ${n < 0 ? `<span class="neg">dépassée de ${-n} j</span>` : n === 0 ? 'aujourd\'hui' : `dans ${n} jour(s)`}</div></div></li>`; }).join('')}</ul><p class="small muted">Dates usuelles, à confirmer chaque année auprès du SPF Finances et de votre caisse sociale.</p>` : '<div class="empty">Rien d\'urgent.</div>'}</div>
       </div>
       <div class="grid grid-2" style="margin-top:16px">
-        <div class="card"><h2>Factures à suivre</h2>${d.unpaid.length ? `<div class="table-wrap"><table><tbody>${d.unpaid.slice(0, 6).map((i) => `<tr class="clickable" data-href="#/factures/${i.id}"><td>${esc(i.number)}</td><td>${esc(clientName(i.clientId))}</td><td>${App.statusBadge(invStatus(i))}</td><td class="num">${eur(App.invoiceTotals(i).ttc)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Tout est encaissé 🎉</div>'}</div>
-        <div class="card"><h2>À faire</h2><ul class="checklist">
-          ${todo(d).map((t) => `<li><span class="st ${t.ok ? 'ok' : 'ko'}">${t.ok ? '✓' : '!'}</span><div>${t.html}</div></li>`).join('')}
-        </ul></div>
+        <div class="card"><h2>Principaux postes de charges</h2>${cats.length ? cats.map(([l, v]) => `<div class="bar-row"><span>${esc(l)}</span><div class="track"><div class="fill" style="width:${(v / catMax) * 100}%"></div></div><span class="num">${eur(v)}</span></div>`).join('') : '<div class="empty">Aucune charge enregistrée</div>'}</div>
+        <div class="card"><h2>À faire</h2><ul class="checklist">${todo(d).map((t) => `<li><span class="st ${t.ok ? 'ok' : 'ko'}">${t.ok ? '✓' : '!'}</span><div>${t.html}</div></li>`).join('')}</ul></div>
       </div>`;
     $('#year', el).onchange = (e) => { selectedYear = Number(e.target.value); V.dashboard(el); };
     const demo = $('#demo', el);
     if (demo) demo.onclick = (e) => { e.preventDefault(); App.loadDemo(); App.toast('Données de démonstration chargées', 'success'); App.render(); };
-    $$('[data-href]', el).forEach((r) => (r.onclick = () => App.go(r.dataset.href)));
   };
 
   function todo(d) {
-    const s = App.state, items = [];
+    const s = App.state, c = s.settings.company, items = [];
+    items.push({ ok: App.bceValid(c.enterpriseNumber), html: App.bceValid(c.enterpriseNumber) ? `Numéro d'entreprise ${App.bceFormat(c.enterpriseNumber)} valide` : '<a href="#/parametres">Indiquer un numéro d\'entreprise BCE valide</a>' });
+    items.push({ ok: App.ibanValid(c.iban), html: App.ibanValid(c.iban) ? 'IBAN valide : QR de paiement sur vos factures' : '<a href="#/parametres">Ajouter votre IBAN</a> (QR de paiement et communication structurée)' });
     items.push({ ok: !d.bankToReconcile, html: d.bankToReconcile ? `<a href="#/banque">${d.bankToReconcile} opération(s) bancaire(s)</a> à rapprocher` : 'Banque rapprochée' });
     items.push({ ok: !d.overdue.length, html: d.overdue.length ? `<a href="#/factures">Relancer ${d.overdue.length} facture(s) en retard</a>` : 'Aucune facture en retard' });
     const missing = s.expenses.filter((e) => !e.receipt).length;
-    items.push({ ok: !missing, html: missing ? `<a href="#/depenses">${missing} dépense(s) sans justificatif</a>` : 'Tous les justificatifs sont joints' });
-    if (s.settings.company.regimeTva !== 'franchise' && d.currentPeriod) {
-      const prev = App.tvaPeriods(Number(App.today().slice(0, 4))).filter((p) => p.end < App.today()).pop();
-      const declared = prev && s.tvaDeclarations.some((x) => x.start === prev.start);
-      if (prev) items.push({ ok: declared, html: declared ? `TVA ${esc(prev.label)} déclarée` : `<a href="#/tva">Déclarer la TVA ${esc(prev.label)}</a>` });
-    }
-    items.push({ ok: App.ai.isReady(), html: App.ai.isReady() ? 'Assistant IA activé' : '<a href="#/parametres">Activer l\'assistant IA</a> (clé API Claude)' });
+    items.push({ ok: !missing, html: missing ? `<a href="#/depenses">${missing} dépense(s) sans justificatif</a> (à conserver 10 ans)` : 'Tous les justificatifs sont joints' });
+    if (c.regimeTva === 'franchise' && d.franchiseCA > s.settings.fiscal.franchiseSeuil * 0.8) items.push({ ok: false, html: `Chiffre d'affaires proche du seuil de franchise TVA (${eur(s.settings.fiscal.franchiseSeuil)})` });
+    items.push({ ok: App.ai.isReady(), html: App.ai.isReady() ? 'Assistant IA activé' : '<a href="#/parametres">Activer l\'assistant IA</a>' });
     return items;
   }
 
-  /* ============ FACTURES & DEVIS ============ */
+  /* ============ FACTURES, DEVIS, NOTES DE CRÉDIT ============ */
   V.factures = (el, params) => {
     if (params[0] === 'new') return invoiceEditor(el, null, params[1] || 'facture');
     if (params[0]) { const inv = App.state.invoices.find((i) => i.id === params[0]); if (inv) return invoiceEditor(el, inv); }
-    let filter = sessionStorage.getItem('inv-filter') || 'facture';
+    let filter = 'facture';
+    try { filter = sessionStorage.getItem('inv-filter') || 'facture'; } catch (e) { /* ignore */ }
     const draw = () => {
       const q = ($('#q', el) || {}).value || '';
       const list = App.state.invoices.filter((i) => i.type === filter)
         .filter((i) => !q || (i.number + clientName(i.clientId)).toLowerCase().includes(q.toLowerCase()))
         .sort((a, b) => (a.date < b.date ? 1 : -1));
       const tot = list.reduce((s, i) => { const t = App.invoiceTotals(i); s.ht += t.ht; s.ttc += t.ttc; return s; }, { ht: 0, ttc: 0 });
-      $('#list', el).innerHTML = list.length ? `<div class="table-wrap"><table><thead><tr><th>Numéro</th><th>Client</th><th>Date</th><th>Échéance</th><th>Statut</th><th class="num">HT</th><th class="num">TTC</th></tr></thead><tbody>
-        ${list.map((i) => { const t = App.invoiceTotals(i); return `<tr class="clickable" data-id="${i.id}"><td><strong>${esc(i.number)}</strong></td><td>${esc(clientName(i.clientId))}</td><td>${fdate(i.date)}</td><td>${fdate(i.dueDate)}</td><td>${App.statusBadge(invStatus(i))}</td><td class="num">${eur(t.ht)}</td><td class="num">${eur(t.ttc)}</td></tr>`; }).join('')}
+      $('#list', el).innerHTML = list.length ? `<div class="table-wrap"><table><thead><tr><th>Numéro</th><th>Client</th><th>Date</th><th>Échéance</th><th>Statut</th><th class="num">HTVA</th><th class="num">TVAC</th></tr></thead><tbody>
+        ${list.map((i) => { const t = App.invoiceTotals(i); return `<tr class="clickable" data-id="${i.id}"><td><strong>${esc(i.number)}</strong>${i.vatRegime && i.vatRegime !== 'normal' ? ` <span class="badge">${esc(i.vatRegime.replace('_', ' '))}</span>` : ''}</td><td>${esc(clientName(i.clientId))}</td><td>${fdate(i.date)}</td><td>${fdate(i.dueDate)}</td><td>${App.statusBadge(invStatus(i))}</td><td class="num">${eur(t.ht)}</td><td class="num">${eur(t.ttc)}</td></tr>`; }).join('')}
         <tr class="total"><td colspan="5">Total (${list.length})</td><td class="num">${eur(tot.ht)}</td><td class="num">${eur(tot.ttc)}</td></tr></tbody></table></div>`
-        : `<div class="empty">Aucun document. <a href="#/factures/new/${filter}">Créer ${filter === 'devis' ? 'un devis' : filter === 'avoir' ? 'un avoir' : 'une facture'}</a></div>`;
+        : `<div class="empty">Aucun document. <a href="#/factures/new/${filter}">Créer ${filter === 'devis' ? 'une offre / un devis' : filter === 'avoir' ? 'une note de crédit' : 'une facture'}</a></div>`;
       $$('[data-id]', el).forEach((r) => (r.onclick = () => App.go('#/factures/' + r.dataset.id)));
       $$('.tabs button', el).forEach((b) => b.classList.toggle('active', b.dataset.t === filter));
     };
-    el.innerHTML = head('Factures & devis', 'Numérotation automatique, mentions légales, suivi des paiements et relances.',
-      `<a class="btn" href="#/factures/new/devis">+ Devis</a><a class="btn" href="#/factures/new/avoir">+ Avoir</a><a class="btn primary" href="#/factures/new/facture">+ Facture</a>`) +
-      `<div class="card"><div class="tabs"><button data-t="facture">Factures</button><button data-t="devis">Devis</button><button data-t="avoir">Avoirs</button></div>
+    el.innerHTML = head('Factures', 'Numérotation continue, mentions légales belges, communication structurée, QR de paiement et facture électronique Peppol.',
+      `<a class="btn" href="#/factures/new/devis">+ Devis</a><a class="btn" href="#/factures/new/avoir">+ Note de crédit</a><a class="btn primary" href="#/factures/new/facture">+ Facture</a>`) +
+      `<div class="card"><div class="tabs"><button data-t="facture">Factures</button><button data-t="devis">Devis / offres</button><button data-t="avoir">Notes de crédit</button></div>
       <div class="toolbar"><input id="q" placeholder="Rechercher un numéro ou un client…" style="max-width:320px"><button class="btn sm" id="export">Exporter CSV</button></div><div id="list"></div></div>`;
-    $$('.tabs button', el).forEach((b) => (b.onclick = () => { filter = b.dataset.t; sessionStorage.setItem('inv-filter', filter); draw(); }));
+    $$('.tabs button', el).forEach((b) => (b.onclick = () => { filter = b.dataset.t; try { sessionStorage.setItem('inv-filter', filter); } catch (e) { /* ignore */ } draw(); }));
     $('#q', el).oninput = draw;
     $('#export', el).onclick = () => {
-      const rows = [['Type', 'Numéro', 'Client', 'Date', 'Échéance', 'Statut', 'HT', 'TVA', 'TTC', 'Payée le']];
-      App.state.invoices.forEach((i) => { const t = App.invoiceTotals(i); rows.push([i.type, i.number, clientName(i.clientId), i.date, i.dueDate, i.status, t.ht, t.tva, t.ttc, i.paidDate || '']); });
+      const rows = [['Type', 'Numéro', 'Client', 'N° TVA client', 'Date', 'Échéance', 'Statut', 'Régime TVA', 'HTVA', 'TVA', 'TVAC', 'Communication', 'Payée le']];
+      App.state.invoices.forEach((i) => { const t = App.invoiceTotals(i); const cl = App.state.clients.find((c) => c.id === i.clientId) || {}; rows.push([i.type, i.number, cl.name || '', cl.vatNumber || '', i.date, i.dueDate, i.status, i.vatRegime || 'normal', t.ht, t.tva, t.ttc, App.invoiceComm(i), i.paidDate || '']); });
       App.download('factures.csv', App.toCSV(rows), 'text/csv');
     };
     draw();
   };
 
+  /* Régime de TVA proposé automatiquement selon le client */
+  function suggestRegime(client) {
+    const c = App.state.settings.company;
+    if (c.regimeTva === 'franchise') return 'franchise';
+    if (c.regimeTva === 'exempte') return 'exempte';
+    if (!client) return 'normal';
+    const v = App.vatParse(client.vatNumber);
+    const country = client.country || v.country || 'BE';
+    const EU = ['AT', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'EL', 'GR', 'ES', 'FI', 'FR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK'];
+    if (country !== 'BE' && EU.includes(country) && v.valid) return 'intracom_services';
+    if (country !== 'BE' && !EU.includes(country)) return 'export';
+    return 'normal';
+  }
+
   function invoiceEditor(el, existing, type) {
-    const s = App.state;
+    const s = App.state, c = s.settings.company;
     const isNew = !existing;
+    const firstClient = s.clients[0];
     const inv = existing ? JSON.parse(JSON.stringify(existing)) : {
-      id: App.uid(), type, number: App.nextNumber(type), clientId: (s.clients[0] || {}).id || '', date: App.today(),
-      dueDate: App.addDays(App.today(), s.settings.company.paymentTerms || 30), status: 'brouillon', paidDate: '', notes: '',
-      revenueAccount: '706000',
-      lines: [{ desc: '', qty: 1, unitPrice: 0, tvaRate: s.settings.company.regimeTva === 'franchise' ? 0 : 20, discount: 0 }],
+      id: App.uid(), type, number: App.nextNumber(type), clientId: firstClient ? firstClient.id : '', date: App.today(),
+      dueDate: App.addDays(App.today(), c.paymentTerms || 30), status: 'brouillon', paidDate: '', notes: '', revenueAccount: '701000',
+      vatRegime: suggestRegime(firstClient), buyerReference: '',
+      lines: [{ desc: '', qty: 1, unitPrice: 0, tvaRate: 21, discount: 0 }],
     };
-    const label = { facture: 'Facture', devis: 'Devis', avoir: 'Avoir' }[inv.type];
+    const label = { facture: 'Facture', devis: 'Devis', avoir: 'Note de crédit' }[inv.type];
     const draw = () => {
       const t = App.invoiceTotals(inv);
+      const noVat = inv.vatRegime !== 'normal';
+      const cl = s.clients.find((x) => x.id === inv.clientId);
+      const warn = [];
+      if (cl && inv.vatRegime === 'intracom_services' && !App.vatParse(cl.vatNumber).valid) warn.push('Le client doit avoir un numéro de TVA européen valide pour l\'autoliquidation.');
+      if (cl && inv.vatRegime === 'cocontractant' && App.vatParse(cl.vatNumber).country !== 'BE') warn.push('L\'autoliquidation « cocontractant » s\'applique à un client assujetti belge (travaux immobiliers).');
+      if (cl && App.vatParse(cl.vatNumber).valid && inv.type !== 'devis') warn.push('Client assujetti : depuis 2026, la facture doit être transmise en format électronique structuré (Peppol). Utilisez « Export Peppol ».');
       el.innerHTML = head(`${label} ${esc(inv.number)}`, isNew ? 'Nouveau document' : App.statusBadge(invStatus(inv)),
         `<a class="btn" href="#/factures">← Retour</a>${!isNew ? `<button class="btn danger" id="del">Supprimer</button>` : ''}
          ${inv.type === 'devis' && !isNew ? '<button class="btn" id="convert">Convertir en facture</button>' : ''}
-         ${inv.type === 'facture' && !isNew ? '<button class="btn" id="credit">Créer un avoir</button>' : ''}
-         ${!isNew && inv.type === 'facture' && invStatus(inv) === 'retard' ? '<button class="btn" id="remind">Relance</button>' : ''}
-         <button class="btn" id="preview">Aperçu / PDF</button><button class="btn primary" id="save">Enregistrer</button>`) +
+         ${inv.type === 'facture' && !isNew ? '<button class="btn" id="credit">Créer une note de crédit</button>' : ''}
+         ${!isNew && inv.type === 'facture' && invStatus(inv) === 'retard' ? '<button class="btn" id="remind">Rappel de paiement</button>' : ''}
+         ${inv.type !== 'devis' ? '<button class="btn" id="peppol">Export Peppol (UBL)</button>' : ''}
+         <button class="btn" id="preview">Aperçu</button><button class="btn primary" id="save">Enregistrer</button>`) +
+        warn.map((w) => `<div class="alert warning small">${esc(w)}</div>`).join('') +
         `<div class="card"><div class="form-grid">
-          <label class="field">Client <select id="client">${App.options([['', '— Choisir —'], ...s.clients.map((c) => [c.id, c.name])], inv.clientId)}<option value="__new">+ Nouveau client…</option></select></label>
+          <label class="field">Client <select id="client">${App.options([['', '— Choisir —'], ...s.clients.map((x) => [x.id, x.name])], inv.clientId)}<option value="__new">+ Nouveau client…</option></select></label>
           <label class="field">Numéro <input id="number" value="${esc(inv.number)}"></label>
           <label class="field">Date <input type="date" id="date" value="${inv.date}"></label>
-          <label class="field">${inv.type === 'devis' ? 'Valide jusqu\'au' : 'Échéance'} <input type="date" id="due" value="${inv.dueDate || ''}"></label>
+          <label class="field">${inv.type === 'devis' ? 'Valable jusqu\'au' : 'Échéance'} <input type="date" id="due" value="${inv.dueDate || ''}"></label>
           <label class="field">Statut <select id="status">${App.options(inv.type === 'devis' ? [['brouillon', 'Brouillon'], ['envoyee', 'Envoyé'], ['accepte', 'Accepté'], ['refuse', 'Refusé']] : [['brouillon', 'Brouillon (non comptabilisé)'], ['envoyee', 'Émise / envoyée'], ['payee', 'Payée'], ['annulee', 'Annulée']], inv.status)}</select></label>
           <label class="field">Payée le <input type="date" id="paid" value="${inv.paidDate || ''}" ${inv.status === 'payee' ? '' : 'disabled'}></label>
-          <label class="field">Compte de produit <select id="rev">${App.options([['706000', '706 Prestations de services'], ['707000', '707 Ventes de marchandises'], ['708000', '708 Activités annexes']], inv.revenueAccount || '706000')}</select></label>
+          <label class="field full">Régime de TVA <select id="regime">${App.options(App.SALES_REGIMES, inv.vatRegime || 'normal')}</select></label>
+          <label class="field">Compte de produit <select id="rev">${App.options(App.REVENUE_ACCOUNTS, inv.revenueAccount || '701000')}</select></label>
+          <label class="field">Référence client / bon de commande <input id="bref" value="${esc(inv.buyerReference || '')}"></label>
+          ${inv.type === 'facture' ? `<div class="field"><span>Communication structurée</span><strong style="font-family:var(--mono);color:var(--text);padding-top:8px">${App.invoiceComm(inv)}</strong></div>` : ''}
         </div></div>
-        <div class="card"><h2>Lignes</h2><div class="table-wrap"><table class="lines-table"><thead><tr><th style="min-width:220px">Désignation</th><th style="width:80px">Qté</th><th style="width:120px">Prix unit. HT</th><th style="width:80px">Remise %</th><th style="width:90px">TVA</th><th class="num" style="width:110px">Total HT</th><th></th></tr></thead><tbody>
-          ${inv.lines.map((l, k) => `<tr data-k="${k}"><td><input data-f="desc" value="${esc(l.desc)}" placeholder="Description de la prestation"></td><td><input type="number" step="any" data-f="qty" value="${l.qty}"></td><td><input type="number" step="any" data-f="unitPrice" value="${l.unitPrice}"></td><td><input type="number" step="any" data-f="discount" value="${l.discount || 0}"></td><td><select data-f="tvaRate">${App.tvaOptions(l.tvaRate)}</select></td><td class="num">${eur(round2(l.qty * l.unitPrice * (1 - (l.discount || 0) / 100)))}</td><td><button class="btn ghost sm" data-rm="${k}" aria-label="Supprimer la ligne">✕</button></td></tr>`).join('')}
+        <div class="card"><h2>Lignes</h2><div class="table-wrap"><table class="lines-table"><thead><tr><th style="min-width:220px">Description</th><th style="width:80px">Qté</th><th style="width:120px">Prix unit. HTVA</th><th style="width:80px">Remise %</th><th style="width:90px">TVA</th><th class="num" style="width:110px">Total HTVA</th><th></th></tr></thead><tbody>
+          ${inv.lines.map((l, k) => `<tr data-k="${k}"><td><input data-f="desc" value="${esc(l.desc)}" placeholder="Description de la prestation"></td><td><input type="number" step="any" data-f="qty" value="${l.qty}"></td><td><input type="number" step="any" data-f="unitPrice" value="${l.unitPrice}"></td><td><input type="number" step="any" data-f="discount" value="${l.discount || 0}"></td><td><select data-f="tvaRate" ${noVat ? 'disabled' : ''}>${App.tvaOptions(noVat ? 0 : l.tvaRate)}</select></td><td class="num">${eur(round2(l.qty * l.unitPrice * (1 - (l.discount || 0) / 100)))}</td><td><button class="btn ghost sm" data-rm="${k}" aria-label="Supprimer la ligne">✕</button></td></tr>`).join('')}
         </tbody></table></div>
         <div class="toolbar" style="margin-top:10px"><button class="btn sm" id="add">+ Ajouter une ligne</button></div>
         <div style="display:flex;justify-content:flex-end"><table style="width:300px"><tbody>
-          <tr><td>Total HT</td><td class="num">${eur(t.ht)}</td></tr>
-          ${Object.entries(t.byRate).map(([r, v]) => `<tr class="sub"><td>TVA ${r} %</td><td class="num">${eur(v.tva * t.sign)}</td></tr>`).join('')}
-          <tr class="total"><td>Total TTC</td><td class="num">${eur(t.ttc)}</td></tr></tbody></table></div></div>
+          <tr><td>Total HTVA</td><td class="num">${eur(t.ht)}</td></tr>
+          ${Object.entries(t.byRate).filter(([r]) => Number(r)).map(([r, v]) => `<tr class="sub"><td>TVA ${r} %</td><td class="num">${eur(v.tva * t.sign)}</td></tr>`).join('')}
+          <tr class="total"><td>Total TVAC</td><td class="num">${eur(t.ttc)}</td></tr></tbody></table></div>
+          ${noVat ? `<p class="small muted">Mention ajoutée automatiquement : ${esc(App.LEGAL_MENTIONS[inv.vatRegime] || '')}</p>` : ''}</div>
         <div class="card"><label class="field">Notes / conditions <textarea id="notes" placeholder="Conditions particulières, référence de commande…">${esc(inv.notes || '')}</textarea></label></div>`;
       bind();
     };
     const sync = () => {
       inv.clientId = $('#client', el).value; inv.number = $('#number', el).value; inv.date = $('#date', el).value;
       inv.dueDate = $('#due', el).value; inv.status = $('#status', el).value; inv.paidDate = $('#paid', el).value;
-      inv.notes = $('#notes', el).value; inv.revenueAccount = $('#rev', el).value;
+      inv.notes = $('#notes', el).value; inv.revenueAccount = $('#rev', el).value; inv.vatRegime = $('#regime', el).value; inv.buyerReference = $('#bref', el).value;
       $$('tr[data-k]', el).forEach((tr) => {
         const l = inv.lines[tr.dataset.k];
-        $$('[data-f]', tr).forEach((i) => (l[i.dataset.f] = i.dataset.f === 'desc' ? i.value : Number(i.value) || 0));
+        $$('[data-f]', tr).forEach((i) => { if (!i.disabled) l[i.dataset.f] = i.dataset.f === 'desc' ? i.value : Number(i.value) || 0; });
       });
     };
     const bind = () => {
       $$('input, select, textarea', el).forEach((i) => i.addEventListener('change', () => {
         sync();
-        if (i.id === 'client' && i.value === '__new') return App.editClient(null, (c) => { inv.clientId = c.id; draw(); });
+        if (i.id === 'client' && i.value === '__new') return App.editClient(null, (cl) => { inv.clientId = cl.id; inv.vatRegime = suggestRegime(cl); draw(); });
+        if (i.id === 'client') inv.vatRegime = suggestRegime(s.clients.find((x) => x.id === inv.clientId));
         if (i.id === 'status' && inv.status === 'payee' && !inv.paidDate) inv.paidDate = App.today();
-        if (i.id === 'date' && inv.type !== 'devis') inv.dueDate = App.addDays(inv.date, s.settings.company.paymentTerms || 30);
+        if (i.id === 'date' && inv.type !== 'devis') inv.dueDate = App.addDays(inv.date, c.paymentTerms || 30);
         draw();
       }));
-      $('#add', el).onclick = () => { sync(); inv.lines.push({ desc: '', qty: 1, unitPrice: 0, tvaRate: inv.lines.at(-1)?.tvaRate ?? 20, discount: 0 }); draw(); };
-      $$('[data-rm]', el).forEach((b) => (b.onclick = () => { sync(); inv.lines.splice(Number(b.dataset.rm), 1); if (!inv.lines.length) inv.lines.push({ desc: '', qty: 1, unitPrice: 0, tvaRate: 20 }); draw(); }));
+      $('#add', el).onclick = () => { sync(); inv.lines.push({ desc: '', qty: 1, unitPrice: 0, tvaRate: inv.lines.at(-1)?.tvaRate ?? 21, discount: 0 }); draw(); };
+      $$('[data-rm]', el).forEach((b) => (b.onclick = () => { sync(); inv.lines.splice(Number(b.dataset.rm), 1); if (!inv.lines.length) inv.lines.push({ desc: '', qty: 1, unitPrice: 0, tvaRate: 21 }); draw(); }));
       $('#save', el).onclick = () => {
         sync();
         if (!inv.clientId || inv.clientId === '__new') return App.toast('Choisissez un client', 'error');
-        if (s.invoices.some((x) => x.number === inv.number && x.id !== inv.id)) return App.toast('Ce numéro existe déjà', 'error');
+        if (s.invoices.some((x) => x.number === inv.number && x.id !== inv.id)) return App.toast('Ce numéro existe déjà : la numérotation doit être continue et unique', 'error');
+        if (!inv.structuredComm && inv.type === 'facture') inv.structuredComm = App.invoiceComm(inv);
         const idx = s.invoices.findIndex((x) => x.id === inv.id);
         if (idx >= 0) s.invoices[idx] = inv; else s.invoices.push(inv);
         App.save(); App.toast('Document enregistré', 'success'); App.go('#/factures');
       };
       $('#preview', el).onclick = () => { sync(); previewInvoice(inv); };
+      const pp = $('#peppol', el);
+      if (pp) pp.onclick = () => { sync(); App.download(`${inv.number}.xml`, App.peppolUbl(inv)); };
       const del = $('#del', el);
-      if (del) del.onclick = () => App.confirmBox(inv.status !== 'brouillon' && inv.type === 'facture' ? 'Attention : une facture émise ne devrait pas être supprimée (obligation de numérotation continue). Préférez un avoir. Supprimer quand même ?' : 'Supprimer ce document ?', () => {
+      if (del) del.onclick = () => App.confirmBox(inv.status !== 'brouillon' && inv.type === 'facture' ? 'Une facture émise ne doit pas être supprimée (numérotation continue obligatoire). Établissez plutôt une note de crédit. Supprimer quand même ?' : 'Supprimer ce document ?', () => {
         s.invoices = s.invoices.filter((x) => x.id !== inv.id); App.save(); App.go('#/factures');
       }, 'Supprimer');
       const conv = $('#convert', el);
       if (conv) conv.onclick = () => {
-        const f = Object.assign(JSON.parse(JSON.stringify(inv)), { id: App.uid(), type: 'facture', number: App.nextNumber('facture'), date: App.today(), dueDate: App.addDays(App.today(), s.settings.company.paymentTerms || 30), status: 'brouillon', quoteRef: inv.number });
+        const f = Object.assign(JSON.parse(JSON.stringify(inv)), { id: App.uid(), type: 'facture', number: App.nextNumber('facture'), date: App.today(), dueDate: App.addDays(App.today(), c.paymentTerms || 30), status: 'brouillon', quoteRef: inv.number, structuredComm: '' });
         const q = s.invoices.find((x) => x.id === inv.id); if (q) q.status = 'accepte';
         s.invoices.push(f); App.save(); App.toast('Facture créée depuis le devis', 'success'); App.go('#/factures/' + f.id);
       };
       const cr = $('#credit', el);
       if (cr) cr.onclick = () => {
-        const a = Object.assign(JSON.parse(JSON.stringify(inv)), { id: App.uid(), type: 'avoir', number: App.nextNumber('avoir'), date: App.today(), status: 'envoyee', paidDate: '', notes: `Avoir sur facture ${inv.number}` });
+        const a = Object.assign(JSON.parse(JSON.stringify(inv)), { id: App.uid(), type: 'avoir', number: App.nextNumber('avoir'), date: App.today(), status: 'envoyee', paidDate: '', notes: `Note de crédit relative à la facture ${inv.number}`, structuredComm: '' });
         s.invoices.push(a); App.save(); App.go('#/factures/' + a.id);
       };
       const rem = $('#remind', el);
@@ -187,81 +217,143 @@
   function invoiceHTML(inv) {
     const c = App.state.settings.company, cl = App.state.clients.find((x) => x.id === inv.clientId) || {};
     const t = App.invoiceTotals(inv);
-    const title = { facture: 'FACTURE', devis: 'DEVIS', avoir: 'AVOIR' }[inv.type];
+    const title = { facture: 'FACTURE', devis: 'DEVIS', avoir: 'NOTE DE CRÉDIT' }[inv.type];
+    const qr = App.epcQr(inv);
+    const mention = inv.vatRegime && inv.vatRegime !== 'normal' ? App.LEGAL_MENTIONS[inv.vatRegime] : '';
     return `<div class="invoice-paper">
-      <div class="inv-head"><div><h1>${title}</h1><div>N° <strong>${esc(inv.number)}</strong></div><div>Date : ${fdate(inv.date)}</div>${inv.dueDate ? `<div>${inv.type === 'devis' ? 'Validité' : 'Échéance'} : ${fdate(inv.dueDate)}</div>` : ''}</div>
-      <div style="text-align:right"><strong>${esc(c.name)}</strong> ${esc(c.legalForm)}<br>${esc(c.address).replace(/\n/g, '<br>')}<br>${c.siret ? 'SIRET ' + esc(c.siret) + '<br>' : ''}${c.tvaNumber ? 'TVA ' + esc(c.tvaNumber) + '<br>' : ''}${esc(c.email)}</div></div>
-      <div style="margin-bottom:24px"><div style="color:#666;font-size:11px">FACTURÉ À</div><strong>${esc(cl.name)}</strong><br>${esc(cl.address || '').replace(/\n/g, '<br>')}${cl.tvaNumber ? '<br>TVA ' + esc(cl.tvaNumber) : ''}${cl.siret ? '<br>SIRET ' + esc(cl.siret) : ''}</div>
-      <table><thead><tr><th>Désignation</th><th class="num">Qté</th><th class="num">P.U. HT</th><th class="num">TVA</th><th class="num">Total HT</th></tr></thead><tbody>
-      ${inv.lines.map((l) => `<tr><td>${esc(l.desc)}${l.discount ? ` <em>(remise ${l.discount} %)</em>` : ''}</td><td class="num">${l.qty}</td><td class="num">${eur(l.unitPrice)}</td><td class="num">${l.tvaRate} %</td><td class="num">${eur(round2(l.qty * l.unitPrice * (1 - (l.discount || 0) / 100)))}</td></tr>`).join('')}
+      <div class="inv-head"><div><h1>${title}</h1><div>N° <strong>${esc(inv.number)}</strong></div><div>Date : ${fdate(inv.date)}</div>${inv.dueDate ? `<div>${inv.type === 'devis' ? 'Valable jusqu\'au' : 'Échéance'} : ${fdate(inv.dueDate)}</div>` : ''}${inv.buyerReference ? `<div>Votre référence : ${esc(inv.buyerReference)}</div>` : ''}</div>
+      <div style="text-align:right"><strong>${esc(c.name)}</strong><br>${esc(c.address)}<br>${esc(c.postcode)} ${esc(c.city)}<br>${c.enterpriseNumber ? `${c.regimeTva === 'franchise' ? 'N° d\'entreprise' : 'TVA'} BE ${App.bceFormat(c.enterpriseNumber)}<br>${c.rpm ? 'RPM ' + esc(c.rpm) + '<br>' : ''}` : ''}${esc(c.email)}${c.phone ? ' · ' + esc(c.phone) : ''}</div></div>
+      <div style="margin-bottom:24px"><div style="color:#666;font-size:11px">CLIENT</div><strong>${esc(cl.name)}</strong><br>${esc(cl.address || '').replace(/\n/g, '<br>')}${cl.vatNumber ? '<br>TVA ' + esc(App.vatParse(cl.vatNumber).formatted) : ''}</div>
+      <table><thead><tr><th>Description</th><th class="num">Qté</th><th class="num">P.U. HTVA</th><th class="num">TVA</th><th class="num">Total HTVA</th></tr></thead><tbody>
+      ${inv.lines.map((l) => `<tr><td>${esc(l.desc)}${l.discount ? ` <em>(remise ${l.discount} %)</em>` : ''}</td><td class="num">${l.qty}</td><td class="num">${eur(l.unitPrice)}</td><td class="num">${inv.vatRegime && inv.vatRegime !== 'normal' ? '—' : l.tvaRate + ' %'}</td><td class="num">${eur(round2(l.qty * l.unitPrice * (1 - (l.discount || 0) / 100)))}</td></tr>`).join('')}
       </tbody></table>
-      <div class="totals"><div><span>Total HT</span><span>${eur(t.ht)}</span></div>
-      ${Object.entries(t.byRate).filter(([r]) => Number(r)).map(([r, v]) => `<div><span>TVA ${r} %</span><span>${eur(v.tva * t.sign)}</span></div>`).join('')}
-      <div class="grand"><span>Total TTC</span><span>${eur(t.ttc)}</span></div></div>
+      <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-end;flex-wrap:wrap">
+        <div>${inv.type === 'facture' && c.iban ? `<div style="font-size:12px;margin-top:16px">Paiement sur <strong>${esc(c.iban)}</strong>${c.bic ? ' (BIC ' + esc(c.bic) + ')' : ''}<br>Communication : <strong style="font-family:monospace">${App.invoiceComm(inv)}</strong></div>${qr ? `<div style="width:120px;margin-top:8px">${qr}<div style="font-size:10px;color:#666">Scannez avec votre app bancaire</div></div>` : ''}` : ''}</div>
+        <div class="totals"><div><span>Total HTVA</span><span>${eur(t.ht)}</span></div>
+        ${Object.entries(t.byRate).filter(([r]) => Number(r)).map(([r, v]) => `<div><span>TVA ${r} % sur ${eur(v.base * t.sign)}</span><span>${eur(v.tva * t.sign)}</span></div>`).join('')}
+        <div class="grand"><span>Total TVAC</span><span>${eur(t.ttc)}</span></div></div></div>
       ${inv.notes ? `<p style="margin-top:20px">${esc(inv.notes)}</p>` : ''}
-      <div class="legal">${App.state.settings.company.regimeTva === 'franchise' ? 'TVA non applicable, art. 293 B du CGI.\n' : ''}${inv.type === 'facture' ? `Conditions de paiement : ${c.paymentTerms} jours. ${c.iban ? 'IBAN : ' + esc(c.iban) + (c.bic ? ' — BIC : ' + esc(c.bic) : '') : ''}\n${esc(c.legalMentions)}` : ''}${inv.type === 'devis' ? 'Bon pour accord — date et signature :' : ''}</div>
+      <div class="legal">${mention ? esc(mention) + '\n' : ''}${inv.type === 'facture' ? `Conditions de paiement : ${c.paymentTerms} jours.\n${esc(c.legalMentions)}` : ''}${inv.type === 'devis' ? 'Pour accord — date et signature :' : ''}</div>
     </div>`;
   }
+  App.invoiceHTML = invoiceHTML;
 
   function previewInvoice(inv) {
     App.modal({
       title: 'Aperçu', wide: true, body: invoiceHTML(inv),
-      footer: `<button class="btn" data-close>Fermer</button><button class="btn" id="mail">Envoyer par e-mail</button><button class="btn primary" id="print">${App.isArtifact ? 'Télécharger (à imprimer en PDF)' : 'Imprimer / PDF'}</button>`,
+      footer: `<button class="btn" data-close>Fermer</button><button class="btn" id="mail">Copier l'e-mail d'envoi</button><button class="btn primary" id="print">${App.isArtifact ? 'Télécharger (à imprimer en PDF)' : 'Imprimer / PDF'}</button>`,
       onMount: (m) => {
-        $('#print', m).onclick = () => { if (App.isArtifact) return App.download(`${inv.number}.html`, `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(inv.number)}</title><style>body{font-family:Arial,sans-serif;margin:30px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}.num{text-align:right}.inv-head{display:flex;justify-content:space-between;margin-bottom:30px}h1{color:#2f5bea}.totals{margin-left:auto;width:280px;margin-top:16px}.totals div{display:flex;justify-content:space-between;padding:4px 0}.grand{font-weight:700;border-top:2px solid #111}.legal{margin-top:30px;font-size:11px;color:#666;white-space:pre-line}</style></head><body>${invoiceHTML(inv)}<script>window.print()<\/script></body></html>`); document.body.classList.add('printing-modal'); window.print(); setTimeout(() => document.body.classList.remove('printing-modal'), 500); };
+        $('#print', m).onclick = () => {
+          if (App.isArtifact) return App.download(`${inv.number}.html`, `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(inv.number)}</title><style>body{font-family:Arial,sans-serif;margin:30px;color:#111}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}.num{text-align:right}.inv-head{display:flex;justify-content:space-between;margin-bottom:30px}h1{color:#2f5bea}.totals{margin-left:auto;width:300px;margin-top:16px}.totals div{display:flex;justify-content:space-between;padding:4px 0}.grand{font-weight:700;border-top:2px solid #111}.legal{margin-top:30px;font-size:11px;color:#666;white-space:pre-line}svg{width:120px;height:120px}</style></head><body>${invoiceHTML(inv)}<script>window.print()<\/script></body></html>`);
+          document.body.classList.add('printing-modal'); window.print(); setTimeout(() => document.body.classList.remove('printing-modal'), 500);
+        };
         $('#mail', m).onclick = () => {
-          const cl = App.state.clients.find((x) => x.id === inv.clientId) || {};
           const t = App.invoiceTotals(inv);
-          location.href = `mailto:${encodeURIComponent(cl.email || '')}?subject=${encodeURIComponent(`${inv.type === 'devis' ? 'Devis' : 'Facture'} ${inv.number} — ${App.state.settings.company.name}`)}&body=${encodeURIComponent(`Bonjour,\n\nVeuillez trouver ci-joint ${inv.type === 'devis' ? 'notre devis' : 'notre facture'} ${inv.number} d'un montant de ${eur(t.ttc)} TTC.\n\nCordialement,\n${App.state.settings.company.name}`)}`;
+          const txt = `Bonjour,\n\nVeuillez trouver ci-joint ${inv.type === 'devis' ? 'notre offre' : 'notre facture'} ${inv.number} d'un montant de ${eur(t.ttc)} TVAC.\n${inv.type === 'facture' ? `Merci d'effectuer le paiement sur le compte ${App.state.settings.company.iban} avec la communication ${App.invoiceComm(inv)}.\n` : ''}\nCordialement,\n${App.state.settings.company.name}`;
+          copyText(txt);
         };
       },
     });
   }
+  function copyText(txt) {
+    const done = () => App.toast('Texte copié', 'success');
+    try { navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt)); } catch (e) { fallbackCopy(txt); }
+  }
+  function fallbackCopy(txt) {
+    App.modal({ title: 'Texte à copier', body: `<textarea id="ct" style="min-height:220px">${esc(txt)}</textarea>`, footer: '<button class="btn" data-close>Fermer</button>', onMount: (m) => $('#ct', m).select() });
+  }
+  App.copyText = copyText;
 
   function reminder(inv) {
-    const cl = App.state.clients.find((x) => x.id === inv.clientId) || {};
-    const t = App.invoiceTotals(inv);
+    const t = App.invoiceTotals(inv), c = App.state.settings.company;
     const days = Math.round((new Date(App.today()) - new Date(inv.dueDate)) / 86400000);
-    const txt = `Bonjour,\n\nSauf erreur de notre part, la facture ${inv.number} du ${fdate(inv.date)}, d'un montant de ${eur(t.ttc)} TTC, arrivée à échéance le ${fdate(inv.dueDate)} (il y a ${days} jours), reste impayée.\n\nNous vous remercions de bien vouloir procéder à son règlement dans les meilleurs délais${App.state.settings.company.iban ? ' (IBAN : ' + App.state.settings.company.iban + ')' : ''}.\n\nNous vous rappelons que tout retard de paiement entraîne l'application de pénalités ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement.\n\nCordialement,\n${App.state.settings.company.name}`;
+    const txt = `Bonjour,\n\nSauf erreur de notre part, la facture ${inv.number} du ${fdate(inv.date)}, d'un montant de ${eur(t.ttc)} TVAC, échue le ${fdate(inv.dueDate)} (il y a ${days} jours), reste impayée.\n\nNous vous remercions de bien vouloir procéder à son règlement sur le compte ${c.iban} avec la communication ${App.invoiceComm(inv)}.\n\nConformément à la loi du 2 août 2002, des intérêts de retard et une indemnité forfaitaire peuvent être réclamés.\n\nCordialement,\n${c.name}`;
     App.modal({
-      title: 'Relance de paiement', body: `<textarea id="rt" style="min-height:260px">${esc(txt)}</textarea>`,
-      footer: `<button class="btn" data-close>Fermer</button><button class="btn primary" id="send">Ouvrir dans la messagerie</button>`,
-      onMount: (m) => ($('#send', m).onclick = () => (location.href = `mailto:${encodeURIComponent(cl.email || '')}?subject=${encodeURIComponent('Relance — facture ' + inv.number)}&body=${encodeURIComponent($('#rt', m).value)}`)),
+      title: 'Rappel de paiement', body: `<textarea id="rt" style="min-height:260px">${esc(txt)}</textarea>`,
+      footer: `<button class="btn" data-close>Fermer</button><button class="btn primary" id="copy">Copier le texte</button>`,
+      onMount: (m) => ($('#copy', m).onclick = () => copyText($('#rt', m).value)),
     });
   }
 
   /* ============ CLIENTS ============ */
   App.editClient = (client, onSaved) => {
-    const c = client || { id: App.uid(), name: '', email: '', address: '', siret: '', tvaNumber: '', phone: '' };
+    const c = client || { id: App.uid(), name: '', email: '', address: '', vatNumber: '', country: 'BE', phone: '' };
     App.modal({
       title: client ? 'Modifier le client' : 'Nouveau client',
       body: `<form class="form-grid" id="cf">
-        <label class="field full">Nom / raison sociale <input name="name" value="${esc(c.name)}" required></label>
+        <label class="field">N° de TVA / d'entreprise <input name="vatNumber" id="cvat" value="${esc(c.vatNumber)}" placeholder="BE0123456789 (vide pour un particulier)"></label>
+        <div class="field"><span>Vérification</span><span id="vatst" style="padding-top:8px"></span></div>
+        <div class="full actions"><a class="btn sm" id="kbo" target="_blank" rel="noopener">Ouvrir la fiche BCE ↗</a><a class="btn sm" href="${App.viesUrl()}" target="_blank" rel="noopener">Vérifier sur VIES ↗</a>${App.ai.isReady() ? '<button type="button" class="btn sm" id="aifill">✦ Remplir depuis la fiche BCE</button>' : ''}</div>
+        <label class="field full">Nom / dénomination <input name="name" value="${esc(c.name)}" required></label>
+        <label class="field full">Adresse <textarea name="address">${esc(c.address)}</textarea></label>
+        <label class="field">Pays <input name="country" id="ccountry" value="${esc(c.country || 'BE')}" maxlength="2"></label>
         <label class="field">E-mail <input name="email" type="email" value="${esc(c.email)}"></label>
         <label class="field">Téléphone <input name="phone" value="${esc(c.phone || '')}"></label>
-        <label class="field">SIRET <input name="siret" value="${esc(c.siret)}"></label>
-        <label class="field">N° TVA intracom. <input name="tvaNumber" value="${esc(c.tvaNumber)}"></label>
-        <label class="field full">Adresse <textarea name="address">${esc(c.address)}</textarea></label></form>`,
+      </form>`,
       footer: `<button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Enregistrer</button>`,
-      onMount: (m, close) => ($('#ok', m).onclick = () => {
-        const d = App.formData($('#cf', m));
-        if (!d.name.trim()) return App.toast('Le nom est obligatoire', 'error');
-        Object.assign(c, d);
-        if (!App.state.clients.includes(c)) App.state.clients.push(c);
-        App.save(); close(); onSaved ? onSaved(c) : App.render();
-      }),
+      onMount: (m, close) => {
+        const f = $('#cf', m);
+        const check = () => {
+          const v = App.vatParse(f.vatNumber.value);
+          $('#vatst', m).innerHTML = !f.vatNumber.value.trim() ? '<span class="muted">Particulier / non assujetti</span>' : v.valid ? `<span class="pos">✓ ${esc(v.formatted)}</span>` : '<span class="neg">Numéro invalide (contrôle modulo 97)</span>';
+          if (v.country) $('#ccountry', m).value = v.country === 'EL' ? 'GR' : v.country;
+          const k = $('#kbo', m); k.hidden = v.country !== 'BE' || !v.valid; k.href = App.kboUrl(v.number);
+        };
+        f.vatNumber.oninput = check; check();
+        const ai = $('#aifill', m);
+        if (ai) ai.onclick = () => App.companyFromBce((d) => {
+          if (d.name) f.name.value = d.name;
+          if (d.street) f.address.value = `${d.street}, ${d.postcode} ${d.city}`.trim();
+          if (d.enterprise_number) { f.vatNumber.value = 'BE' + App.digits(d.enterprise_number).padStart(10, '0'); check(); }
+        });
+        $('#ok', m).onclick = () => {
+          const d = App.formData(f);
+          if (!d.name.trim()) return App.toast('Le nom est obligatoire', 'error');
+          const v = App.vatParse(d.vatNumber);
+          if (d.vatNumber.trim() && !v.valid) return App.toast('Numéro de TVA invalide', 'error');
+          d.vatNumber = d.vatNumber.trim() ? v.formatted : '';
+          d.country = (d.country || 'BE').toUpperCase();
+          Object.assign(c, d);
+          if (!App.state.clients.includes(c)) App.state.clients.push(c);
+          App.save(); close(); onSaved ? onSaved(c) : App.render();
+        };
+      },
+    });
+  };
+
+  /* Remplissage d'une fiche entreprise depuis la BCE (texte copié ou capture d'écran) */
+  App.companyFromBce = (apply) => {
+    App.modal({
+      title: 'Remplir depuis la fiche BCE',
+      body: `<p class="muted">Ouvrez la fiche sur <a href="https://kbopub.economie.fgov.be/kbopub/zoeknummerform.html?lang=fr" target="_blank" rel="noopener">kbopub.economie.fgov.be</a>, puis collez ici son texte (Ctrl+A, Ctrl+C) ou ajoutez une capture d'écran. L'IA en extrait les données.</p>
+        <label class="field">Texte de la fiche <textarea id="bt" style="min-height:160px" placeholder="Collez ici le contenu de la fiche BCE…"></textarea></label>
+        <label class="field" style="margin-top:10px">ou capture d'écran <input type="file" id="bi" accept="image/*"></label>
+        <div id="bres" style="margin-top:12px"></div>`,
+      footer: '<button class="btn" data-close>Annuler</button><button class="btn primary" id="go">✦ Extraire</button>',
+      onMount: (m, close) => {
+        $('#go', m).onclick = async (ev) => {
+          const btn = ev.currentTarget, text = $('#bt', m).value.trim(), file = $('#bi', m).files[0];
+          if (!text && !file) return App.toast('Collez le texte ou ajoutez une capture', 'error');
+          btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Lecture…';
+          try {
+            const d = await App.ai.extractCompany(text, file);
+            if (d.enterprise_number && !App.bceValid(d.enterprise_number)) App.toast('Attention : le numéro lu ne passe pas le contrôle modulo 97', 'error');
+            apply(d); close(); App.toast('Fiche remplie — vérifiez les données', 'success');
+          } catch (e) { $('#bres', m).innerHTML = `<div class="alert danger">${esc(e.message)}</div>`; btn.disabled = false; btn.textContent = '✦ Extraire'; }
+        };
+      },
     });
   };
 
   V.clients = (el) => {
     const s = App.state;
     const stats = (id) => {
-      const inv = s.invoices.filter((i) => i.clientId === id && i.type !== 'devis' && i.status !== 'brouillon');
+      const inv = s.invoices.filter((i) => i.clientId === id && i.type !== 'devis' && !['brouillon', 'annulee'].includes(i.status));
       return { ca: round2(inv.reduce((x, i) => x + App.invoiceTotals(i).ht, 0)), du: round2(inv.filter((i) => i.status === 'envoyee').reduce((x, i) => x + App.invoiceTotals(i).ttc, 0)), n: inv.length };
     };
     el.innerHTML = head('Clients', `${s.clients.length} client(s)`, '<button class="btn primary" id="new">+ Client</button>') +
-      `<div class="card">${s.clients.length ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>E-mail</th><th>N° TVA</th><th class="num">Factures</th><th class="num">CA HT</th><th class="num">Reste dû</th><th></th></tr></thead><tbody>
-      ${s.clients.map((c) => { const st = stats(c.id); return `<tr><td><strong>${esc(c.name)}</strong></td><td>${esc(c.email)}</td><td>${esc(c.tvaNumber)}</td><td class="num">${st.n}</td><td class="num">${eur(st.ca)}</td><td class="num ${st.du ? 'neg' : ''}">${eur(st.du)}</td><td class="num"><button class="btn sm" data-edit="${c.id}">Modifier</button> <button class="btn sm danger" data-del="${c.id}">✕</button></td></tr>`; }).join('')}
+      `<div class="card">${s.clients.length ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>N° TVA</th><th>Pays</th><th class="num">Factures</th><th class="num">CA HTVA</th><th class="num">Reste dû</th><th></th></tr></thead><tbody>
+      ${s.clients.map((c) => { const st = stats(c.id); const v = App.vatParse(c.vatNumber); return `<tr><td><strong>${esc(c.name)}</strong><div class="small muted">${esc(c.email)}</div></td><td>${c.vatNumber ? `${esc(v.formatted)} ${v.valid ? '<span class="badge success">valide</span>' : '<span class="badge danger">invalide</span>'}` : '<span class="muted">particulier</span>'}</td><td>${esc(c.country || 'BE')}</td><td class="num">${st.n}</td><td class="num">${eur(st.ca)}</td><td class="num ${st.du ? 'neg' : ''}">${eur(st.du)}</td><td class="num"><button class="btn sm" data-edit="${c.id}">Modifier</button> <button class="btn sm danger" data-del="${c.id}" aria-label="Supprimer">✕</button></td></tr>`; }).join('')}
       </tbody></table></div>` : '<div class="empty">Aucun client pour l\'instant.</div>'}</div>`;
     $('#new', el).onclick = () => App.editClient(null);
     $$('[data-edit]', el).forEach((b) => (b.onclick = () => App.editClient(s.clients.find((c) => c.id === b.dataset.edit))));
@@ -274,35 +366,47 @@
   /* ============ DÉPENSES ============ */
   App.editExpense = (exp, prefill) => {
     const s = App.state;
-    const e = exp ? JSON.parse(JSON.stringify(exp)) : Object.assign({ id: App.uid(), date: App.today(), supplier: '', account: '606400', description: '', ht: 0, tvaRate: 20, tva: 0, ttc: 0, paid: true, paidDate: '', paymentMethod: 'carte', receipt: '' }, prefill || {});
+    const e = exp ? JSON.parse(JSON.stringify(exp)) : Object.assign({ id: App.uid(), date: App.today(), supplier: '', account: '612300', description: '', ht: 0, tvaRate: 21, tva: 0, ttc: 0, deductiblePct: 100, vatRegime: 'normal', paid: true, paidDate: '', paymentMethod: 'carte', receipt: '' }, prefill || {});
     App.modal({
       title: exp ? 'Modifier la dépense' : 'Nouvelle dépense',
       body: `<form class="form-grid" id="ef">
         <label class="field">Date <input type="date" name="date" value="${e.date}"></label>
         <label class="field">Fournisseur <input name="supplier" value="${esc(e.supplier)}" list="sup-list"><datalist id="sup-list">${[...new Set(s.expenses.map((x) => x.supplier))].map((x) => `<option value="${esc(x)}">`).join('')}</datalist></label>
-        <label class="field full">Catégorie (compte PCG) <select name="account">${App.options(App.EXPENSE_CATEGORIES.map((c) => [c.account, `${c.account} — ${c.label}`]), e.account)}</select></label>
+        <label class="field full">Catégorie (compte PCMN) <select name="account">${App.options(App.EXPENSE_CATEGORIES.map((c) => [c.account, `${c.account} — ${c.label}`]), e.account)}</select></label>
         <label class="field full">Description <input name="description" value="${esc(e.description)}"></label>
-        <label class="field">Montant TTC <input type="number" step="0.01" name="ttc" value="${e.ttc}"></label>
+        <label class="field full">Régime de TVA <select name="vatRegime">${App.options(App.PURCHASE_REGIMES, e.vatRegime || 'normal')}</select></label>
+        <label class="field" id="lttc">Montant TVAC payé <input type="number" step="0.01" name="ttc" value="${e.ttc}"></label>
         <label class="field">Taux TVA <select name="tvaRate">${App.tvaOptions(e.tvaRate)}</select></label>
-        <label class="field">Montant HT <input type="number" step="0.01" name="ht" value="${e.ht}"></label>
-        <label class="field">TVA déductible <input type="number" step="0.01" name="tva" value="${e.tva}"></label>
-        <label class="field">Moyen de paiement <select name="paymentMethod">${App.options([['carte', 'Carte'], ['virement', 'Virement'], ['prelevement', 'Prélèvement'], ['cheque', 'Chèque'], ['especes', 'Espèces']], e.paymentMethod)}</select></label>
+        <label class="field">Montant HTVA <input type="number" step="0.01" name="ht" value="${e.ht}"></label>
+        <label class="field" id="ltva">TVA <input type="number" step="0.01" name="tva" value="${e.tva}"></label>
+        <label class="field">TVA déductible (%) <input type="number" min="0" max="100" name="deductiblePct" value="${e.deductiblePct ?? 100}"></label>
+        <label class="field">Payé par <select name="paymentMethod">${App.options([['carte', 'Carte / Bancontact'], ['virement', 'Virement'], ['domiciliation', 'Domiciliation'], ['especes', 'Espèces (caisse)'], ['prive', 'Fonds privés (compte courant)']], e.paymentMethod)}</select></label>
         <label class="field">Payée le <input type="date" name="paidDate" value="${e.paidDate || ''}"></label>
         <label class="check full"><input type="checkbox" name="paid" ${e.paid ? 'checked' : ''}> Dépense déjà payée</label>
-        <label class="field full">Justificatif (photo ou PDF) <input type="file" id="rcpt" accept="image/*,application/pdf" capture="environment"></label>
+        <div class="full small muted" id="dedhint"></div>
+        <label class="field full">Justificatif (photo ou PDF) <input type="file" id="rcpt" accept="image/*,application/pdf"></label>
         ${e.receipt ? `<div class="full"><img src="${e.receipt}" style="max-width:180px;border-radius:8px;border:1px solid var(--border)" alt="Justificatif"></div>` : ''}
-        <div class="full alert small" id="ai-hint" ${App.ai.isReady() ? '' : 'hidden'}>✦ Ajoutez un justificatif puis cliquez sur « Remplir avec l'IA » pour extraire automatiquement les montants.</div>
+        <div class="full alert small" id="ai-hint" ${App.ai.isReady() ? '' : 'hidden'}>✦ Ajoutez une photo du justificatif puis cliquez sur « Remplir avec l'IA » : montants, TVA, catégorie et déductibilité sont extraits automatiquement.</div>
       </form>`,
       footer: `${exp ? '<button class="btn danger" id="del">Supprimer</button>' : ''}<button class="btn" id="ai-fill" ${App.ai.isReady() ? '' : 'hidden'}>✦ Remplir avec l'IA</button><button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Enregistrer</button>`,
       onMount: (m, close) => {
         const f = $('#ef', m);
+        const autoliq = () => f.vatRegime.value !== 'normal';
         const recalc = (src) => {
           const rate = Number(f.tvaRate.value) || 0;
-          if (src === 'ht') { f.tva.value = round2(f.ht.value * rate / 100); f.ttc.value = round2(Number(f.ht.value) + Number(f.tva.value)); }
+          if (autoliq()) { if (src === 'ttc') f.ht.value = f.ttc.value; f.tva.value = round2(f.ht.value * rate / 100); f.ttc.value = f.ht.value; }
+          else if (src === 'ht') { f.tva.value = round2(f.ht.value * rate / 100); f.ttc.value = round2(Number(f.ht.value) + Number(f.tva.value)); }
           else if (src !== 'tva') { f.ht.value = round2(f.ttc.value / (1 + rate / 100)); f.tva.value = round2(f.ttc.value - f.ht.value); }
           else f.ht.value = round2(f.ttc.value - f.tva.value);
+          $('#lttc', m).firstChild.textContent = autoliq() ? 'Montant payé (HTVA) ' : 'Montant TVAC payé ';
+          $('#ltva', m).firstChild.textContent = autoliq() ? 'TVA autoliquidée ' : 'TVA ';
+          const pctv = Number(f.deductiblePct.value);
+          $('#dedhint', m).textContent = pctv < 100 ? `TVA déductible à ${pctv} % : ${eur(f.tva.value * pctv / 100)} récupérés, le reste est ajouté à la charge.` : '';
         };
         f.ttc.oninput = () => recalc('ttc'); f.tvaRate.onchange = () => recalc('ttc'); f.ht.oninput = () => recalc('ht'); f.tva.oninput = () => recalc('tva');
+        f.vatRegime.onchange = () => recalc('ht'); f.deductiblePct.oninput = () => recalc('none');
+        f.account.onchange = () => { const d = App.VAT_DEDUCTIBILITY[f.account.value]; f.deductiblePct.value = d ?? 100; recalc('none'); };
+        recalc('none');
         let file = null;
         $('#rcpt', m).onchange = async (ev) => { file = ev.target.files[0]; if (file) e.receipt = await App.compressImage(file, 800); };
         $('#ai-fill', m).onclick = async (ev) => {
@@ -313,19 +417,21 @@
             if (r.date) f.date.value = r.date;
             f.supplier.value = r.supplier || f.supplier.value; f.description.value = r.description || '';
             if (App.EXPENSE_CATEGORIES.some((c) => c.account === r.account)) f.account.value = r.account;
-            f.tvaRate.value = App.TVA_RATES.includes(Number(r.tva_rate)) ? r.tva_rate : 20;
+            f.tvaRate.value = App.TVA_RATES.includes(Number(r.tva_rate)) ? r.tva_rate : 21;
+            if (App.PURCHASE_REGIMES.some(([k]) => k === r.vat_regime)) f.vatRegime.value = r.vat_regime;
+            f.deductiblePct.value = r.vat_deductible_pct ?? (App.VAT_DEDUCTIBILITY[f.account.value] ?? 100);
             f.ttc.value = r.total_ttc; f.ht.value = r.total_ht; f.tva.value = r.total_tva;
-            if (['carte', 'virement', 'prelevement', 'cheque', 'especes'].includes(r.payment_method)) f.paymentMethod.value = r.payment_method;
+            if (['carte', 'virement', 'domiciliation', 'especes'].includes(r.payment_method)) f.paymentMethod.value = r.payment_method;
+            recalc('none');
             $('#ai-hint', m).hidden = false;
-            $('#ai-hint', m).innerHTML = `✦ Extraction terminée (confiance ${Math.round((r.confidence || 0) * 100)} %). ${esc(r.remarks || '')}${r.is_asset ? '<br><strong>Ce bien semble être une immobilisation</strong> : enregistrez-le plutôt dans Immobilisations pour l\'amortir.' : ''}`;
+            $('#ai-hint', m).innerHTML = `✦ Extraction terminée (confiance ${Math.round((r.confidence || 0) * 100)} %). ${esc(r.remarks || '')}${r.is_asset ? '<br><strong>Ce bien semble être un investissement</strong> : enregistrez-le plutôt dans Immobilisations pour l\'amortir.' : ''}`;
           } catch (err) { App.toast(err.message, 'error'); }
           btn.disabled = false; btn.textContent = '✦ Remplir avec l\'IA';
         };
         $('#ok', m).onclick = () => {
-          const d = App.formData(f);
-          Object.assign(e, d);
+          Object.assign(e, App.formData(f));
           e.ht = round2(e.ht); e.tva = round2(e.tva); e.ttc = round2(e.ttc);
-          if (!e.ttc) return App.toast('Indiquez un montant', 'error');
+          if (!e.ht && !e.ttc) return App.toast('Indiquez un montant', 'error');
           if (e.paid && !e.paidDate) e.paidDate = e.date;
           const i = s.expenses.findIndex((x) => x.id === e.id);
           const bankId = e._bank; delete e._bank;
@@ -352,70 +458,126 @@
         .filter((e) => !q || `${e.supplier} ${e.description}`.toLowerCase().includes(q))
         .sort((a, b) => (a.date < b.date ? 1 : -1));
       const tot = list.reduce((x, e) => ({ ht: x.ht + e.ht, tva: x.tva + e.tva, ttc: x.ttc + e.ttc }), { ht: 0, tva: 0, ttc: 0 });
-      $('#list', el).innerHTML = list.length ? `<div class="table-wrap"><table><thead><tr><th></th><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th>Statut</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th></tr></thead><tbody>
-        ${list.map((e) => `<tr class="clickable" data-id="${e.id}"><td>${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" alt="">` : '<span class="badge warning" title="Justificatif manquant">!</span>'}</td><td>${fdate(e.date)}</td><td><strong>${esc(e.supplier)}</strong><div class="small muted">${esc(e.description)}</div></td><td>${esc(App.accountLabel(e.account))}</td><td>${e.paid ? '<span class="badge success">Payée</span>' : '<span class="badge warning">À payer</span>'}</td><td class="num">${eur(e.ht)}</td><td class="num">${eur(e.tva)}</td><td class="num">${eur(e.ttc)}</td></tr>`).join('')}
+      $('#list', el).innerHTML = list.length ? `<div class="table-wrap"><table><thead><tr><th></th><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th>Statut</th><th class="num">HTVA</th><th class="num">TVA</th><th class="num">Payé</th></tr></thead><tbody>
+        ${list.map((e) => `<tr class="clickable" data-id="${e.id}"><td>${e.receipt ? `<img class="receipt-thumb" src="${e.receipt}" alt="">` : '<span class="badge warning" title="Justificatif manquant">!</span>'}</td><td>${fdate(e.date)}</td><td><strong>${esc(e.supplier)}</strong><div class="small muted">${esc(e.description)}</div></td><td>${esc(App.accountLabel(e.account))}${e.vatRegime && e.vatRegime !== 'normal' ? ' <span class="badge">autoliquidation</span>' : ''}${(e.deductiblePct ?? 100) < 100 ? ` <span class="badge">TVA ${e.deductiblePct} %</span>` : ''}</td><td>${e.paid ? '<span class="badge success">Payée</span>' : '<span class="badge warning">À payer</span>'}</td><td class="num">${eur(e.ht)}</td><td class="num">${eur(e.tva)}</td><td class="num">${eur(e.ttc)}</td></tr>`).join('')}
         <tr class="total"><td colspan="5">Total (${list.length})</td><td class="num">${eur(tot.ht)}</td><td class="num">${eur(tot.tva)}</td><td class="num">${eur(tot.ttc)}</td></tr></tbody></table></div>`
         : '<div class="empty">Aucune dépense sur cette période.</div>';
       $$('[data-id]', el).forEach((r) => (r.onclick = () => App.editExpense(s.expenses.find((e) => e.id === r.dataset.id))));
     };
-    el.innerHTML = head('Dépenses', 'Achats, frais généraux et notes de frais, avec justificatifs et TVA déductible.',
+    el.innerHTML = head('Dépenses', 'Achats et frais, avec TVA déductible (règles belges de déductibilité) et justificatifs.',
       `<select id="year">${App.yearOptions(y)}</select><a class="btn" href="#/ia/scan">✦ Scanner des justificatifs</a><button class="btn" id="exp">Exporter CSV</button><button class="btn primary" id="new">+ Dépense</button>`) +
       `<div class="card"><div class="toolbar"><input id="q" placeholder="Rechercher…" style="max-width:260px"><select id="cat"><option value="">Toutes catégories</option>${App.options(App.EXPENSE_CATEGORIES.map((c) => [c.account, c.label]))}</select></div><div id="list"></div></div>`;
     $('#year', el).onchange = (e) => { selectedYear = Number(e.target.value); V.depenses(el, []); };
     $('#q', el).oninput = draw; $('#cat', el).onchange = draw;
     $('#new', el).onclick = () => App.editExpense(null);
-    $('#exp', el).onclick = () => App.download('depenses.csv', App.toCSV([['Date', 'Fournisseur', 'Description', 'Compte', 'Catégorie', 'HT', 'Taux TVA', 'TVA', 'TTC', 'Payée'], ...s.expenses.map((e) => [e.date, e.supplier, e.description, e.account, App.accountLabel(e.account), e.ht, e.tvaRate, e.tva, e.ttc, e.paid ? 'oui' : 'non'])]), 'text/csv');
+    $('#exp', el).onclick = () => App.download('depenses.csv', App.toCSV([['Date', 'Fournisseur', 'Description', 'Compte', 'Catégorie', 'Régime', 'HTVA', 'Taux TVA', 'TVA', '% déductible', 'Payé', 'Payée'], ...s.expenses.map((e) => [e.date, e.supplier, e.description, e.account, App.accountLabel(e.account), e.vatRegime || 'normal', e.ht, e.tvaRate, e.tva, e.deductiblePct ?? 100, e.ttc, e.paid ? 'oui' : 'non'])]), 'text/csv');
     draw();
   };
 
   /* ============ BANQUE ============ */
+  const BANK_CATEGORIES = () => [...App.EXPENSE_CATEGORIES.map((c) => [c.account, `${c.account} — ${c.label}`]), ...App.REVENUE_ACCOUNTS, ['750000', '750000 — Produits financiers (intérêts)'], ['100000', '100000 — Apport de l\'exploitant / capital'], ['489100', '489100 — Compte courant dirigeant (prélèvement / apport privé)'], ['173000', '173000 — Remboursement d\'emprunt (capital)'], ['451800', '451800 — Paiement TVA au SPF Finances'], ['411800', '411800 — Remboursement de TVA reçu'], ['412000', '412000 — Versement anticipé d\'impôt'], ['450000', '450000 — Paiement d\'impôt (avertissement-extrait de rôle)'], ['453000', '453000 — Précompte professionnel versé'], ['454000', '454000 — ONSS'], ['455000', '455000 — Salaires nets'], ['456000', '456000 — Caisse d\'assurances sociales (provisions)'], ['499000', '499000 — Compte d\'attente']];
+
   V.banque = (el) => {
     const s = App.state;
     const matchLabel = (b) => {
       const m = b.matched; if (!m) return '<span class="badge warning">À rapprocher</span>';
-      if (m.type === 'invoice') { const i = s.invoices.find((x) => x.id === m.id); return `<span class="badge success">Facture ${esc(i ? i.number : '?')}</span>`; }
-      if (m.type === 'expense') { const e = s.expenses.find((x) => x.id === m.id); return `<span class="badge success">Dépense ${esc(e ? e.supplier : '?')}</span>`; }
-      return `<span class="badge primary">${esc(App.accountLabel(m.account))}${m.tvaRate ? ' · TVA ' + m.tvaRate + ' %' : ''}</span>`;
+      const how = b.auto ? ` <span class="badge" title="Rapproché automatiquement">${esc(b.auto)}</span>` : '';
+      if (m.type === 'invoice') { const i = s.invoices.find((x) => x.id === m.id); return `<span class="badge success">Facture ${esc(i ? i.number : '?')}</span>${how}`; }
+      if (m.type === 'expense') { const e = s.expenses.find((x) => x.id === m.id); return `<span class="badge success">Dépense ${esc(e ? e.supplier : '?')}</span>${how}`; }
+      return `<span class="badge primary">${esc(App.accountLabel(m.account))}${m.tvaRate ? ' · TVA ' + m.tvaRate + ' %' : ''}</span>${how}`;
     };
     const list = [...s.bank].sort((a, b) => (a.date < b.date ? 1 : -1));
-    const solde = App.trialBalance(null, App.today()).filter((a) => a.account === '512000').reduce((x, a) => x + a.solde, 0);
-    const relevé = round2((Number(s.settings.opening.banque) || 0) + s.bank.reduce((x, b) => x + Number(b.amount), 0));
-    el.innerHTML = head('Banque & rapprochement', 'Importez votre relevé (CSV), puis rapprochez chaque opération d\'une facture, d\'une dépense ou d\'une catégorie.',
-      `<label class="btn">Importer un relevé CSV<input type="file" id="csv" accept=".csv,.txt,text/csv" hidden></label><button class="btn" id="add">+ Opération</button><button class="btn primary" id="ai" ${s.bank.some((b) => !b.matched) ? '' : 'disabled'}>✦ Trier avec l'IA</button>`) +
-      `<div class="grid grid-3"><div class="card kpi"><div class="label">Solde comptable 512</div><div class="value">${eur(solde)}</div><div class="sub">Calculé à partir des écritures</div></div>
-       <div class="card kpi"><div class="label">Opérations à rapprocher</div><div class="value">${s.bank.filter((b) => !b.matched).length}</div><div class="sub">sur ${s.bank.length} importée(s)</div></div>
-       <div class="card kpi"><div class="label">Solde d'ouverture + relevés importés</div><div class="value">${eur(relevé)}</div><div class="sub">À comparer avec votre banque</div></div></div>
+    const solde = App.trialBalance(null, App.today()).filter((a) => a.account === '550000').reduce((x, a) => x + a.solde, 0);
+    const releve = round2((Number(s.settings.opening.banque) || 0) + s.bank.reduce((x, b) => x + Number(b.amount), 0));
+    el.innerHTML = head('Banque', 'Importez vos extraits (CODA ou CSV de votre banque) : les paiements sont rapprochés automatiquement par communication structurée, montant et règles apprises.',
+      `<label class="btn primary">Importer CODA / CSV<input type="file" id="csv" accept=".cod,.coda,.txt,.csv,text/csv" multiple hidden></label><button class="btn" id="add">+ Opération</button><button class="btn" id="auto">Rapprocher automatiquement</button><button class="btn" id="ai" ${s.bank.some((b) => !b.matched) && App.ai.isReady() ? '' : 'disabled'}>✦ Trier le reste avec l'IA</button>`) +
+      `<div class="grid grid-3"><div class="card kpi"><div class="label">Solde comptable (550)</div><div class="value">${eur(solde)}</div><div class="sub">Calculé à partir des écritures</div></div>
+       <div class="card kpi"><div class="label">Opérations à rapprocher</div><div class="value">${s.bank.filter((b) => !b.matched).length}</div><div class="sub">sur ${s.bank.length} importée(s) · ${s.bankRules.length} règle(s) apprise(s)</div></div>
+       <div class="card kpi"><div class="label">Ouverture + extraits importés</div><div class="value">${eur(releve)}</div><div class="sub">À comparer avec le solde de votre banque</div></div></div>
        <div class="card" style="margin-top:16px">${list.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Libellé</th><th class="num">Montant</th><th>Rapprochement</th><th></th></tr></thead><tbody>
-       ${list.map((b) => `<tr><td>${fdate(b.date)}</td><td>${esc(b.label)}${b.aiReason ? `<div class="small muted">✦ ${esc(b.aiReason)}</div>` : ''}</td><td class="num ${b.amount < 0 ? 'neg' : 'pos'}">${eur(b.amount)}</td><td>${matchLabel(b)}</td><td class="num"><button class="btn sm" data-m="${b.id}">${b.matched ? 'Modifier' : 'Rapprocher'}</button> <button class="btn sm danger" data-d="${b.id}" aria-label="Supprimer">✕</button></td></tr>`).join('')}
-       </tbody></table></div>` : '<div class="empty">Aucune opération. Importez un relevé CSV exporté depuis votre banque (colonnes date, libellé, montant ou débit/crédit).</div>'}</div>`;
-    $('#csv', el).onchange = (e) => importCSV(e.target.files[0]);
+       ${list.map((b) => `<tr><td>${fdate(b.date)}</td><td>${esc(b.label)}${b.comm ? `<div class="small muted" style="font-family:var(--mono)">${esc(b.comm)}</div>` : ''}${b.aiReason ? `<div class="small muted">✦ ${esc(b.aiReason)}</div>` : ''}</td><td class="num ${b.amount < 0 ? 'neg' : 'pos'}">${eur(b.amount)}</td><td>${matchLabel(b)}</td><td class="num"><button class="btn sm" data-m="${b.id}">${b.matched ? 'Modifier' : 'Rapprocher'}</button> <button class="btn sm danger" data-d="${b.id}" aria-label="Supprimer">✕</button></td></tr>`).join('')}
+       </tbody></table></div>` : '<div class="empty">Aucune opération. Téléchargez vos extraits CODA (format standard des banques belges : BNP Paribas Fortis, KBC, Belfius, ING…) ou un export CSV depuis votre banque en ligne.</div>'}</div>
+       ${s.bankRules.length ? `<div class="card"><h2>Règles apprises</h2><p class="small muted">Créées automatiquement quand vous catégorisez une opération ; appliquées aux prochains imports.</p><div class="table-wrap"><table><tbody>${s.bankRules.map((r, k) => `<tr><td>Libellé contient « ${esc(r.pattern)} »</td><td>${esc(App.accountLabel(r.account))}</td><td>TVA ${r.tvaRate} %</td><td class="num"><button class="btn sm danger" data-rr="${k}">Supprimer</button></td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
+    $('#csv', el).onchange = (e) => importFiles([...e.target.files]);
     $('#add', el).onclick = () => matchModal({ id: App.uid(), date: App.today(), label: '', amount: 0, matched: null }, true);
+    $('#auto', el).onclick = () => { const n = autoReconcile(); App.save(); App.toast(n ? `${n} opération(s) rapprochée(s) automatiquement` : 'Aucune correspondance certaine trouvée', n ? 'success' : ''); App.render(); };
     $$('[data-m]', el).forEach((b) => (b.onclick = () => matchModal(s.bank.find((x) => x.id === b.dataset.m))));
     $$('[data-d]', el).forEach((b) => (b.onclick = () => App.confirmBox('Supprimer cette opération ?', () => { unmatch(s.bank.find((x) => x.id === b.dataset.d)); s.bank = s.bank.filter((x) => x.id !== b.dataset.d); App.save(); App.render(); }, 'Supprimer')));
-    $('#ai', el).onclick = async (ev) => {
-      const btn = ev.currentTarget; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Tri en cours…';
-      try {
-        const todo = s.bank.filter((b) => !b.matched);
-        const res = await App.ai.categorizeBank(todo);
-        let n = 0;
-        (res.results || []).forEach((r) => {
-          const b = s.bank.find((x) => x.id === r.id); if (!b || b.matched) return;
-          if (r.match_type === 'invoice' && s.invoices.some((i) => i.id === r.match_id)) applyMatch(b, { type: 'invoice', id: r.match_id });
-          else if (r.match_type === 'expense' && s.expenses.some((i) => i.id === r.match_id)) applyMatch(b, { type: 'expense', id: r.match_id });
-          else if (r.account) applyMatch(b, { type: 'category', account: r.account, tvaRate: Number(r.tva_rate) || 0 });
-          b.aiReason = `${r.reason} (confiance ${Math.round((r.confidence || 0) * 100)} %)`; n++;
-        });
-        App.save(); App.toast(`${n} opération(s) classée(s) par l'IA — vérifiez-les`, 'success'); App.render();
-      } catch (err) { App.toast(err.message, 'error'); btn.disabled = false; btn.textContent = '✦ Trier avec l\'IA'; }
-    };
+    $$('[data-rr]', el).forEach((b) => (b.onclick = () => { s.bankRules.splice(Number(b.dataset.rr), 1); App.save(); App.render(); }));
+    $('#ai', el).onclick = (ev) => aiSort(ev.currentTarget);
   };
+
+  async function aiSort(btn) {
+    const s = App.state;
+    const todoList = s.bank.filter((b) => !b.matched);
+    if (!todoList.length || !App.ai.isReady()) return 0;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Tri en cours…'; }
+    try {
+      const res = await App.ai.categorizeBank(todoList);
+      let n = 0;
+      (res.results || []).forEach((r) => {
+        const b = s.bank.find((x) => x.id === r.id); if (!b || b.matched) return;
+        if ((r.confidence || 0) < 0.5) { b.aiReason = `Suggestion : ${App.accountLabel(r.account)} — ${r.reason}`; return; }
+        if (r.match_type === 'invoice' && s.invoices.some((i) => i.id === r.match_id)) applyMatch(b, { type: 'invoice', id: r.match_id });
+        else if (r.match_type === 'expense' && s.expenses.some((i) => i.id === r.match_id)) applyMatch(b, { type: 'expense', id: r.match_id });
+        else if (r.account) applyMatch(b, { type: 'category', account: r.account, tvaRate: Number(r.tva_rate) || 0 });
+        b.auto = 'IA'; b.aiReason = `${r.reason} (confiance ${Math.round((r.confidence || 0) * 100)} %)`; n++;
+      });
+      App.save(); App.toast(`${n} opération(s) classée(s) par l'IA — vérifiez-les`, 'success'); App.render();
+      return n;
+    } catch (err) { App.toast(err.message, 'error'); if (btn) { btn.disabled = false; btn.textContent = '✦ Trier le reste avec l\'IA'; } return 0; }
+  }
+
+  /* Rapprochement automatique sans IA : communication structurée, montant + nom, règles apprises */
+  const norm = (str) => String(str || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const NOISE = new Set(['PAIEMENT', 'VIREMENT', 'DOMICILIATION', 'BANCONTACT', 'CARTE', 'SEPA', 'VERS', 'DE', 'DU', 'LA', 'LE', 'EN', 'FAVEUR', 'AVEC', 'MAESTRO', 'VISA', 'DEBIT', 'CREDIT', 'ACHAT', 'PAR', 'EUROPEEN', 'INSTANTANE', 'BE', 'NR', 'REF', 'COMMUNICATION', 'DATE', 'VALEUR']);
+  const keyOf = (label) => norm(label).split(' ').filter((w) => w.length > 2 && !NOISE.has(w) && !/^\d+$/.test(w)).slice(0, 2).join(' ');
+
+  function autoReconcile() {
+    const s = App.state;
+    let n = 0;
+    s.bank.filter((b) => !b.matched).forEach((b) => {
+      const openInv = s.invoices.filter((i) => i.type === 'facture' && i.status === 'envoyee');
+      const lbl = norm(b.label);
+      // 1. Communication structurée
+      const commDigits = App.digits(b.comm || (String(b.label).match(/\+{3}[\d/ ]+\+{3}/) || [''])[0]);
+      if (commDigits.length === 12) {
+        const inv = openInv.find((i) => App.digits(App.invoiceComm(i)) === commDigits);
+        if (inv) { applyMatch(b, { type: 'invoice', id: inv.id }); b.auto = 'communication'; n++; return; }
+      }
+      if (b.amount > 0) {
+        const same = openInv.filter((i) => Math.abs(App.invoiceTotals(i).ttc - b.amount) < 0.01);
+        const named = same.filter((i) => norm(clientName(i.clientId)).split(' ').some((w) => w.length > 3 && lbl.includes(w)));
+        const pick = named.length === 1 ? named[0] : same.length === 1 ? same[0] : null;
+        if (pick) { applyMatch(b, { type: 'invoice', id: pick.id }); b.auto = 'montant'; n++; return; }
+      } else {
+        const unpaid = s.expenses.filter((e) => !e.paid);
+        const same = unpaid.filter((e) => Math.abs((e.vatRegime && e.vatRegime !== 'normal' ? e.ht : e.ttc) + b.amount) < 0.01);
+        const named = same.filter((e) => norm(e.supplier).split(' ').some((w) => w.length > 3 && lbl.includes(w)));
+        const pick = named.length === 1 ? named[0] : same.length === 1 ? same[0] : null;
+        if (pick) { applyMatch(b, { type: 'expense', id: pick.id }); b.auto = 'montant'; n++; return; }
+      }
+      const rule = s.bankRules.find((r) => r.pattern && lbl.includes(r.pattern) && (r.sign || 0) === Math.sign(b.amount));
+      if (rule) { applyMatch(b, { type: 'category', account: rule.account, tvaRate: rule.tvaRate }); b.auto = 'règle'; n++; }
+    });
+    return n;
+  }
+  App.autoReconcile = autoReconcile;
+
+  function learnRule(b, account, tvaRate) {
+    const pattern = keyOf(b.label);
+    if (!pattern) return;
+    const s = App.state, sign = Math.sign(b.amount);
+    s.bankRules = s.bankRules.filter((r) => !(r.pattern === pattern && (r.sign || 0) === sign));
+    s.bankRules.push({ pattern, account, tvaRate, sign });
+  }
 
   function unmatch(b) {
     if (!b || !b.matched) return;
     const s = App.state, m = b.matched;
     if (m.type === 'invoice') { const i = s.invoices.find((x) => x.id === m.id); if (i && i.status === 'payee') { i.status = 'envoyee'; i.paidDate = ''; } }
     if (m.type === 'expense') { const e = s.expenses.find((x) => x.id === m.id); if (e) { e.paid = false; e.paidDate = ''; } }
-    b.matched = null;
+    b.matched = null; b.auto = '';
   }
   function applyMatch(b, m) {
     const s = App.state;
@@ -427,24 +589,24 @@
 
   function matchModal(b, isNew) {
     const s = App.state;
-    const openInv = s.invoices.filter((i) => i.type !== 'devis' && i.status !== 'brouillon' && (i.status !== 'payee' || (b.matched && b.matched.id === i.id)));
+    const openInv = s.invoices.filter((i) => i.type !== 'devis' && !['brouillon', 'annulee'].includes(i.status) && (i.status !== 'payee' || (b.matched && b.matched.id === i.id)));
     const unpaidExp = s.expenses.filter((e) => !e.paid || (b.matched && b.matched.id === e.id));
     const best = (arr, amt) => arr.slice().sort((a, c) => Math.abs(Math.abs(amt) - Math.abs(a.v)) - Math.abs(Math.abs(amt) - Math.abs(c.v)));
     const invOpts = best(openInv.map((i) => ({ id: i.id, v: App.invoiceTotals(i).ttc, l: `${i.number} — ${clientName(i.clientId)} — ${eur(App.invoiceTotals(i).ttc)}` })), b.amount);
     const expOpts = best(unpaidExp.map((e) => ({ id: e.id, v: e.ttc, l: `${fdate(e.date)} ${e.supplier} — ${eur(e.ttc)}` })), b.amount);
-    const cats = [...App.EXPENSE_CATEGORIES.map((c) => [c.account, `${c.account} — ${c.label}`]), ['706000', '706000 — Prestations de services'], ['707000', '707000 — Ventes de marchandises'], ['758000', '758000 — Produits divers'], ['768000', '768000 — Produits financiers'], ['108000', '108000 — Apport / prélèvement exploitant'], ['455000', '455000 — Compte courant d\'associé'], ['164000', '164000 — Remboursement d\'emprunt'], ['445510', '445510 — Paiement de TVA'], ['444000', '444000 — Paiement de l\'IS'], ['431000', '431000 — URSSAF'], ['421000', '421000 — Salaires nets'], ['471000', '471000 — Compte d\'attente']];
     const m = b.matched || {};
     App.modal({
       title: isNew ? 'Nouvelle opération' : 'Rapprocher l\'opération',
       body: `<form class="form-grid" id="bf">
         <label class="field">Date <input type="date" name="date" value="${b.date}"></label>
-        <label class="field">Montant (− débit / + crédit) <input type="number" step="0.01" name="amount" value="${b.amount}"></label>
+        <label class="field">Montant (− sortie / + entrée) <input type="number" step="0.01" name="amount" value="${b.amount}"></label>
         <label class="field full">Libellé <input name="label" value="${esc(b.label)}"></label>
-        <label class="field full">Type de rapprochement <select name="type">${App.options([['', '— Non rapprochée —'], ['invoice', 'Règlement d\'une facture client'], ['expense', 'Paiement d\'une dépense saisie'], ['category', 'Catégoriser directement'], ['newexp', 'Créer une dépense à partir de l\'opération']], m.type || (b.amount > 0 && invOpts.length ? 'invoice' : b.amount < 0 && expOpts.length ? 'expense' : 'category'))}</select></label>
+        <label class="field full">Type de rapprochement <select name="type">${App.options([['', '— Non rapprochée —'], ['invoice', 'Paiement d\'une facture client'], ['expense', 'Paiement d\'une dépense encodée'], ['category', 'Catégoriser directement'], ['newexp', 'Créer une dépense à partir de l\'opération']], m.type || (b.amount > 0 && invOpts.length ? 'invoice' : b.amount < 0 && expOpts.length ? 'expense' : 'category'))}</select></label>
         <label class="field full" data-show="invoice">Facture <select name="invoice">${App.options(invOpts.map((o) => [o.id, o.l]), m.id)}</select></label>
         <label class="field full" data-show="expense">Dépense <select name="expense">${App.options(expOpts.map((o) => [o.id, o.l]), m.id)}</select></label>
-        <label class="field" data-show="category">Compte <select name="account">${App.options(cats, m.account || (b.amount > 0 ? '706000' : '471000'))}</select></label>
+        <label class="field" data-show="category">Compte <select name="account">${App.options(BANK_CATEGORIES(), m.account || (b.amount > 0 ? '701000' : '499000'))}</select></label>
         <label class="field" data-show="category">TVA incluse <select name="tvaRate">${App.tvaOptions(m.tvaRate ?? 0)}</select></label>
+        <label class="check full" data-show="category"><input type="checkbox" name="learn" checked> Retenir pour les prochaines opérations similaires (« ${esc(keyOf(b.label) || '…')} »)</label>
       </form>`,
       footer: `<button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Valider</button>`,
       onMount: (md, close) => {
@@ -457,79 +619,105 @@
           if (isNew) s.bank.push(b);
           if (d.type === 'newexp') {
             App.save(); close();
-            return App.editExpense(null, { date: b.date, supplier: b.label, ttc: Math.abs(b.amount), ht: round2(Math.abs(b.amount) / 1.2), tva: round2(Math.abs(b.amount) - Math.abs(b.amount) / 1.2), paid: true, paidDate: b.date, _bank: b.id });
+            const amt = Math.abs(b.amount);
+            return App.editExpense(null, { date: b.date, supplier: b.label, ttc: amt, ht: round2(amt / 1.21), tva: round2(amt - amt / 1.21), paid: true, paidDate: b.date, _bank: b.id });
           }
           if (!d.type) unmatch(b);
           else if (d.type === 'invoice' && d.invoice) applyMatch(b, { type: 'invoice', id: d.invoice });
           else if (d.type === 'expense' && d.expense) applyMatch(b, { type: 'expense', id: d.expense });
-          else if (d.type === 'category') applyMatch(b, { type: 'category', account: d.account, tvaRate: Number(d.tvaRate) || 0 });
+          else if (d.type === 'category') {
+            applyMatch(b, { type: 'category', account: d.account, tvaRate: Number(d.tvaRate) || 0 });
+            if (d.learn) { learnRule(b, d.account, Number(d.tvaRate) || 0); const k = autoReconcile(); if (k) App.toast(`Règle apprise : ${k} autre(s) opération(s) classée(s)`, 'success'); }
+          }
           App.save(); close(); App.render();
         };
       },
     });
   }
 
-  function importCSV(file) {
-    if (!file) return;
-    const r = new FileReader();
-    r.onload = () => {
-      const rows = App.parseCSV(String(r.result));
-      if (rows.length < 2) return App.toast('Fichier vide ou illisible', 'error');
-      const header = rows[0].map((h) => h.toLowerCase());
-      const find = (...keys) => header.findIndex((h) => keys.some((k) => h.includes(k)));
-      let iDate = find('date'), iLabel = find('libell', 'label', 'description', 'intitul', 'détail', 'detail'), iAmount = find('montant', 'amount', 'valeur');
-      const iDebit = find('débit', 'debit'), iCredit = find('crédit', 'credit');
-      if (iDate < 0) iDate = 0; if (iLabel < 0) iLabel = 1;
-      let n = 0, dup = 0;
-      rows.slice(1).forEach((row) => {
-        const date = App.parseDate(row[iDate]); if (!date) return;
-        let amount = iAmount >= 0 ? App.parseAmount(row[iAmount]) : App.parseAmount(row[iCredit]) - Math.abs(App.parseAmount(row[iDebit]));
-        if (iAmount < 0 && iDebit < 0) amount = App.parseAmount(row[2]);
-        const label = (row[iLabel] || '').trim();
-        if (App.state.bank.some((b) => b.date === date && b.label === label && b.amount === round2(amount))) { dup++; return; }
-        App.state.bank.push({ id: App.uid(), date, label, amount: round2(amount), matched: null }); n++;
+  async function importFiles(files) {
+    const s = App.state;
+    let n = 0, dup = 0;
+    for (const file of files) {
+      const text = await file.text();
+      const first = text.split(/\r?\n/)[0] || '';
+      const isCoda = /^[0-9]/.test(first) && first.replace(/\s+$/, "").length >= 100 && !/[;,\t]/.test(first.slice(0, 20));
+      const rows = isCoda ? App.parseCoda(text) : parseBankCsv(text);
+      rows.forEach((r) => {
+        if (s.bank.some((b) => b.date === r.date && b.amount === r.amount && (b.label === r.label || (r.comm && b.comm === r.comm)))) { dup++; return; }
+        s.bank.push(Object.assign({ id: App.uid(), matched: null }, r)); n++;
       });
-      App.save(); App.toast(`${n} opération(s) importée(s)${dup ? `, ${dup} doublon(s) ignoré(s)` : ''}`, 'success'); App.render();
-    };
-    r.readAsText(file, 'utf-8');
+    }
+    const auto = autoReconcile();
+    App.save();
+    App.toast(`${n} opération(s) importée(s)${dup ? `, ${dup} doublon(s) ignoré(s)` : ''} · ${auto} rapprochée(s) automatiquement`, 'success');
+    App.render();
+    if (s.settings.company.autoAI && App.ai.isReady() && s.bank.some((b) => !b.matched)) aiSort(null);
+  }
+
+  /* CSV des banques belges (séparateur ; , montants 1.234,56, colonnes variables) */
+  function parseBankCsv(text) {
+    const rows = App.parseCSV(text);
+    if (rows.length < 2) return [];
+    let h = 0;
+    while (h < Math.min(rows.length, 15) && !rows[h].some((c) => /date/i.test(c))) h++;
+    if (h >= rows.length) h = 0;
+    const header = rows[h].map((x) => x.toLowerCase());
+    const find = (...keys) => header.findIndex((x) => keys.some((k) => x.includes(k)));
+    let iDate = find('date d\'exécution', 'date de comptabilisation', 'date comptable', 'date valeur', 'date');
+    const iAmount = find('montant', 'amount', 'bedrag');
+    const iDebit = find('débit', 'debit'), iCredit = find('crédit', 'credit');
+    const iName = find('nom de la contrepartie', 'contrepartie', 'nom', 'tegenpartij');
+    const iComm = find('communication', 'mededeling', 'message');
+    const iLabel = find('détails', 'details', 'libellé', 'description', 'transaction', 'omschrijving');
+    if (iDate < 0) iDate = 0;
+    return rows.slice(h + 1).map((r) => {
+      const date = App.parseDate(r[iDate]); if (!date) return null;
+      let amount = iAmount >= 0 ? App.parseAmount(r[iAmount]) : App.parseAmount(r[iCredit]) - Math.abs(App.parseAmount(r[iDebit]));
+      const commRaw = iComm >= 0 ? r[iComm] : '';
+      const comm = App.structuredValid(commRaw) ? App.structuredComm(App.digits(commRaw).slice(0, 10)) : '';
+      const label = [iName >= 0 ? r[iName] : '', comm ? '' : commRaw, iLabel >= 0 && iLabel !== iName && iLabel !== iComm ? r[iLabel] : ''].map((x) => String(x || '').trim()).filter(Boolean).join(' — ').slice(0, 200) || 'Opération';
+      return amount ? { date, amount: round2(amount), comm, label } : null;
+    }).filter(Boolean);
   }
 
   /* ============ IMMOBILISATIONS ============ */
   V.immobilisations = (el) => {
-    const s = App.state;
-    const y = selectedYear;
-    el.innerHTML = head('Immobilisations & amortissements', 'Biens durables de plus de 500 € HT, amortis en linéaire prorata temporis. Les dotations sont passées automatiquement à chaque clôture.',
+    const s = App.state, y = selectedYear;
+    el.innerHTML = head('Immobilisations & amortissements', 'Investissements amortis en linéaire (prorata temporis la première année). Les amortissements sont comptabilisés automatiquement à chaque clôture.',
       '<button class="btn primary" id="new">+ Immobilisation</button>') +
-      `<div class="card">${s.assets.length ? `<div class="table-wrap"><table><thead><tr><th>Bien</th><th>Compte</th><th>Mise en service</th><th class="num">Durée</th><th class="num">Valeur HT</th><th class="num">Dotation ${y}</th><th class="num">Amort. cumulés</th><th class="num">VNC fin ${y}</th><th></th></tr></thead><tbody>
-      ${s.assets.map((a) => { const sch = App.depreciationSchedule(a); const row = sch.find((r) => r.year === y); const last = sch.filter((r) => r.year <= y).pop(); return `<tr><td><strong>${esc(a.label)}</strong><div class="small muted">${esc(a.supplier || '')}</div></td><td>${a.account}</td><td>${fdate(a.date)}</td><td class="num">${a.duration} ans</td><td class="num">${eur(a.value)}</td><td class="num">${eur(row ? row.dotation : 0)}</td><td class="num">${eur(last ? last.cumul : 0)}</td><td class="num">${eur(last ? last.vnc : a.value)}</td><td class="num"><button class="btn sm" data-plan="${a.id}">Plan</button> <button class="btn sm" data-e="${a.id}">Modifier</button></td></tr>`; }).join('')}
+      `<div class="card">${s.assets.length ? `<div class="table-wrap"><table><thead><tr><th>Bien</th><th>Compte</th><th>Mise en service</th><th class="num">Durée</th><th class="num">Valeur d'acquisition</th><th class="num">Amortissement ${y}</th><th class="num">Amort. cumulés</th><th class="num">Valeur nette fin ${y}</th><th></th></tr></thead><tbody>
+      ${s.assets.map((a) => { const sch = App.depreciationSchedule(a); const row = sch.find((r) => r.year === y); const last = sch.filter((r) => r.year <= y).pop(); return `<tr><td><strong>${esc(a.label)}</strong><div class="small muted">${esc(a.supplier || '')}</div></td><td>${a.account}</td><td>${fdate(a.date)}</td><td class="num">${a.duration} ans</td><td class="num">${eur(Number(a.value) + App.assetVat(a).nonDed)}</td><td class="num">${eur(row ? row.dotation : 0)}</td><td class="num">${eur(last ? last.cumul : 0)}</td><td class="num">${eur(last ? last.vnc : a.value)}</td><td class="num"><button class="btn sm" data-plan="${a.id}">Plan</button> <button class="btn sm" data-e="${a.id}">Modifier</button></td></tr>`; }).join('')}
       </tbody></table></div>` : '<div class="empty">Aucune immobilisation.</div>'}</div>`;
     $('#new', el).onclick = () => editAsset(null);
     $$('[data-e]', el).forEach((b) => (b.onclick = () => editAsset(s.assets.find((a) => a.id === b.dataset.e))));
     $$('[data-plan]', el).forEach((b) => (b.onclick = () => {
       const a = s.assets.find((x) => x.id === b.dataset.plan);
-      App.modal({ title: 'Plan d\'amortissement — ' + esc(a.label), body: `<table><thead><tr><th>Exercice</th><th class="num">Dotation</th><th class="num">Cumul</th><th class="num">VNC</th></tr></thead><tbody>${App.depreciationSchedule(a).map((r) => `<tr><td>${r.year}</td><td class="num">${eur(r.dotation)}</td><td class="num">${eur(r.cumul)}</td><td class="num">${eur(r.vnc)}</td></tr>`).join('')}</tbody></table>`, footer: '<button class="btn" data-close>Fermer</button>' });
+      App.modal({ title: 'Tableau d\'amortissement — ' + esc(a.label), body: `<table><thead><tr><th>Exercice</th><th class="num">Amortissement</th><th class="num">Cumul</th><th class="num">Valeur nette</th></tr></thead><tbody>${App.depreciationSchedule(a).map((r) => `<tr><td>${r.year}</td><td class="num">${eur(r.dotation)}</td><td class="num">${eur(r.cumul)}</td><td class="num">${eur(r.vnc)}</td></tr>`).join('')}</tbody></table>`, footer: '<button class="btn" data-close>Fermer</button>' });
     }));
   };
 
   function editAsset(asset) {
     const s = App.state;
-    const a = asset ? JSON.parse(JSON.stringify(asset)) : { id: App.uid(), label: '', account: '218300', date: App.today(), value: 0, tvaRate: 20, duration: 3, supplier: '', paid: true };
+    const a = asset ? JSON.parse(JSON.stringify(asset)) : { id: App.uid(), label: '', account: '241000', date: App.today(), value: 0, tvaRate: 21, deductiblePct: 100, duration: 3, supplier: '', paid: true };
     App.modal({
       title: asset ? 'Modifier l\'immobilisation' : 'Nouvelle immobilisation',
       body: `<form class="form-grid" id="af">
         <label class="field full">Désignation <input name="label" value="${esc(a.label)}"></label>
         <label class="field full">Catégorie <select name="account">${App.options(App.ASSET_CATEGORIES.map((c) => [c.account, `${c.account} — ${c.label} (${c.duration} ans usuels)`]), a.account)}</select></label>
-        <label class="field">Date de mise en service <input type="date" name="date" value="${a.date}"></label>
+        <label class="field">Date d'acquisition <input type="date" name="date" value="${a.date}"></label>
         <label class="field">Fournisseur <input name="supplier" value="${esc(a.supplier || '')}"></label>
-        <label class="field">Valeur HT <input type="number" step="0.01" name="value" value="${a.value}"></label>
+        <label class="field">Valeur HTVA <input type="number" step="0.01" name="value" value="${a.value}"></label>
         <label class="field">TVA <select name="tvaRate">${App.tvaOptions(a.tvaRate)}</select></label>
+        <label class="field">TVA déductible (%) <input type="number" name="deductiblePct" min="0" max="100" value="${a.deductiblePct ?? 100}"></label>
         <label class="field">Durée (années) <input type="number" min="1" name="duration" value="${a.duration}"></label>
         <label class="check"><input type="checkbox" name="paid" ${a.paid !== false ? 'checked' : ''}> Payée</label>
+        <p class="full small muted">Véhicule : TVA déductible au maximum à 50 %. La TVA non déductible est intégrée à la valeur amortissable.</p>
       </form>`,
       footer: `${asset ? '<button class="btn danger" id="del">Supprimer</button>' : ''}<button class="btn" data-close>Annuler</button><button class="btn primary" id="ok">Enregistrer</button>`,
       onMount: (m, close) => {
         const f = $('#af', m);
-        f.account.onchange = () => { const c = App.ASSET_CATEGORIES.find((x) => x.account === f.account.value); if (c) f.duration.value = c.duration; };
+        f.account.onchange = () => { const c = App.ASSET_CATEGORIES.find((x) => x.account === f.account.value); if (c) f.duration.value = c.duration; f.deductiblePct.value = f.account.value === '245000' ? 50 : 100; };
         $('#ok', m).onclick = () => {
           Object.assign(a, App.formData(f));
           if (!a.label || !a.value) return App.toast('Désignation et valeur obligatoires', 'error');

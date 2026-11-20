@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ComptaPro</title>
-  <meta name="description" content="Comptabilité complète pour indépendants et petites entreprises : facturation, dépenses, banque, TVA, bilan de fin d'année et assistant IA.">
+  <title>ComptaPro Belgique</title>
+  <meta name="description" content="Comptabilité belge complète : facturation Peppol, dépenses, banque CODA, TVA Intervat, comptes annuels et assistant IA.">
   <meta name="theme-color" content="#2f5bea">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
@@ -13,19 +13,19 @@
 <body>
   <div class="layout">
     <aside class="sidebar">
-      <div class="brand"><div class="brand-logo">€</div>ComptaPro</div>
+      <div class="brand"><div class="brand-logo">€</div>ComptaPro <span class="badge" style="margin-left:2px">BE</span></div>
       <nav class="nav" id="nav">
         <a href="#/dashboard" data-route="dashboard"><span class="ico">◧</span>Tableau de bord</a>
         <div class="nav-section">Activité</div>
-        <a href="#/factures" data-route="factures"><span class="ico">🧾</span>Factures &amp; devis</a>
+        <a href="#/factures" data-route="factures"><span class="ico">🧾</span>Factures</a>
         <a href="#/clients" data-route="clients"><span class="ico">👥</span>Clients</a>
         <a href="#/depenses" data-route="depenses"><span class="ico">💳</span>Dépenses</a>
         <a href="#/banque" data-route="banque"><span class="ico">🏦</span>Banque <span class="pill" id="pill-bank" hidden></span></a>
         <a href="#/immobilisations" data-route="immobilisations"><span class="ico">🖥</span>Immobilisations</a>
         <div class="nav-section">Fiscalité &amp; clôture</div>
         <a href="#/tva" data-route="tva"><span class="ico">％</span>TVA</a>
-        <a href="#/journal" data-route="journal"><span class="ico">📒</span>Journal &amp; grand livre</a>
-        <a href="#/etats" data-route="etats"><span class="ico">📊</span>Bilan &amp; résultat</a>
+        <a href="#/journal" data-route="journal"><span class="ico">📒</span>Journaux</a>
+        <a href="#/etats" data-route="etats"><span class="ico">📊</span>Comptes annuels</a>
         <a href="#/cloture" data-route="cloture"><span class="ico">🔒</span>Clôture annuelle</a>
         <div class="nav-section">Intelligence</div>
         <a href="#/ia" data-route="ia"><span class="ico">✦</span>Assistant IA</a>
@@ -44,6 +44,7 @@
   <div class="toasts" id="toasts"></div>
   <div id="modal-root"></div>
 
+  <script src="vendor/qrcode.js"></script>
   <script src="js/store.js"></script>
   <script src="js/compta.js"></script>
   <script src="js/ui.js"></script>
