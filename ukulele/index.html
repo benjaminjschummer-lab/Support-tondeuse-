@@ -276,7 +276,7 @@ C                 G
       </div>
       <div class="songs" id="songs"></div>
       <p class="sync" id="sync"></p>
-      <p class="sync">Version 8</p>
+      <p class="sync">Version 9</p>
     </div>
   </section>
 
@@ -806,7 +806,10 @@ async function geminiModels(key) {
   return list;
 }
 async function chordsViaGemini(song, key) {
-  const models = await geminiModels(key);
+  let models = await geminiModels(key);
+  const good = store.get("gemGood", "");
+  if (good && models.includes(good)) models = [good, ...models.filter((m) => m !== good)];
+  const log = [];
   const prompt = chordPrompt(song) + "\nRéponds uniquement avec l'objet JSON demandé.";
   let last = null;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -822,11 +825,11 @@ async function chordsViaGemini(song, key) {
         const c = (j.candidates || [])[0];
         if (!c || !c.content) { last = { gemini: true, status: 0, message: "réponse vide" + (c && c.finishReason ? " (" + c.finishReason + ")" : "") }; schema = false; continue; }
         const txt = (c.content.parts || []).map((x) => x.text || "").join("");
-        try { return JSON.parse(txt.replace(/^```(?:json)?\s*|\s*```$/g, "")); }
+        try { const out = JSON.parse(txt.replace(/^```(?:json)?\s*|\s*```$/g, "")); store.set("gemGood", m); return out; }
         catch { last = { gemini: true, status: 0, message: "JSON illisible" }; schema = false; continue; }
       } catch (e) {
         if (!(e && e.gemini)) throw e;
-        last = e;
+        last = e; log.push(m.replace(/^gemini-/, "") + " : " + e.status + " " + String(e.message || "").slice(0, 60));
         if (e.status === 400 && /key/i.test(e.message)) throw e;
         if (e.status === 403) throw e;
         if (e.status === 404) break;                                   // model not available: next one
@@ -839,6 +842,7 @@ async function chordsViaGemini(song, key) {
     }
   }
   store.set("gemModels", null);
+  if (last && log.length) last.message = log.slice(-3).join(" | ");
   throw last || { gemini: true, status: 0, message: "aucun modèle disponible" };
 }
 
