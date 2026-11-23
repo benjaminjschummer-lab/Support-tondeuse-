@@ -276,7 +276,7 @@ C                 G
       </div>
       <div class="songs" id="songs"></div>
       <p class="sync" id="sync"></p>
-      <p class="sync">Version 10</p>
+      <p class="sync">Version 11</p>
     </div>
   </section>
 
@@ -741,6 +741,8 @@ async function addChords(song) {
   if (!getKey()) { setStatus("Paroles affichées. Ajoute ta clé gratuite dans Réglages pour avoir les accords.", "err"); $("settings").open = true; return; }
   const key = getKey(), gem = key.startsWith("AIza");
   setStatus((gem ? "Gemini" : "Claude") + " place les accords ukulélé sur les paroles… (10 à 40 s)", "", true);
+  toast("Reste sur cette page pendant que les accords arrivent");
+  let lock = null; try { lock = await navigator.wakeLock?.request("screen"); } catch {}
   try {
     song._err = "";
     const r = gem ? await chordsViaGemini(song, key) : await chordsViaClaude(song, key);
@@ -758,11 +760,14 @@ async function addChords(song) {
     persistLocal(); renderLibrary(); setStatus("");
     if (current && current.id === song.id) { const y = $("sheet").scrollTop; stop(); openSong(song.id); $("sheet").scrollTop = y; updateNow(true); }
     toast("Accords ukulélé ajoutés");
+    try { lock?.release(); } catch {}
   } catch (e) {
+    try { lock?.release(); } catch {}
     if (e && e.gemini) {
       const m = e.status === 429 ? "Quota gratuit Gemini atteint : réessaie dans une minute (ou demain si la limite du jour est atteinte)."
         : e.status === 400 && /key/i.test(e.message) ? "Clé Gemini refusée : vérifie-la dans Réglages."
         : e.status === 403 ? "Cette clé Gemini n'a pas accès à l'API : recrée-la sur aistudio.google.com."
+        : e.net ? "La connexion a été coupée (Safari mis en arrière-plan ?). Reste sur cette page et touche « Ajouter les accords »."
         : e.status >= 500 ? "Gemini est surchargé en ce moment (" + String(e.message || e.status).slice(0, 240) + "). Réessaie dans une minute." : "Impossible d'obtenir les accords (" + String(e.message || "erreur").slice(0, 240) + ").";
       failChords(song, m); return;
     }
@@ -808,6 +813,11 @@ async function geminiModels(key) {
   store.set("gemModels", { at: Date.now(), list });
   return list;
 }
+function waitVisible() {
+  if (!document.hidden) return new Promise((r) => setTimeout(r, 1000));
+  setStatus("Reviens sur Kanikapila pour continuer…", "", true);
+  return new Promise((r) => document.addEventListener("visibilitychange", function f() { if (!document.hidden) { document.removeEventListener("visibilitychange", f); r(); } }));
+}
 async function chordsViaGemini(song, key) {
   let models = await geminiModels(key);
   const good = store.get("gemGood", "");
@@ -817,12 +827,13 @@ async function chordsViaGemini(song, key) {
   let last = null;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   for (const m of models) {
-    let schema = true;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    let schema = true, think = true;
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         setStatus(attempt ? "Gemini est chargé, nouvel essai…" : "Gemini place les accords (" + m + ")…", "", true);
         const cfg = { responseMimeType: "application/json", temperature: 0.2 };
         if (schema) cfg.responseSchema = toGeminiSchema(CHORD_SCHEMA);
+        if (think) cfg.thinkingConfig = /gemini-2\./.test(m) ? { thinkingBudget: /lite/.test(m) ? 0 : 512 } : { thinkingLevel: "low" };
         const j = await gemFetch("models/" + m + ":generateContent", key, { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: cfg });
         if (j.promptFeedback && j.promptFeedback.blockReason) { setStatus("Gemini a refusé cette chanson.", "err"); return null; }
         const c = (j.candidates || [])[0];
@@ -831,12 +842,18 @@ async function chordsViaGemini(song, key) {
         try { const out = JSON.parse(txt.replace(/^```(?:json)?\s*|\s*```$/g, "")); store.set("gemGood", m); return out; }
         catch { last = { gemini: true, status: 0, message: "JSON illisible" }; schema = false; continue; }
       } catch (e) {
+        if (e instanceof TypeError) {                                   // connection cut (Safari in background, network change)
+          last = { gemini: true, status: 0, net: true, message: "connexion coupée" };
+          log.push(m.replace(/^gemini-/, "") + " : connexion coupée");
+          await waitVisible(); continue;
+        }
         if (!(e && e.gemini)) throw e;
         last = e; log.push(m.replace(/^gemini-/, "") + " : " + e.status + " " + String(e.message || "").slice(0, 60));
         if (e.status === 400 && /key/i.test(e.message)) throw e;
         if (e.status === 403) throw e;
         if (e.status === 404) break;                                   // model not available: next one
-        if (e.status === 400) { if (schema) { schema = false; continue; } break; }
+        if (e.status === 400 && think && /think/i.test(e.message)) { think = false; attempt--; continue; }
+        if (e.status === 400) { if (schema) { schema = false; continue; } if (think) { think = false; continue; } break; }
         if (e.status === 429 && /day|daily|per.?day/i.test(e.message)) break;
         // 429 per-minute or 5xx overloaded: wait, then retry (dropping the schema on the 2nd failure)
         if (e.status === 504) break;                                   // too slow: next model
