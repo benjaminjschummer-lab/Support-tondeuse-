@@ -276,7 +276,7 @@ C                 G
       </div>
       <div class="songs" id="songs"></div>
       <p class="sync" id="sync"></p>
-      <p class="sync">Version 11</p>
+      <p class="sync">Version 12</p>
     </div>
   </section>
 
@@ -764,7 +764,7 @@ async function addChords(song) {
   } catch (e) {
     try { lock?.release(); } catch {}
     if (e && e.gemini) {
-      const m = e.status === 429 ? "Quota gratuit Gemini atteint : réessaie dans une minute (ou demain si la limite du jour est atteinte)."
+      const m = e.status === 429 ? "Quota gratuit Gemini atteint (" + String(e.message || "").slice(0, 240) + ")."
         : e.status === 400 && /key/i.test(e.message) ? "Clé Gemini refusée : vérifie-la dans Réglages."
         : e.status === 403 ? "Cette clé Gemini n'a pas accès à l'API : recrée-la sur aistudio.google.com."
         : e.net ? "La connexion a été coupée (Safari mis en arrière-plan ?). Reste sur cette page et touche « Ajouter les accords »."
@@ -822,7 +822,7 @@ async function chordsViaGemini(song, key) {
   let models = await geminiModels(key);
   const good = store.get("gemGood", "");
   if (good && models.includes(good)) models = [good, ...models.filter((m) => m !== good)];
-  const log = [];
+  const log = [], t0 = Date.now();
   const prompt = chordPrompt(song) + "\nRéponds uniquement avec l'objet JSON demandé.";
   let last = null;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -830,7 +830,8 @@ async function chordsViaGemini(song, key) {
     let schema = true, think = true;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        setStatus(attempt ? "Gemini est chargé, nouvel essai…" : "Gemini place les accords (" + m + ")…", "", true);
+        if (Date.now() - t0 > 100000) throw last || { gemini: true, status: 0, message: "trop long" };
+        setStatus("Gemini place les accords (" + m.replace(/^gemini-/, "") + (attempt ? ", essai " + (attempt + 1) : "") + ")…", "", true);
         const cfg = { responseMimeType: "application/json", temperature: 0.2 };
         if (schema) cfg.responseSchema = toGeminiSchema(CHORD_SCHEMA);
         if (think) cfg.thinkingConfig = /gemini-2\./.test(m) ? { thinkingBudget: /lite/.test(m) ? 0 : 512 } : { thinkingLevel: "low" };
@@ -854,10 +855,12 @@ async function chordsViaGemini(song, key) {
         if (e.status === 404) break;                                   // model not available: next one
         if (e.status === 400 && think && /think/i.test(e.message)) { think = false; attempt--; continue; }
         if (e.status === 400) { if (schema) { schema = false; continue; } if (think) { think = false; continue; } break; }
-        if (e.status === 429 && /day|daily|per.?day/i.test(e.message)) break;
+        if (e.status === 429) break;                                   // quota: never hammer the same model
         // 429 per-minute or 5xx overloaded: wait, then retry (dropping the schema on the 2nd failure)
         if (e.status === 504) break;                                   // too slow: next model
-        if (attempt === 0) await wait(2000);
+        if (attempt >= 1) break;                                       // overloaded twice: next model
+        setStatus("Gemini surchargé (" + m.replace(/^gemini-/, "") + " : " + e.status + "), nouvel essai…", "", true);
+        await wait(3000);
       }
     }
   }
