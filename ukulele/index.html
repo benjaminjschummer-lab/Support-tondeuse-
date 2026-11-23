@@ -276,7 +276,7 @@ C                 G
       </div>
       <div class="songs" id="songs"></div>
       <p class="sync" id="sync"></p>
-      <p class="sync">Version 9</p>
+      <p class="sync">Version 10</p>
     </div>
   </section>
 
@@ -742,14 +742,17 @@ async function addChords(song) {
   const key = getKey(), gem = key.startsWith("AIza");
   setStatus((gem ? "Gemini" : "Claude") + " place les accords ukulélé sur les paroles… (10 à 40 s)", "", true);
   try {
+    song._err = "";
     const r = gem ? await chordsViaGemini(song, key) : await chordsViaClaude(song, key);
-    if (!r) return;
-    if (!r.known) { setStatus("L'IA ne connaît pas assez cette chanson pour donner ses accords. Les paroles restent affichées.", "err"); return; }
+    if (!r) { failChords(song, $("q-status").textContent); return; }
+    if (!r.known) { failChords(song, "L'IA dit ne pas connaître assez cette chanson pour donner ses accords."); return; }
     const ok = (c) => typeof c === "string" && U.isChord(c);
     song.chords = {
       intro: (r.intro || []).filter(ok).slice(0, 16), outro: (r.outro || []).filter(ok).slice(0, 16),
       lines: (r.lines || []).map((l) => ({ n: l.n | 0, chords: (l.chords || []).filter((x) => x && ok(x.c)).map((x) => ({ c: x.c, w: Math.max(0, x.w | 0) })) })).filter((l) => l.chords.length),
     };
+    const nChords = song.chords.intro.length + song.chords.outro.length + song.chords.lines.reduce((a, l) => a + l.chords.length, 0);
+    if (!nChords) { song.chords = null; failChords(song, "Réponse reçue mais sans accord utilisable (" + JSON.stringify(r).slice(0, 120) + ")"); return; }
     Object.assign(song, { bpm: Math.max(40, Math.min(220, r.bpm | 0 || 100)), strum: String(r.strum || "").slice(0, 40), key: String(r.key || "").slice(0, 10), ai: true, chordsBy: gem ? "Gemini" : "Claude", updated: Date.now() });
     song.text = structuredText(song);
     persistLocal(); renderLibrary(); setStatus("");
@@ -760,12 +763,12 @@ async function addChords(song) {
       const m = e.status === 429 ? "Quota gratuit Gemini atteint : réessaie dans une minute (ou demain si la limite du jour est atteinte)."
         : e.status === 400 && /key/i.test(e.message) ? "Clé Gemini refusée : vérifie-la dans Réglages."
         : e.status === 403 ? "Cette clé Gemini n'a pas accès à l'API : recrée-la sur aistudio.google.com."
-        : e.status >= 500 ? "Gemini est surchargé en ce moment (" + String(e.message || e.status).slice(0, 80) + "). Réessaie dans une minute." : "Impossible d'obtenir les accords (" + String(e.message || "erreur").slice(0, 80) + ").";
-      setStatus(m, "err"); toast("Accords pas encore disponibles"); retryNote(song); return;
+        : e.status >= 500 ? "Gemini est surchargé en ce moment (" + String(e.message || e.status).slice(0, 240) + "). Réessaie dans une minute." : "Impossible d'obtenir les accords (" + String(e.message || "erreur").slice(0, 240) + ").";
+      failChords(song, m); return;
     }
-    if (e instanceof TypeError) { setStatus("Pas de connexion au service d'IA.", "err"); return; }
-    if (e instanceof SyntaxError) { setStatus("Réponse illisible, réessaie.", "err"); return; }
-    claudeError(e);
+    if (e instanceof TypeError) { failChords(song, "Pas de connexion au service d'IA (" + e.message + ")."); return; }
+    if (e instanceof SyntaxError) { failChords(song, "Réponse illisible, réessaie."); return; }
+    claudeError(e); failChords(song, $("q-status").textContent);
   }
 }
 
@@ -846,6 +849,11 @@ async function chordsViaGemini(song, key) {
   throw last || { gemini: true, status: 0, message: "aucun modèle disponible" };
 }
 
+function failChords(song, msg) {
+  song._err = msg || "Échec sans message.";
+  setStatus(song._err, "err"); toast("Accords pas ajoutés : voir le message");
+  if (current && current.id === song.id) openSongInfo(song);
+}
 function retryNote(song) {
   const b = document.createElement("button"); b.className = "btn"; b.type = "button"; b.textContent = "Réessayer les accords";
   b.style.marginLeft = "8px"; b.onclick = () => addChords(song);
@@ -1052,6 +1060,7 @@ function openSongInfo(s) {
       const b = document.createElement("button"); b.className = "btn primary"; b.type = "button"; b.textContent = "Ajouter les accords"; b.id = "chord-btn";
       b.style.padding = "4px 10px"; b.onclick = () => { b.disabled = true; b.textContent = "Accords en cours…"; addChords(s).finally(() => { if (current && current.id === s.id) openSongInfo(s); }); };
       info.append(b);
+      if (s._err) { const er = document.createElement("span"); er.style.cssText = "flex-basis:100%;color:#D9534F;font-weight:700"; er.textContent = "Erreur : " + s._err; info.append(er); }
     }
   } else if (s.ai) {
     const add = (k, v) => { const sp = document.createElement("span"); sp.append(k + " "); const b = document.createElement("b"); b.textContent = v; sp.append(b); info.append(sp); };
