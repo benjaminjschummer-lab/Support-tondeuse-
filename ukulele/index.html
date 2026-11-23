@@ -80,6 +80,11 @@ button { cursor: pointer; }
 .line.chordsonly .ch { font-size: 1.05em; padding-right: 1.1em; }
 .ch[data-dots]::after { content: attr(data-dots); display: block; font-family: var(--f-body); font-size: .5em; letter-spacing: .25em; color: var(--muted); line-height: 1; margin-top: -1px; }
 .info { font-size: 13px; color: var(--muted); padding-block: 6px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; gap: 6px 14px; flex-wrap: wrap; }
+.line[data-t] { cursor: pointer; }
+.install { border-top: 1px solid var(--line); padding-top: 10px; }
+.keyrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.keyrow input { flex: 1; min-width: 200px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); padding: 10px 12px; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+.hint a { color: var(--accent); font-weight: 700; }
 .info b { color: var(--ink); font-family: var(--f-display); letter-spacing: .04em; }
 
 /* editor */
@@ -223,6 +228,15 @@ button { cursor: pointer; }
         <button class="btn primary" id="q-go" type="submit">Chercher</button>
       </form>
       <p class="status" id="q-status"></p>
+      <details class="install" id="settings" hidden>
+        <summary style="cursor:pointer;font-weight:700;color:var(--accent)">Réglages : clé API Anthropic (pour les accords)</summary>
+        <p class="hint" style="margin-top:10px">Les paroles viennent de LRCLIB (base de paroles synchronisées alimentée par ses utilisateurs). Les accords sont placés par Claude avec ta propre clé API : crée-la sur <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com ↗</a>. Compte environ 3 à 6 centimes par nouvelle chanson ; fixe une limite de dépense dans la console. La clé reste dans ce navigateur et n'est envoyée qu'à api.anthropic.com.</p>
+        <div class="keyrow">
+          <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" aria-label="Clé API Anthropic">
+          <button class="btn primary" id="key-save" type="button">Enregistrer</button>
+          <button class="btn" id="key-clear" type="button">Effacer</button>
+        </div>
+      </details>
       <div class="row">
         <button class="btn" id="new-song">+ Ajouter à la main</button>
         <div class="settings">
@@ -618,7 +632,7 @@ async function searchSong(q) {
   q = q.trim(); if (!q) return;
   const known = songs.find((s) => s.query === q.toLowerCase() || (s.title + " " + s.artist).toLowerCase() === q.toLowerCase());
   if (known) { setStatus(""); openSong(known.id); return; }
-  if (!sample) { setStatus("La recherche marche dans Kanikapila ouvert depuis claude.ai.", "err"); return; }
+  if (!sample) { if (!window.claude) searchLyrics(q); else setStatus("Recherche indisponible ici : autorise Kanikapila à interroger Claude.", "err"); return; }
   searching?.abort(); searching = new AbortController();
   $("q-go").disabled = true; setStatus(`Recherche de « ${q} »…`, "", true);
   let seen = false;
@@ -643,6 +657,178 @@ async function searchSong(q) {
     setStatus(code === "not_granted" ? "Autorise Kanikapila à interroger Claude pour utiliser la recherche." : code === "rate_limited" ? "Trop de recherches d'un coup : réessaie dans un moment." : "La recherche a échoué, réessaie.", "err");
   } finally { $("q-go").disabled = false; }
 }
+/* ---------- standalone mode: lyrics from LRCLIB + chords from Claude (user's own API key) ---------- */
+const MODEL = "claude-opus-5-5";
+const getKey = () => { try { return localStorage.getItem("kanikapila.apikey") || ""; } catch { return ""; } };
+function setKey(k) { try { k ? localStorage.setItem("kanikapila.apikey", k) : localStorage.removeItem("kanikapila.apikey"); } catch {} }
+$("api-key").value = getKey() ? "••••••••••••" : "";
+$("key-save").onclick = () => {
+  const v = $("api-key").value.trim();
+  if (!/^sk-ant-/.test(v)) { toast("Colle une clé qui commence par sk-ant-"); return; }
+  setKey(v); $("api-key").value = "••••••••••••"; toast("Clé enregistrée sur cet appareil");
+  const pending = current && current.lyrics && !current.chords ? current : null;
+  if (pending) addChords(pending);
+};
+$("key-clear").onclick = () => { setKey(""); $("api-key").value = ""; toast("Clé effacée"); };
+$("api-key").onfocus = () => { if ($("api-key").value.startsWith("•")) $("api-key").value = ""; };
+
+let sdkLoading = null;
+function loadSdk() {
+  if (window.Anthropic) return Promise.resolve(window.Anthropic);
+  return sdkLoading || (sdkLoading = new Promise((res, rej) => {
+    const sc = document.createElement("script"); sc.src = "vendor/anthropic-sdk-1.6.0.js";
+    sc.onload = () => res(window.Anthropic); sc.onerror = () => { sdkLoading = null; rej(new Error("sdk")); };
+    document.head.append(sc);
+  }));
+}
+function parseLrc(item) {
+  const out = [];
+  if (item.syncedLyrics) {
+    for (const raw of item.syncedLyrics.split("\n")) {
+      const tags = [...raw.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+      if (!tags.length) continue;
+      const text = raw.replace(/\[\d+:\d+(?:\.\d+)?\]/g, "").trim();
+      for (const m of tags) out.push({ t: +m[1] * 60 + +m[2], text });
+    }
+    out.sort((a, b) => a.t - b.t);
+  } else {
+    for (const raw of (item.plainLyrics || "").split("\n")) out.push({ t: null, text: raw.trim() });
+  }
+  while (out.length && !out[0].text) out.shift();
+  return out;
+}
+const CHORD_SCHEMA = {
+  type: "object", additionalProperties: false, required: ["known", "key", "bpm", "strum", "intro", "lines", "outro"],
+  properties: {
+    known: { type: "boolean" }, key: { type: "string" }, bpm: { type: "integer" }, strum: { type: "string" },
+    intro: { type: "array", items: { type: "string" } }, outro: { type: "array", items: { type: "string" } },
+    lines: { type: "array", items: { type: "object", additionalProperties: false, required: ["n", "chords"], properties: {
+      n: { type: "integer" },
+      chords: { type: "array", items: { type: "object", additionalProperties: false, required: ["c", "w"], properties: { c: { type: "string" }, w: { type: "integer" } } } },
+    } } },
+  },
+};
+function chordPrompt(song) {
+  const numbered = song.lyrics.map((l, i) => (l.text ? i + ": " + l.text : null)).filter(Boolean).join("\n");
+  return `Tu écris des grilles d'accords pour ukulélé (accordage G C E A).
+Chanson : « ${song.title} » de ${song.artist || "artiste inconnu"}${song.duration ? ` (durée ${Math.round(song.duration)} s)` : ""}.
+Ses paroles, une ligne par numéro :
+<paroles>
+${numbered}
+</paroles>
+
+Donne les accords de cette chanson tels qu'on les joue couramment, dans la tonalité originale, en notation anglaise (Am, F#m7, Bb, Csus4).
+- lines : pour chaque ligne où un accord commence, n = numéro de la ligne et chords = les accords dans l'ordre, avec w = index du mot de la ligne (à partir de 0) sur lequel l'accord tombe. Répète l'accord en cours au début de chaque nouvelle partie (couplet, refrain).
+- intro : accords joués avant la première ligne chantée. outro : accords après la dernière.
+- bpm : tempo de la chanson. strum : rythmique au ukulélé avec B (bas) et H (haut), ex. "B B H H B H".
+- Ta réponse ne contient que des numéros, des index et des accords : ne recopie aucune parole.
+- known = false (et listes vides) si tu ne connais pas assez cette chanson pour donner ses vrais accords.`;
+}
+async function addChords(song) {
+  if (!getKey()) { setStatus("Paroles affichées. Ajoute ta clé API dans Réglages pour avoir les accords.", "err"); $("settings").open = true; return; }
+  setStatus("Claude place les accords ukulélé sur les paroles… (20 à 40 s)", "", true);
+  try {
+    const Anthropic = await loadSdk();
+    const client = new Anthropic({ apiKey: getKey(), dangerouslyAllowBrowser: true, timeout: 180000 });
+    const resp = await client.beta.messages.create({
+      model: MODEL, max_tokens: 16000,
+      betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
+      output_config: { effort: "medium", format: { type: "json_schema", schema: CHORD_SCHEMA } },
+      messages: [{ role: "user", content: chordPrompt(song) }],
+    });
+    if (resp.stop_reason === "refusal") { setStatus("Claude a refusé de traiter cette chanson.", "err"); return; }
+    if (resp.stop_reason === "max_tokens") { setStatus("Réponse trop longue, réessaie.", "err"); return; }
+    const txt = resp.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    const r = JSON.parse(txt);
+    if (!r.known) { setStatus("Claude ne connaît pas assez cette chanson pour donner ses accords. Les paroles restent affichées.", "err"); return; }
+    const ok = (c) => typeof c === "string" && U.isChord(c);
+    song.chords = {
+      intro: (r.intro || []).filter(ok).slice(0, 16), outro: (r.outro || []).filter(ok).slice(0, 16),
+      lines: (r.lines || []).map((l) => ({ n: l.n | 0, chords: (l.chords || []).filter((x) => ok(x.c)).map((x) => ({ c: x.c, w: Math.max(0, x.w | 0) })) })).filter((l) => l.chords.length),
+    };
+    Object.assign(song, { bpm: Math.max(40, Math.min(220, r.bpm | 0 || 100)), strum: String(r.strum || "").slice(0, 40), key: String(r.key || "").slice(0, 10), ai: true, updated: Date.now() });
+    song.text = structuredText(song);
+    persistLocal(); renderLibrary(); setStatus("");
+    if (current && current.id === song.id) { const y = $("sheet").scrollTop; stop(); openSong(song.id); $("sheet").scrollTop = y; updateNow(true); }
+    toast("Accords ukulélé ajoutés");
+  } catch (e) {
+    const A = window.Anthropic, st = e && e.status;
+    let m = "Impossible d'obtenir les accords, réessaie.";
+    if (A && e instanceof A.AuthenticationError) m = "Clé API refusée : vérifie-la dans Réglages.";
+    else if (A && e instanceof A.PermissionDeniedError) m = "Cette clé n'a pas accès au modèle : vérifie ton compte Anthropic.";
+    else if (A && e instanceof A.RateLimitError) m = "Trop de demandes : réessaie dans une minute.";
+    else if (A && e instanceof A.BadRequestError) m = "Demande refusée par l'API" + (/credit|billing/i.test(e.message) ? " : crédit épuisé sur ton compte Anthropic." : ".");
+    else if (A && e instanceof A.APIConnectionError) m = "Pas de connexion à l'API Anthropic.";
+    else if (st >= 500) m = "Le service Anthropic est indisponible, réessaie plus tard.";
+    else if (e instanceof SyntaxError) m = "Réponse illisible, réessaie.";
+    setStatus(m, "err");
+  }
+}
+async function searchLyrics(q) {
+  searching?.abort(); searching = new AbortController();
+  $("q-go").disabled = true; setStatus(`Recherche des paroles de « ${q} »…`, "", true);
+  try {
+    const r = await fetch("https://lrclib.net/api/search?q=" + encodeURIComponent(q), { signal: searching.signal });
+    if (!r.ok) throw new Error("http " + r.status);
+    const list = (await r.json()).filter((x) => !x.instrumental && (x.syncedLyrics || x.plainLyrics));
+    if (!list.length) { setStatus(`Aucune parole trouvée pour « ${q} ». Essaie avec le titre et l'artiste.`, "err"); return; }
+    const best = list.find((x) => x.syncedLyrics) || list[0];
+    const song = { id: "u-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      title: String(best.trackName || q).slice(0, 120), artist: String(best.artistName || "").slice(0, 120),
+      duration: +best.duration || 0, lyrics: parseLrc(best), lrclib: best.id, chords: null, query: q.toLowerCase(), updated: Date.now() };
+    song.text = structuredText(song);
+    songs.push(song); persistLocal(); renderLibrary(); $("q").value = "";
+    openSong(song.id);
+    $("q-go").disabled = false;
+    await addChords(song);
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    setStatus("Recherche impossible : vérifie ta connexion internet.", "err");
+  } finally { $("q-go").disabled = false; }
+}
+// Lyrics + chord positions -> lines the player renders (each chord carries its time when lyrics are synced).
+function structuredLines(song) {
+  const out = [], L = song.lyrics, ch = song.chords || { intro: [], outro: [], lines: [] };
+  const byN = new Map(ch.lines.map((l) => [l.n, l.chords]));
+  const synced = L.length && L[0].t != null;
+  const end = song.duration || (synced ? L[L.length - 1].t + 8 : 0);
+  const firstT = synced ? L.find((l) => l.text)?.t ?? 0 : 0;
+  const spread = (list, a, b) => list.map((c, i) => ({ chord: c, text: "", time: synced ? a + ((b - a) * i) / list.length : null }));
+  if (ch.intro.length) { out.push({ type: "section", text: "Intro" }); out.push({ type: "line", chordsOnly: true, t: synced ? 0 : null, segs: spread(ch.intro, 0, firstT) }); }
+  else if (synced && firstT > 3) out.push({ type: "line", t: 0, segs: [{ chord: null, text: "♪" }] });
+  L.forEach((l, i) => {
+    if (!l.text) { if (out.length && out[out.length - 1].type !== "gap") out.push({ type: "gap" }); return; }
+    const nextT = synced ? (L[i + 1] ? L[i + 1].t : end) : null;
+    const toks = l.text.split(/(\s+)/).filter((x) => x !== "");
+    const nWords = toks.filter((x) => !/^\s+$/.test(x)).length || 1;
+    const chords = (byN.get(i) || []).map((x) => ({ c: x.c, w: Math.min(x.w, nWords - 1) })).sort((a, b) => a.w - b.w);
+    const segs = []; let cur = { chord: null, text: "", time: null }, w = 0, k = 0;
+    const timeAt = (wi) => (synced ? l.t + ((nextT - l.t) * wi) / nWords : null);
+    for (const tok of toks) {
+      if (!/^\s+$/.test(tok)) {
+        const here = []; while (k < chords.length && chords[k].w === w) here.push(chords[k++]);
+        here.forEach((x, j) => {
+          if (cur.chord || cur.text) segs.push(cur);
+          cur = { chord: x.c, text: "", time: timeAt(w + j / here.length) };
+        });
+        w++;
+      }
+      cur.text += tok;
+    }
+    segs.push(cur);
+    out.push({ type: "line", t: synced ? l.t : null, segs: segs.filter((x) => x.chord || x.text) });
+  });
+  if (ch.outro.length) {
+    const lastT = synced ? Math.min(end, (L[L.length - 1]?.t ?? 0) + 4) : 0;
+    out.push({ type: "section", text: "Outro" });
+    out.push({ type: "line", chordsOnly: true, t: synced ? lastT : null, segs: spread(ch.outro, lastT, Math.max(lastT + 4, end)) });
+  }
+  return out;
+}
+function structuredText(song) {
+  return structuredLines(song).map((l) => l.type === "gap" ? "" : l.type === "section" ? "[" + l.text + "]" : l.segs.map((x) => (x.chord ? "[" + x.chord + "]" : "") + x.text).join("")).join("\n");
+}
+
 async function saveRemote(song) {
   if (db && uid) try { await db.collection("data/users/" + uid).doc(song.id).set(song); } catch { setSync("Enregistrée sur cet appareil seulement"); }
 }
@@ -656,7 +842,7 @@ function renderLibrary() {
     const meta = document.createElement("div"); meta.className = "meta";
     const t = document.createElement("div"); t.className = "t"; t.textContent = s.title || "Sans titre";
     const a = document.createElement("div"); a.className = "a"; a.textContent = s.artist || "";
-    if (s.builtin || s.ai) { const tg = document.createElement("span"); tg.className = "tag"; tg.textContent = s.builtin ? "Exemple" : "♩ " + s.bpm; a.append(" ", tg); }
+    if (s.builtin || s.ai || s.lyrics) { const tg = document.createElement("span"); tg.className = "tag"; tg.textContent = s.builtin ? "Exemple" : s.lyrics ? (s.chords ? "Paroles + accords" : "Paroles") : "♩ " + s.bpm; a.append(" ", tg); }
     const chips = document.createElement("div"); chips.className = "chips";
     songChords(parseSong(s.text)).slice(0, 8).forEach((c) => { const sp = document.createElement("span"); sp.className = "chip"; sp.textContent = U.chordName(c, songPrefs(s.id).transpose, notation); chips.append(sp); });
     meta.append(t, a, chips);
@@ -695,7 +881,7 @@ $("ed-save").onclick = async () => {
   const id = editingId || "u-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const prev = songs.find((x) => x.id === id);
   const song = Object.assign({}, prev || {}, { id, title: $("ed-t").value.trim() || "Sans titre", artist: $("ed-a").value.trim(), text, updated: Date.now() });
-  if (prev && prev.text !== text) { delete song.beats; delete song.bpm; }
+  if (prev && prev.text !== text) { delete song.beats; delete song.bpm; delete song.lyrics; delete song.chords; }
   const i = songs.findIndex((s) => s.id === id);
   if (i >= 0) songs[i] = song; else songs.push(song);
   persistLocal(); $("editor").hidden = true; renderLibrary(); openSong(id);
@@ -715,6 +901,7 @@ function persistLocal() { store.set("songs", songs); }
 function setSync(t) { $("sync").textContent = t; }
 
 /* ---------- player ---------- */
+let lyricMode = false, syncLines = [], chordTimes = [], songT = 0;
 let tempo = null, chordDoc = [], beatPos = 0, forced = -1, lastBeat = -1;
 let chordEls = [], lineEls = [], playing = false, lastT = 0, acc = 0, raf = 0, curIdx = -1, wake = null;
 
@@ -726,7 +913,15 @@ function openSong(id) {
   const p = songPrefs(id); $("dur").value = p.dur || "";
   if (s.bpm && !p.bpm) p.bpm = s.bpm;
   const info = $("info"); info.replaceChildren(); info.hidden = !s.ai;
-  if (s.ai) {
+  if (s.lyrics) {
+    info.hidden = false;
+    const add = (k, v) => { const sp = document.createElement("span"); sp.append(k + " "); const b = document.createElement("b"); b.textContent = v; sp.append(b); info.append(sp); };
+    if (s.strum) add("Rythmique", s.strum);
+    if (s.key) add("Tonalité", s.key);
+    const n = document.createElement("span");
+    n.textContent = (s.lyrics[0]?.t != null ? "Paroles synchronisées (LRCLIB)" : "Paroles (LRCLIB)") + (s.chords ? " · accords placés par Claude, vérifie à l'oreille" : " · accords en attente");
+    info.append(n);
+  } else if (s.ai) {
     const add = (k, v) => { const sp = document.createElement("span"); sp.append(k + " "); const b = document.createElement("b"); b.textContent = v; sp.append(b); info.append(sp); };
     if (s.strum) add("Rythmique", s.strum);
     add("Tempo", "♩ " + s.bpm); add("Mesure", (s.bpb || 4) + " temps");
@@ -737,7 +932,7 @@ function openSong(id) {
 function renderSheet() {
   if (!current) return;
   const p = songPrefs(current.id);
-  const parsed = parseSong(current.text);
+  const parsed = current.lyrics ? structuredLines(current) : parseSong(current.text);
   const inner = $("sheet-inner"); inner.replaceChildren();
   let chordCount = 0;
   const tempoBeats = current.beats && current.bpm ? current.beats : null;
@@ -746,6 +941,7 @@ function renderSheet() {
     if (l.type === "gap") { const g = document.createElement("div"); g.className = "gap"; inner.append(g); continue; }
     if (l.type === "section") { const h = document.createElement("div"); h.className = "section"; h.textContent = l.text; inner.append(h); continue; }
     const d = document.createElement("div"); d.className = "line";
+    if (l.t != null) { d.dataset.t = l.t; d.addEventListener("click", (e) => { if (!e.target.closest(".ch")) seekLine(+d.dataset.t); }); }
     const has = l.segs.some((s) => s.chord);
     if (!has) d.classList.add("nochords"); else if (l.chordsOnly) d.classList.add("chordsonly");
     for (const s of l.segs) {
@@ -755,7 +951,7 @@ function renderSheet() {
         const ch = U.parseChord(s.chord);
         const b = document.createElement("button"); b.className = "ch"; b.type = "button";
         b.textContent = U.chordName(ch, p.transpose, notation);
-        b._ch = ch; b.onclick = () => openChord(ch);
+        b._ch = ch; b._time = s.time; b.onclick = () => openChord(ch);
         if (tempoBeats) { const nb = tempoBeats[chordCount] || 0; if (nb) b.dataset.dots = "•".repeat(Math.min(nb, 8)); }
         chordCount++;
         c.append(b);
@@ -779,8 +975,10 @@ function renderSheet() {
   }
   tempo = tempoBeats && chordCount === tempoBeats.length ? { beats: tempoBeats, starts: [] } : null;
   if (tempo) { let acc2 = 0; for (const n of tempo.beats) { tempo.starts.push(acc2); acc2 += n; } tempo.total = acc2; }
-  $("sp-k").textContent = tempo ? "Tempo" : "Vitesse"; $("dur").parentElement.hidden = !!tempo;
-  $("sp-v").textContent = tempo ? p.bpm : p.speed; $("tr-v").textContent = (p.transpose > 0 ? "+" : "") + p.transpose;
+  lyricMode = !tempo && !!current.lyrics && current.lyrics[0]?.t != null;
+  if (!p.rate) p.rate = 100;
+  $("sp-k").textContent = tempo ? "Tempo" : "Vitesse"; $("dur").parentElement.hidden = !!tempo || lyricMode;
+  $("sp-v").textContent = tempo ? p.bpm : lyricMode ? p.rate + "%" : p.speed; $("tr-v").textContent = (p.transpose > 0 ? "+" : "") + p.transpose;
   measure(); curIdx = -2; updateNow(true);
 }
 function measure() {
@@ -804,6 +1002,8 @@ function measure() {
     }
   }
   chordDoc = chordEls.slice();
+  syncLines = lineEls.filter((L) => L.e.dataset.t !== undefined).map((L) => ({ top: L.top, t: +L.e.dataset.t }));
+  chordTimes = chordDoc.map((c) => (c.b._time == null ? null : c.b._time));
   chordEls.sort((a, b) => a.pos - b.pos);
 }
 function guideY() { const s = $("sheet"); return s.scrollTop + s.clientHeight * 0.28 + fs * 1.2; }
@@ -812,6 +1012,7 @@ function updateNow(force) {
   let idx = -1;
   for (let i = 0; i < chordEls.length; i++) { if (chordEls[i].pos <= gy) idx = i; else break; }
   if (forced >= 0 && chordDoc[forced]) idx = chordEls.indexOf(chordDoc[forced]);
+  else if (lyricMode && playing) idx = -1;
   if (idx === -1 && chordEls.length && !playing) idx = -1;
   if (idx !== curIdx || force) {
     if (chordEls[curIdx]) chordEls[curIdx].b.classList.remove("cur");
@@ -851,6 +1052,15 @@ function tick(t) {
   if (!playing) return;
   const dt = Math.min(0.1, (t - lastT) / 1000); lastT = t;
   const sheet = $("sheet");
+  if (lyricMode) {
+    songT += dt * (songPrefs(current.id).rate || 100) / 100;
+    const end = current.duration || (syncLines.length ? syncLines[syncLines.length - 1].t + 8 : 0);
+    if (songT >= end) { stop(); toast("Fin de la chanson"); return; }
+    sheet.scrollTop = lyricY(songT) - sheet.clientHeight * 0.28 - fs * 0.2;
+    let ci = -1; for (let j = 0; j < chordTimes.length; j++) if (chordTimes[j] != null && chordTimes[j] <= songT) ci = j;
+    if (forced !== ci) { forced = ci; updateNow(true); }
+    raf = requestAnimationFrame(tick); return;
+  }
   if (tempo) {
     const bpm = songPrefs(current.id).bpm || current.bpm;
     beatPos += dt * bpm / 60;
@@ -873,7 +1083,14 @@ let countTimer = 0;
 async function start() {
   if (!current) return;
   audio();
-  if (tempo) {
+  if (lyricMode) {
+    const gy = guideY();
+    let t0 = 0; for (const L of syncLines) if (L.top <= gy - fs * 1.2 + 2) t0 = L.t;
+    songT = $("sheet").scrollTop < 4 ? 0 : t0; forced = -1;
+    playing = true; setPlayIcon(); let n = 3; $("count").hidden = false; $("count").textContent = n;
+    await new Promise((res) => { countTimer = setInterval(() => { n--; if (n <= 0 || !playing) { clearInterval(countTimer); res(); } else $("count").textContent = n; }, 700); });
+    $("count").hidden = true; if (!playing) return;
+  } else if (tempo) {
     const start = curIdx >= 0 ? chordDoc.indexOf(chordEls[curIdx]) : 0;
     beatPos = tempo.starts[Math.max(0, start)] || 0; if (beatPos >= tempo.total) beatPos = 0;
     forced = -1; lastBeat = Math.floor(beatPos) - 1;
@@ -889,6 +1106,19 @@ async function start() {
   playing = true; setPlayIcon(); $("sheet").classList.add("playing");
   lastT = performance.now(); acc = 0; raf = requestAnimationFrame(tick);
   try { wake = await navigator.wakeLock?.request("screen"); } catch {}
+}
+function lyricY(t) {
+  if (!syncLines.length) return 0;
+  let i = 0; while (i + 1 < syncLines.length && syncLines[i + 1].t <= t) i++;
+  const a = syncLines[i], b = syncLines[i + 1];
+  if (t < a.t) return a.top;
+  const f = b && b.t > a.t ? Math.min(1, (t - a.t) / (b.t - a.t)) : 0;
+  return a.top + (b ? (b.top - a.top) * f : 0);
+}
+function seekLine(t) {
+  if (!lyricMode) return;
+  songT = t;
+  if (!playing) { $("sheet").scrollTop = lyricY(t) - $("sheet").clientHeight * 0.28 - fs * 0.2; updateNow(true); }
 }
 let metro = store.get("metro", true);
 function click(accent) {
@@ -915,8 +1145,9 @@ function bump(key, d, lo, hi) {
   else { const y = $("sheet").scrollTop; renderSheet(); $("sheet").scrollTop = y; renderLibrary(); }
 }
 function bumpBpm(d) { const p = songPrefs(current.id); p.bpm = Math.max(40, Math.min(220, (p.bpm || current.bpm) + d)); savePrefs(); $("sp-v").textContent = p.bpm; }
-$("sp-dn").onclick = () => tempo ? bumpBpm(-4) : bump("speed", -1, 1, 20);
-$("sp-up").onclick = () => tempo ? bumpBpm(4) : bump("speed", 1, 1, 20);
+function bumpRate(d) { const p = songPrefs(current.id); p.rate = Math.max(50, Math.min(150, (p.rate || 100) + d)); savePrefs(); $("sp-v").textContent = p.rate + "%"; }
+$("sp-dn").onclick = () => tempo ? bumpBpm(-4) : lyricMode ? bumpRate(-5) : bump("speed", -1, 1, 20);
+$("sp-up").onclick = () => tempo ? bumpBpm(4) : lyricMode ? bumpRate(5) : bump("speed", 1, 1, 20);
 $("tr-dn").onclick = () => bump("transpose", -1, -11, 11);
 $("tr-up").onclick = () => bump("transpose", 1, -11, 11);
 function setFs(v) { const sheet = $("sheet"); const r = sheet.scrollTop / Math.max(1, sheet.scrollHeight); fs = Math.max(14, Math.min(40, v)); store.set("fs", fs); renderSheet(); sheet.scrollTop = r * sheet.scrollHeight; }
@@ -1060,7 +1291,7 @@ else showView(["chansons", "accordeur"].includes(startView) ? startView : "chans
 if (fs !== 21) document.documentElement.style.setProperty("--fs", fs + "px");
 
 (async () => {
-  if (!window.claude?.use) { setStatus("La recherche marche dans Kanikapila ouvert depuis claude.ai. Ici, ajoute tes chansons à la main."); return; }
+  if (!window.claude?.use) { $("settings").hidden = false; return; }
   try { sample = await window.claude.use("sample"); } catch {}
   if (!sample) setStatus("Recherche indisponible ici : ajoute tes chansons à la main.");
 })();
