@@ -7,14 +7,16 @@
    (Sur un compte gratuit, GitHub Pages demande un dépôt public.)
 2. Après 1 à 2 minutes, ouvre `https://<ton-utilisateur>.github.io/Support-tondeuse-/ukulele/`
    et ajoute la page à l'écran d'accueil de ton téléphone.
-3. Dans **Réglages**, colle ta clé API Anthropic (console.anthropic.com → API Keys).
-   Elle reste dans ton navigateur et n'est envoyée qu'à api.anthropic.com.
+3. Dans **Réglages**, colle une **clé Gemini gratuite** (aistudio.google.com/apikey → Create API key, sans carte
+   bancaire ; elle commence par `AIza`). Une clé Anthropic payante (`sk-ant-…`) marche aussi.
+   La clé reste dans ton navigateur et n'est envoyée qu'au service d'IA correspondant.
 
 Quand tu cherches une chanson :
 - les **paroles synchronisées** viennent de [LRCLIB](https://lrclib.net) (base libre alimentée par ses utilisateurs,
   sans licence des ayants droit : usage personnel) ;
-- **Claude Opus 5.5** place les accords sur les mots (environ 3 à 6 centimes par nouvelle chanson), avec repli
-  automatique sur un autre modèle si la demande est refusée ;
+- l'IA place les accords sur les mots : **Gemini Flash** (gratuit, quota quotidien ; sur l'offre gratuite Google peut
+  utiliser les demandes pour améliorer ses modèles), ou **Claude Opus 5.5** avec une clé Anthropic (3 à 6 centimes
+  par chanson, repli automatique sur un autre modèle si la demande est refusée) ;
 - la lecture suit le minutage des paroles ; touche une ligne pour y sauter, ajuste la vitesse en %.
 
 ## Version claude.ai

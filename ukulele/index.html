@@ -229,10 +229,10 @@ button { cursor: pointer; }
       </form>
       <p class="status" id="q-status"></p>
       <details class="install" id="settings" hidden>
-        <summary style="cursor:pointer;font-weight:700;color:var(--accent)">Réglages : clé API Anthropic (pour les accords)</summary>
-        <p class="hint" style="margin-top:10px">Les paroles viennent de LRCLIB (base de paroles synchronisées alimentée par ses utilisateurs). Les accords sont placés par Claude avec ta propre clé API : crée-la sur <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com ↗</a>. Compte environ 3 à 6 centimes par nouvelle chanson ; fixe une limite de dépense dans la console. La clé reste dans ce navigateur et n'est envoyée qu'à api.anthropic.com.</p>
+        <summary style="cursor:pointer;font-weight:700;color:var(--accent)">Réglages : clé gratuite pour les accords</summary>
+        <p class="hint" style="margin-top:10px">Les paroles viennent de LRCLIB (gratuit, sans clé). Pour placer les accords, colle une <b>clé Gemini gratuite</b> : va sur <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey ↗</a>, connecte-toi avec ton compte Google, touche « Create API key » et copie la clé (elle commence par AIza). Sans carte bancaire. Sur l'offre gratuite, Google peut utiliser les demandes (titre et paroles) pour améliorer ses modèles. Une clé Anthropic payante (sk-ant-…) marche aussi. La clé reste dans ce navigateur.</p>
         <div class="keyrow">
-          <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" aria-label="Clé API Anthropic">
+          <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" aria-label="Clé API pour les accords">
           <button class="btn primary" id="key-save" type="button">Enregistrer</button>
           <button class="btn" id="key-clear" type="button">Effacer</button>
         </div>
@@ -664,7 +664,7 @@ function setKey(k) { try { k ? localStorage.setItem("kanikapila.apikey", k) : lo
 $("api-key").value = getKey() ? "••••••••••••" : "";
 $("key-save").onclick = () => {
   const v = $("api-key").value.trim();
-  if (!/^sk-ant-/.test(v)) { toast("Colle une clé qui commence par sk-ant-"); return; }
+  if (!/^(sk-ant-|AIza)/.test(v)) { toast("Colle une clé Gemini (AIza…) ou Anthropic (sk-ant-…)"); return; }
   setKey(v); $("api-key").value = "••••••••••••"; toast("Clé enregistrée sur cet appareil");
   const pending = current && current.lyrics && !current.chords ? current : null;
   if (pending) addChords(pending);
@@ -725,33 +725,112 @@ Donne les accords de cette chanson tels qu'on les joue couramment, dans la tonal
 - known = false (et listes vides) si tu ne connais pas assez cette chanson pour donner ses vrais accords.`;
 }
 async function addChords(song) {
-  if (!getKey()) { setStatus("Paroles affichées. Ajoute ta clé API dans Réglages pour avoir les accords.", "err"); $("settings").open = true; return; }
-  setStatus("Claude place les accords ukulélé sur les paroles… (20 à 40 s)", "", true);
+  if (!getKey()) { setStatus("Paroles affichées. Ajoute ta clé gratuite dans Réglages pour avoir les accords.", "err"); $("settings").open = true; return; }
+  const key = getKey(), gem = key.startsWith("AIza");
+  setStatus((gem ? "Gemini" : "Claude") + " place les accords ukulélé sur les paroles… (10 à 40 s)", "", true);
   try {
+    const r = gem ? await chordsViaGemini(song, key) : await chordsViaClaude(song, key);
+    if (!r) return;
+    if (!r.known) { setStatus("L'IA ne connaît pas assez cette chanson pour donner ses accords. Les paroles restent affichées.", "err"); return; }
+    const ok = (c) => typeof c === "string" && U.isChord(c);
+    song.chords = {
+      intro: (r.intro || []).filter(ok).slice(0, 16), outro: (r.outro || []).filter(ok).slice(0, 16),
+      lines: (r.lines || []).map((l) => ({ n: l.n | 0, chords: (l.chords || []).filter((x) => x && ok(x.c)).map((x) => ({ c: x.c, w: Math.max(0, x.w | 0) })) })).filter((l) => l.chords.length),
+    };
+    Object.assign(song, { bpm: Math.max(40, Math.min(220, r.bpm | 0 || 100)), strum: String(r.strum || "").slice(0, 40), key: String(r.key || "").slice(0, 10), ai: true, chordsBy: gem ? "Gemini" : "Claude", updated: Date.now() });
+    song.text = structuredText(song);
+    persistLocal(); renderLibrary(); setStatus("");
+    if (current && current.id === song.id) { const y = $("sheet").scrollTop; stop(); openSong(song.id); $("sheet").scrollTop = y; updateNow(true); }
+    toast("Accords ukulélé ajoutés");
+  } catch (e) {
+    if (e && e.gemini) {
+      const m = e.status === 429 ? "Quota gratuit Gemini atteint : réessaie dans une minute (ou demain si la limite du jour est atteinte)."
+        : e.status === 400 && /key/i.test(e.message) ? "Clé Gemini refusée : vérifie-la dans Réglages."
+        : e.status === 403 ? "Cette clé Gemini n'a pas accès à l'API : recrée-la sur aistudio.google.com."
+        : e.status >= 500 ? "Gemini est indisponible, réessaie plus tard." : "Impossible d'obtenir les accords (" + (e.message || "erreur") + ").";
+      setStatus(m, "err"); return;
+    }
+    if (e instanceof TypeError) { setStatus("Pas de connexion au service d'IA.", "err"); return; }
+    if (e instanceof SyntaxError) { setStatus("Réponse illisible, réessaie.", "err"); return; }
+    claudeError(e);
+  }
+}
+
+/* Gemini (free key from Google AI Studio). The model is picked from the account's own model list. */
+const GEM = "https://generativelanguage.googleapis.com/v1beta/";
+function toGeminiSchema(x) {
+  const o = { type: x.type.toUpperCase() };
+  if (x.properties) { o.properties = {}; for (const k in x.properties) o.properties[k] = toGeminiSchema(x.properties[k]); o.required = x.required; }
+  if (x.items) o.items = toGeminiSchema(x.items);
+  return o;
+}
+async function gemFetch(url, key, body) {
+  const r = await fetch(GEM + url + (url.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(key),
+    body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw { gemini: true, status: r.status, message: (j.error && j.error.message) || "HTTP " + r.status };
+  return j;
+}
+async function geminiModels(key) {
+  const cached = store.get("gemModels", null);
+  if (cached && cached.at > Date.now() - 864e5) return cached.list;
+  let list = [];
+  try {
+    const j = await gemFetch("models?pageSize=200", key);
+    const ok = (j.models || []).filter((m) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m) => m.name.replace(/^models\//, ""));
+    const ver = (n) => parseFloat((/gemini-(\d+(?:\.\d+)?)/.exec(n) || [])[1] || 0);
+    const bad = /(image|tts|audio|live|embed|vision|thinking|exp|learnlm|robotics|computer)/;
+    const rank = (n) => (/-flash$/.test(n) ? 0 : /-flash-latest$/.test(n) ? 1 : /-flash-lite$/.test(n) ? 2 : /flash/.test(n) && !/preview/.test(n) ? 3 : /flash/.test(n) ? 4 : 9);
+    list = ok.filter((n) => /^gemini-/.test(n) && !bad.test(n) && rank(n) < 9).sort((a, b) => rank(a) - rank(b) || ver(b) - ver(a)).slice(0, 4);
+  } catch (e) { if (e && e.gemini && (e.status === 400 || e.status === 403)) throw e; }
+  if (!list.length) list = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"];
+  store.set("gemModels", { at: Date.now(), list });
+  return list;
+}
+async function chordsViaGemini(song, key) {
+  const models = await geminiModels(key);
+  const prompt = chordPrompt(song) + "\nRéponds uniquement avec l'objet JSON demandé.";
+  let last = null;
+  for (const m of models) {
+    for (const withSchema of [true, false]) {
+      try {
+        const cfg = { responseMimeType: "application/json", temperature: 0.2 };
+        if (withSchema) cfg.responseSchema = toGeminiSchema(CHORD_SCHEMA);
+        const j = await gemFetch("models/" + m + ":generateContent", key, { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: cfg });
+        if (j.promptFeedback && j.promptFeedback.blockReason) { setStatus("Gemini a refusé cette chanson.", "err"); return null; }
+        const c = (j.candidates || [])[0];
+        if (!c || !c.content) { setStatus("Gemini n'a pas répondu" + (c && c.finishReason ? " (" + c.finishReason + ")" : "") + ", réessaie.", "err"); return null; }
+        const txt = (c.content.parts || []).map((x) => x.text || "").join("");
+        return JSON.parse(txt.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+      } catch (e) {
+        last = e;
+        if (e && e.gemini && e.status === 400 && withSchema && !/key/i.test(e.message)) continue; // schema not accepted: retry without it
+        if (e && e.gemini && (e.status === 404 || e.status === 429 || e.status >= 500)) break;     // try the next model
+        throw e;
+      }
+    }
+  }
+  throw last || { gemini: true, status: 0, message: "aucun modèle disponible" };
+}
+
+async function chordsViaClaude(song, key) {
+  {
     const Anthropic = await loadSdk();
-    const client = new Anthropic({ apiKey: getKey(), dangerouslyAllowBrowser: true, timeout: 180000 });
+    const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true, timeout: 180000 });
     const resp = await client.beta.messages.create({
       model: MODEL, max_tokens: 16000,
       betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
       output_config: { effort: "medium", format: { type: "json_schema", schema: CHORD_SCHEMA } },
       messages: [{ role: "user", content: chordPrompt(song) }],
     });
-    if (resp.stop_reason === "refusal") { setStatus("Claude a refusé de traiter cette chanson.", "err"); return; }
-    if (resp.stop_reason === "max_tokens") { setStatus("Réponse trop longue, réessaie.", "err"); return; }
+    if (resp.stop_reason === "refusal") { setStatus("Claude a refusé de traiter cette chanson.", "err"); return null; }
+    if (resp.stop_reason === "max_tokens") { setStatus("Réponse trop longue, réessaie.", "err"); return null; }
     const txt = resp.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-    const r = JSON.parse(txt);
-    if (!r.known) { setStatus("Claude ne connaît pas assez cette chanson pour donner ses accords. Les paroles restent affichées.", "err"); return; }
-    const ok = (c) => typeof c === "string" && U.isChord(c);
-    song.chords = {
-      intro: (r.intro || []).filter(ok).slice(0, 16), outro: (r.outro || []).filter(ok).slice(0, 16),
-      lines: (r.lines || []).map((l) => ({ n: l.n | 0, chords: (l.chords || []).filter((x) => ok(x.c)).map((x) => ({ c: x.c, w: Math.max(0, x.w | 0) })) })).filter((l) => l.chords.length),
-    };
-    Object.assign(song, { bpm: Math.max(40, Math.min(220, r.bpm | 0 || 100)), strum: String(r.strum || "").slice(0, 40), key: String(r.key || "").slice(0, 10), ai: true, updated: Date.now() });
-    song.text = structuredText(song);
-    persistLocal(); renderLibrary(); setStatus("");
-    if (current && current.id === song.id) { const y = $("sheet").scrollTop; stop(); openSong(song.id); $("sheet").scrollTop = y; updateNow(true); }
-    toast("Accords ukulélé ajoutés");
-  } catch (e) {
+    return JSON.parse(txt);
+  }
+}
+function claudeError(e) {
+  {
     const A = window.Anthropic, st = e && e.status;
     let m = "Impossible d'obtenir les accords, réessaie.";
     if (A && e instanceof A.AuthenticationError) m = "Clé API refusée : vérifie-la dans Réglages.";
@@ -919,7 +998,7 @@ function openSong(id) {
     if (s.strum) add("Rythmique", s.strum);
     if (s.key) add("Tonalité", s.key);
     const n = document.createElement("span");
-    n.textContent = (s.lyrics[0]?.t != null ? "Paroles synchronisées (LRCLIB)" : "Paroles (LRCLIB)") + (s.chords ? " · accords placés par Claude, vérifie à l'oreille" : " · accords en attente");
+    n.textContent = (s.lyrics[0]?.t != null ? "Paroles synchronisées (LRCLIB)" : "Paroles (LRCLIB)") + (s.chords ? " · accords placés par " + (s.chordsBy || "Claude") + ", vérifie à l'oreille" : " · accords en attente");
     info.append(n);
   } else if (s.ai) {
     const add = (k, v) => { const sp = document.createElement("span"); sp.append(k + " "); const b = document.createElement("b"); b.textContent = v; sp.append(b); info.append(sp); };
