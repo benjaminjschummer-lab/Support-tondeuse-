@@ -276,6 +276,7 @@ C                 G
       </div>
       <div class="songs" id="songs"></div>
       <p class="sync" id="sync"></p>
+      <p class="sync">Version 7</p>
     </div>
   </section>
 
@@ -871,6 +872,11 @@ function claudeError(e) {
     setStatus(m, "err");
   }
 }
+function cleanTitle(t, artist) {
+  t = String(t).trim();
+  if (artist && t.toLowerCase().startsWith(String(artist).toLowerCase() + " - ")) t = t.slice(String(artist).length + 3);
+  return t;
+}
 async function searchLyrics(q) {
   searching?.abort(); searching = new AbortController();
   $("q-go").disabled = true; setStatus(`Recherche des paroles de « ${q} »…`, "", true);
@@ -881,7 +887,7 @@ async function searchLyrics(q) {
     if (!list.length) { setStatus(`Aucune parole trouvée pour « ${q} ». Essaie avec le titre et l'artiste.`, "err"); return; }
     const best = list.find((x) => x.syncedLyrics) || list[0];
     const song = { id: "u-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      title: String(best.trackName || q).slice(0, 120), artist: String(best.artistName || "").slice(0, 120),
+      title: cleanTitle(best.trackName || q, best.artistName).slice(0, 120), artist: String(best.artistName || "").slice(0, 120),
       duration: +best.duration || 0, lyrics: parseLrc(best), lrclib: best.id, chords: null, query: q.toLowerCase(), updated: Date.now() };
     song.text = structuredText(song);
     songs.push(song); persistLocal(); renderLibrary(); $("q").value = "";
