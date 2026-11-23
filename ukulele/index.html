@@ -70,6 +70,17 @@ button { cursor: pointer; }
 .seg-ctl button { border: 0; background: none; padding: 6px 10px; font-weight: 700; color: var(--muted); }
 .seg-ctl button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .sync { font-size: 13px; color: var(--muted); }
+.search { display: flex; gap: 8px; }
+.search input { flex: 1; min-width: 0; border: 2px solid var(--accent); border-radius: 12px; background: var(--surface); padding: 12px 14px; font-size: 17px; }
+.search .btn { padding: 0 18px; font-size: 16px; }
+.status { font-size: 14px; color: var(--muted); min-height: 1.4em; margin: -8px 0 0; line-height: 1.45; }
+.status.err { color: #C0392B; }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: sp 0.8s linear infinite; vertical-align: -1px; margin-right: 6px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.line.chordsonly .ch { font-size: 1.05em; padding-right: 1.1em; }
+.ch[data-dots]::after { content: attr(data-dots); display: block; font-family: var(--f-body); font-size: .5em; letter-spacing: .25em; color: var(--muted); line-height: 1; margin-top: -1px; }
+.info { font-size: 13px; color: var(--muted); padding-block: 6px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; gap: 6px 14px; flex-wrap: wrap; }
+.info b { color: var(--ink); font-family: var(--f-display); letter-spacing: .04em; }
 
 /* editor */
 .editor { display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 16px; }
@@ -204,11 +215,16 @@ button { cursor: pointer; }
   <section class="view lib gut" id="v-chansons">
     <div class="lib-inner">
       <div>
-        <h1>Chante n'importe quelle chanson au ukulélé</h1>
-        <p class="lede">Colle les paroles avec accords de ta chanson (depuis n'importe quel site de tablatures), lance la lecture : le texte défile tout seul et l'accord à jouer s'affiche au bon moment. Touche un accord pour voir le doigté.</p>
+        <h1>Joue n'importe quelle chanson au ukulélé</h1>
+        <p class="lede">Tape le titre : la grille d'accords s'ouvre, les accords s'enchaînent au tempo de la chanson. Touche un accord pour voir le doigté.</p>
       </div>
+      <form class="search" id="search-form" role="search">
+        <input id="q" type="search" autocomplete="off" placeholder="Titre ou artiste, ex. Riptide" aria-label="Chercher une chanson">
+        <button class="btn primary" id="q-go" type="submit">Chercher</button>
+      </form>
+      <p class="status" id="q-status"></p>
       <div class="row">
-        <button class="btn primary" id="new-song">+ Ajouter une chanson</button>
+        <button class="btn" id="new-song">+ Ajouter à la main</button>
         <div class="settings">
           <span>Notation</span>
           <div class="seg-ctl" role="group" aria-label="Notation des accords">
@@ -261,6 +277,7 @@ C                 G
         <svg id="next-dg" viewBox="0 0 60 78"></svg>
       </button>
     </div>
+    <div class="info gut" id="info" hidden></div>
     <div class="strip gut" id="strip" aria-label="Accords de la chanson"></div>
     <div class="stage">
       <div class="sheet gut" id="sheet"><div class="sheet-inner" id="sheet-inner"></div></div>
@@ -270,7 +287,7 @@ C                 G
     <div class="dock gut">
       <button class="play" id="play" aria-label="Lecture"><svg viewBox="0 0 24 24" id="play-ic"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg></button>
       <button class="icon-btn" id="restart" aria-label="Revenir au début"><svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
-      <div class="ctl-wrap"><div class="ctl"><button class="icon-btn" id="sp-dn" aria-label="Plus lent">−</button><span class="v" id="sp-v">5</span><button class="icon-btn" id="sp-up" aria-label="Plus rapide">+</button></div><span class="k">Vitesse</span></div>
+      <div class="ctl-wrap"><div class="ctl"><button class="icon-btn" id="sp-dn" aria-label="Plus lent">−</button><span class="v" id="sp-v">5</span><button class="icon-btn" id="sp-up" aria-label="Plus rapide">+</button></div><span class="k" id="sp-k">Vitesse</span></div>
       <div class="ctl-wrap"><div class="ctl"><button class="icon-btn" id="tr-dn" aria-label="Transposer vers le bas">−</button><span class="v" id="tr-v">0</span><button class="icon-btn" id="tr-up" aria-label="Transposer vers le haut">+</button></div><span class="k">Tonalité</span></div>
       <div class="ctl-wrap"><div class="ctl"><button class="icon-btn" id="fs-dn" aria-label="Texte plus petit">A</button><button class="icon-btn" id="fs-up" aria-label="Texte plus grand" style="font-size:20px">A</button></div><span class="k">Texte</span></div>
     </div>
@@ -552,6 +569,85 @@ $("c-close").onclick = closeCard;
 $("scrim").addEventListener("click", (e) => { if (e.target === $("scrim")) closeCard(); });
 function closeCard() { $("scrim").hidden = true; }
 
+/* ---------- search: Claude builds the ukulele chord chart ---------- */
+let sample = null;
+const PROMPT = (q) => `Tu aides un joueur de ukulélé. Il a tapé : «${q}».
+Identifie la chanson la plus probable (titre + interprète) et donne sa grille d'accords complète.
+Réponds uniquement en JSON, de cette forme :
+{"found":true,"title":"","artist":"","year":0,"key":"Am","bpm":100,"beats_per_bar":4,"strum":"B B H H B H","confidence":"high|medium|low","public_domain":false,
+ "sections":[{"name":"Intro","lines":[{"chords":[{"c":"Am","beats":4},{"c":"F","beats":4}],"lyric":""}]}]}
+Règles :
+- Suis la vraie structure de la chanson dans l'ordre, répétitions écrites (Intro, Couplet 1, Refrain, Couplet 2, Refrain, Pont, Refrain, Outro). Noms de sections en français.
+- Une ligne = une phrase chantée, en général 2 à 4 mesures. "beats" = durée de l'accord en temps.
+- Accords tels qu'on les joue couramment, dans la tonalité originale, notation anglaise (Am, F#m7, Bb, Csus4).
+- "bpm" = tempo réel de la chanson. "strum" = rythmique ukulélé avec B (bas) et H (haut).
+- Paroles : si la chanson est protégée par le droit d'auteur, public_domain=false et "lyric" vaut "" partout (ne cite aucune parole). Seulement si elle est du domaine public (traditionnelle ou auteurs morts depuis plus de 70 ans), mets les paroles complètes de chaque ligne.
+- Si tu ne connais pas assez la chanson pour donner ses accords, réponds {"found":false,"suggestions":["Titre – Artiste", ...]}.`;
+
+function chartToSong(r, q) {
+  const lines = [], beats = [];
+  for (const sec of r.sections || []) {
+    lines.push("[" + String(sec.name || "Section").replace(/[\[\]]/g, "") + "]");
+    for (const ln of sec.lines || []) {
+      const chords = (ln.chords || []).map((x) => (typeof x === "string" ? { c: x, beats: r.beats_per_bar || 4 } : x)).filter((x) => x && U.isChord(String(x.c)));
+      if (!chords.length) continue;
+      const lyric = String(ln.lyric || "").trim();
+      if (lyric) {
+        let pos = 0, cl = "";
+        chords.forEach((x, i) => { const want = Math.round((i * lyric.length) / chords.length); pos = Math.max(want, cl.length ? cl.length + 1 : 0); cl = cl.padEnd(pos) + x.c; });
+        lines.push(cl, lyric);
+      } else lines.push(chords.map((x) => x.c).join("   "));
+      chords.forEach((x) => beats.push(Math.max(1, Math.min(32, +x.beats || 4))));
+    }
+    lines.push("");
+  }
+  return {
+    title: String(r.title || q).slice(0, 120), artist: String(r.artist || "").slice(0, 120), text: lines.join("\n").trim(),
+    bpm: Math.max(40, Math.min(220, Math.round(+r.bpm || 100))), bpb: +r.beats_per_bar || 4, beats,
+    strum: String(r.strum || "").slice(0, 40), key: String(r.key || "").slice(0, 10), confidence: r.confidence || "medium",
+    ai: true, query: q.toLowerCase(),
+  };
+}
+function setStatus(t, cls, spin) {
+  const e = $("q-status"); e.className = "status" + (cls ? " " + cls : ""); e.replaceChildren();
+  if (spin) { const sp = document.createElement("span"); sp.className = "spin"; e.append(sp); }
+  e.append(t);
+}
+let searching = null;
+async function searchSong(q) {
+  q = q.trim(); if (!q) return;
+  const known = songs.find((s) => s.query === q.toLowerCase() || (s.title + " " + s.artist).toLowerCase() === q.toLowerCase());
+  if (known) { setStatus(""); openSong(known.id); return; }
+  if (!sample) { setStatus("La recherche marche dans Kanikapila ouvert depuis claude.ai.", "err"); return; }
+  searching?.abort(); searching = new AbortController();
+  $("q-go").disabled = true; setStatus(`Recherche de « ${q} »…`, "", true);
+  let seen = false;
+  try {
+    const r = await sample.json(PROMPT(q), { modelTier: "default", signal: searching.signal,
+      onText: ({ text }) => { if (!seen && text && !/^Thinking/i.test(text)) { seen = true; setStatus("Écriture de la grille ukulélé…", "", true); } } });
+    if (!r || !r.found || !Array.isArray(r.sections)) {
+      const sug = (r && Array.isArray(r.suggestions) ? r.suggestions.slice(0, 3).map(String).join(" · ") : "");
+      setStatus(`Je ne connais pas assez « ${q} » pour donner ses accords.` + (sug ? " Essaie : " + sug : " Essaie avec le titre et l'artiste."), "err");
+      return;
+    }
+    const song = chartToSong(r, q);
+    if (!song.beats.length) { setStatus("La grille reçue est vide, réessaie.", "err"); return; }
+    song.id = "u-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    song.updated = Date.now();
+    songs.push(song); persistLocal(); renderLibrary(); setStatus(""); $("q").value = "";
+    openSong(song.id);
+    saveRemote(song);
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    const code = e && e.code;
+    setStatus(code === "not_granted" ? "Autorise Kanikapila à interroger Claude pour utiliser la recherche." : code === "rate_limited" ? "Trop de recherches d'un coup : réessaie dans un moment." : "La recherche a échoué, réessaie.", "err");
+  } finally { $("q-go").disabled = false; }
+}
+async function saveRemote(song) {
+  if (db && uid) try { await db.collection("data/users/" + uid).doc(song.id).set(song); } catch { setSync("Enregistrée sur cet appareil seulement"); }
+}
+$("search-form").addEventListener("submit", (e) => { e.preventDefault(); searchSong($("q").value); });
+
 /* ---------- library ---------- */
 function renderLibrary() {
   const box = $("songs"); box.replaceChildren();
@@ -560,7 +656,7 @@ function renderLibrary() {
     const meta = document.createElement("div"); meta.className = "meta";
     const t = document.createElement("div"); t.className = "t"; t.textContent = s.title || "Sans titre";
     const a = document.createElement("div"); a.className = "a"; a.textContent = s.artist || "";
-    if (s.builtin) { const tg = document.createElement("span"); tg.className = "tag"; tg.textContent = "Exemple"; a.append(" ", tg); }
+    if (s.builtin || s.ai) { const tg = document.createElement("span"); tg.className = "tag"; tg.textContent = s.builtin ? "Exemple" : "♩ " + s.bpm; a.append(" ", tg); }
     const chips = document.createElement("div"); chips.className = "chips";
     songChords(parseSong(s.text)).slice(0, 8).forEach((c) => { const sp = document.createElement("span"); sp.className = "chip"; sp.textContent = U.chordName(c, songPrefs(s.id).transpose, notation); chips.append(sp); });
     meta.append(t, a, chips);
@@ -597,13 +693,15 @@ $("ed-save").onclick = async () => {
   const text = $("ed-x").value;
   if (!text.trim()) { toast("Colle d'abord les paroles avec les accords"); $("ed-x").focus(); return; }
   const id = editingId || "u-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const song = { id, title: $("ed-t").value.trim() || "Sans titre", artist: $("ed-a").value.trim(), text, updated: Date.now() };
+  const prev = songs.find((x) => x.id === id);
+  const song = Object.assign({}, prev || {}, { id, title: $("ed-t").value.trim() || "Sans titre", artist: $("ed-a").value.trim(), text, updated: Date.now() });
+  if (prev && prev.text !== text) { delete song.beats; delete song.bpm; }
   const i = songs.findIndex((s) => s.id === id);
   if (i >= 0) songs[i] = song; else songs.push(song);
   persistLocal(); $("editor").hidden = true; renderLibrary(); openSong(id);
   const n = songChords(parseSong(text)).length;
   toast(n ? `${n} accord${n > 1 ? "s" : ""} reconnu${n > 1 ? "s" : ""}` : "Aucun accord reconnu : vérifie le format");
-  if (db && uid) try { await db.collection("data/users/" + uid).doc(id).set(song); } catch (e) { setSync("Enregistrée sur cet appareil seulement"); }
+  saveRemote(song);
 };
 $("ed-del").onclick = async () => {
   const b = $("ed-del");
@@ -617,6 +715,7 @@ function persistLocal() { store.set("songs", songs); }
 function setSync(t) { $("sync").textContent = t; }
 
 /* ---------- player ---------- */
+let tempo = null, chordDoc = [], beatPos = 0, forced = -1, lastBeat = -1;
 let chordEls = [], lineEls = [], playing = false, lastT = 0, acc = 0, raf = 0, curIdx = -1, wake = null;
 
 function openSong(id) {
@@ -625,6 +724,14 @@ function openSong(id) {
   $("p-t").textContent = s.title; $("p-a").textContent = s.artist || "";
   $("p-edit").hidden = !!s.builtin;
   const p = songPrefs(id); $("dur").value = p.dur || "";
+  if (s.bpm && !p.bpm) p.bpm = s.bpm;
+  const info = $("info"); info.replaceChildren(); info.hidden = !s.ai;
+  if (s.ai) {
+    const add = (k, v) => { const sp = document.createElement("span"); sp.append(k + " "); const b = document.createElement("b"); b.textContent = v; sp.append(b); info.append(sp); };
+    if (s.strum) add("Rythmique", s.strum);
+    add("Tempo", "♩ " + s.bpm); add("Mesure", (s.bpb || 4) + " temps");
+    const n = document.createElement("span"); n.textContent = (s.confidence === "low" ? "Grille incertaine : " : "") + "accords générés par Claude, vérifie à l'oreille."; info.append(n);
+  }
   stop(); showView("jouer"); renderSheet(); $("sheet").scrollTop = 0; updateNow(true);
 }
 function renderSheet() {
@@ -632,6 +739,8 @@ function renderSheet() {
   const p = songPrefs(current.id);
   const parsed = parseSong(current.text);
   const inner = $("sheet-inner"); inner.replaceChildren();
+  let chordCount = 0;
+  const tempoBeats = current.beats && current.bpm ? current.beats : null;
   document.documentElement.style.setProperty("--fs", fs + "px");
   for (const l of parsed) {
     if (l.type === "gap") { const g = document.createElement("div"); g.className = "gap"; inner.append(g); continue; }
@@ -647,6 +756,8 @@ function renderSheet() {
         const b = document.createElement("button"); b.className = "ch"; b.type = "button";
         b.textContent = U.chordName(ch, p.transpose, notation);
         b._ch = ch; b.onclick = () => openChord(ch);
+        if (tempoBeats) { const nb = tempoBeats[chordCount] || 0; if (nb) b.dataset.dots = "•".repeat(Math.min(nb, 8)); }
+        chordCount++;
         c.append(b);
       }
       const ly = document.createElement("span"); ly.className = "l"; ly.textContent = s.text || (has && !l.chordsOnly ? "" : "");
@@ -666,7 +777,10 @@ function renderSheet() {
     b.append(svg, sp); b.onclick = () => openChord(c); b.setAttribute("aria-label", "Doigté " + sp.textContent);
     strip.append(b);
   }
-  $("sp-v").textContent = p.speed; $("tr-v").textContent = (p.transpose > 0 ? "+" : "") + p.transpose;
+  tempo = tempoBeats && chordCount === tempoBeats.length ? { beats: tempoBeats, starts: [] } : null;
+  if (tempo) { let acc2 = 0; for (const n of tempo.beats) { tempo.starts.push(acc2); acc2 += n; } tempo.total = acc2; }
+  $("sp-k").textContent = tempo ? "Tempo" : "Vitesse"; $("dur").parentElement.hidden = !!tempo;
+  $("sp-v").textContent = tempo ? p.bpm : p.speed; $("tr-v").textContent = (p.transpose > 0 ? "+" : "") + p.transpose;
   measure(); curIdx = -2; updateNow(true);
 }
 function measure() {
@@ -689,6 +803,7 @@ function measure() {
       chordEls.push({ b, pos: rowTop + frac * rowH * 0.9, rowTop });
     }
   }
+  chordDoc = chordEls.slice();
   chordEls.sort((a, b) => a.pos - b.pos);
 }
 function guideY() { const s = $("sheet"); return s.scrollTop + s.clientHeight * 0.28 + fs * 1.2; }
@@ -696,6 +811,7 @@ function updateNow(force) {
   const gy = guideY();
   let idx = -1;
   for (let i = 0; i < chordEls.length; i++) { if (chordEls[i].pos <= gy) idx = i; else break; }
+  if (forced >= 0 && chordDoc[forced]) idx = chordEls.indexOf(chordDoc[forced]);
   if (idx === -1 && chordEls.length && !playing) idx = -1;
   if (idx !== curIdx || force) {
     if (chordEls[curIdx]) chordEls[curIdx].b.classList.remove("cur");
@@ -735,6 +851,19 @@ function tick(t) {
   if (!playing) return;
   const dt = Math.min(0.1, (t - lastT) / 1000); lastT = t;
   const sheet = $("sheet");
+  if (tempo) {
+    const bpm = songPrefs(current.id).bpm || current.bpm;
+    beatPos += dt * bpm / 60;
+    if (metro && Math.floor(beatPos) !== lastBeat) { lastBeat = Math.floor(beatPos); click(lastBeat % (current.bpb || 4) === 0); }
+    if (beatPos >= tempo.total) { stop(); toast("Fin de la chanson"); return; }
+    let i = 0; while (i + 1 < tempo.starts.length && tempo.starts[i + 1] <= beatPos) i++;
+    const f = (beatPos - tempo.starts[i]) / tempo.beats[i];
+    const a = chordDoc[i], b = chordDoc[i + 1];
+    const y = a.rowTop + (b && b.rowTop > a.rowTop ? (b.rowTop - a.rowTop) * f : 0);
+    sheet.scrollTop = y - sheet.clientHeight * 0.28 - fs * 0.2;
+    if (forced !== i) { forced = i; updateNow(true); }
+    raf = requestAnimationFrame(tick); return;
+  }
   acc += pxPerSec() * dt;
   if (acc >= 1) { const w = Math.floor(acc); sheet.scrollTop += w; acc -= w; }
   if (sheet.scrollTop + sheet.clientHeight >= sheet.scrollHeight - 2 || guideY() > (lineEls.at(-1)?.top || 0) + 200) { stop(); toast("Fin de la chanson"); }
@@ -744,7 +873,15 @@ let countTimer = 0;
 async function start() {
   if (!current) return;
   audio();
-  if ($("sheet").scrollTop < 4) { // short count-in at the top
+  if (tempo) {
+    const start = curIdx >= 0 ? chordDoc.indexOf(chordEls[curIdx]) : 0;
+    beatPos = tempo.starts[Math.max(0, start)] || 0; if (beatPos >= tempo.total) beatPos = 0;
+    forced = -1; lastBeat = Math.floor(beatPos) - 1;
+    const bpb = current.bpb || 4, ms = 60000 / (songPrefs(current.id).bpm || current.bpm);
+    playing = true; setPlayIcon(); let n = 0; $("count").hidden = false; $("count").textContent = 1; click(true);
+    await new Promise((res) => { countTimer = setInterval(() => { n++; if (n >= bpb || !playing) { clearInterval(countTimer); res(); } else { $("count").textContent = n + 1; click(false); } }, ms); });
+    $("count").hidden = true; if (!playing) return;
+  } else if ($("sheet").scrollTop < 4) { // short count-in at the top
     playing = true; setPlayIcon(); let n = 3; $("count").hidden = false; $("count").textContent = n;
     await new Promise((res) => { countTimer = setInterval(() => { n--; if (n <= 0 || !playing) { clearInterval(countTimer); res(); } else $("count").textContent = n; }, 700); });
     $("count").hidden = true; if (!playing) return;
@@ -753,7 +890,14 @@ async function start() {
   lastT = performance.now(); acc = 0; raf = requestAnimationFrame(tick);
   try { wake = await navigator.wakeLock?.request("screen"); } catch {}
 }
+let metro = store.get("metro", true);
+function click(accent) {
+  const ctx = audio(), o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+  o.frequency.value = accent ? 1500 : 1000; g.gain.setValueAtTime(accent ? 0.25 : 0.15, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+  o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.06);
+}
 function stop() {
+  forced = -1;
   playing = false; clearInterval(countTimer); $("count").hidden = true; cancelAnimationFrame(raf); setPlayIcon();
   $("sheet").classList.remove("playing");
   try { wake?.release(); } catch {} wake = null;
@@ -770,8 +914,9 @@ function bump(key, d, lo, hi) {
   if (key === "speed") { p.dur = ""; $("dur").value = ""; $("sp-v").textContent = p.speed; }
   else { const y = $("sheet").scrollTop; renderSheet(); $("sheet").scrollTop = y; renderLibrary(); }
 }
-$("sp-dn").onclick = () => bump("speed", -1, 1, 20);
-$("sp-up").onclick = () => bump("speed", 1, 1, 20);
+function bumpBpm(d) { const p = songPrefs(current.id); p.bpm = Math.max(40, Math.min(220, (p.bpm || current.bpm) + d)); savePrefs(); $("sp-v").textContent = p.bpm; }
+$("sp-dn").onclick = () => tempo ? bumpBpm(-4) : bump("speed", -1, 1, 20);
+$("sp-up").onclick = () => tempo ? bumpBpm(4) : bump("speed", 1, 1, 20);
 $("tr-dn").onclick = () => bump("transpose", -1, -11, 11);
 $("tr-up").onclick = () => bump("transpose", 1, -11, 11);
 function setFs(v) { const sheet = $("sheet"); const r = sheet.scrollTop / Math.max(1, sheet.scrollHeight); fs = Math.max(14, Math.min(40, v)); store.set("fs", fs); renderSheet(); sheet.scrollTop = r * sheet.scrollHeight; }
@@ -914,6 +1059,11 @@ if (startView === "jouer") { const last = store.get("last", null); openSong(find
 else showView(["chansons", "accordeur"].includes(startView) ? startView : "chansons");
 if (fs !== 21) document.documentElement.style.setProperty("--fs", fs + "px");
 
+(async () => {
+  if (!window.claude?.use) { setStatus("La recherche marche dans Kanikapila ouvert depuis claude.ai. Ici, ajoute tes chansons à la main."); return; }
+  try { sample = await window.claude.use("sample"); } catch {}
+  if (!sample) setStatus("Recherche indisponible ici : ajoute tes chansons à la main.");
+})();
 // Sync the song library across devices when running inside claude.ai.
 (async () => {
   if (!window.claude?.use) return;
