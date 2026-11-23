@@ -81,7 +81,11 @@ button { cursor: pointer; }
 .ch[data-dots]::after { content: attr(data-dots); display: block; font-family: var(--f-body); font-size: .5em; letter-spacing: .25em; color: var(--muted); line-height: 1; margin-top: -1px; }
 .info { font-size: 13px; color: var(--muted); padding-block: 6px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; gap: 6px 14px; flex-wrap: wrap; }
 .line[data-t] { cursor: pointer; }
-.install { border-top: 1px solid var(--line); padding-top: 10px; }
+.keycard { border: 2px solid var(--accent); border-radius: 14px; background: var(--surface); padding: 12px 14px; }
+.keycard summary { cursor: pointer; font-weight: 700; font-size: 16px; color: var(--accent); }
+.keycard.set { border-width: 1px; border-color: var(--line); }
+.online { margin: 0; padding: 12px 14px; border: 2px solid var(--accent); border-radius: 14px; background: var(--surface); line-height: 1.45; }
+.online a { color: var(--accent); font-weight: 700; }
 .keyrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .keyrow input { flex: 1; min-width: 200px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); padding: 10px 12px; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
 .hint a { color: var(--accent); font-weight: 700; }
@@ -228,8 +232,9 @@ button { cursor: pointer; }
         <button class="btn primary" id="q-go" type="submit">Chercher</button>
       </form>
       <p class="status" id="q-status"></p>
-      <details class="install" id="settings" hidden>
-        <summary style="cursor:pointer;font-weight:700;color:var(--accent)">Réglages : clé gratuite pour les accords</summary>
+      <p class="online" id="online" hidden>Les paroles ne s'affichent que dans la version en ligne : <a href="https://benjaminjschummer-lab.github.io/Support-tondeuse-/ukulele/" target="_blank" rel="noopener">ouvrir Kanikapila en ligne ↗</a></p>
+      <details class="keycard" id="settings" hidden>
+        <summary id="key-sum">Clé pour les accords : à ajouter</summary>
         <p class="hint" style="margin-top:10px">Les paroles viennent de LRCLIB (gratuit, sans clé). Pour placer les accords, colle une <b>clé Gemini gratuite</b> : va sur <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey ↗</a>, connecte-toi avec ton compte Google, touche « Create API key » et copie la clé (elle commence par AIza). Sans carte bancaire. Sur l'offre gratuite, Google peut utiliser les demandes (titre et paroles) pour améliorer ses modèles. Une clé Anthropic payante (sk-ant-…) marche aussi. La clé reste dans ce navigateur.</p>
         <div class="keyrow">
           <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" aria-label="Clé API pour les accords">
@@ -662,14 +667,20 @@ const MODEL = "claude-opus-5-5";
 const getKey = () => { try { return localStorage.getItem("kanikapila.apikey") || ""; } catch { return ""; } };
 function setKey(k) { try { k ? localStorage.setItem("kanikapila.apikey", k) : localStorage.removeItem("kanikapila.apikey"); } catch {} }
 $("api-key").value = getKey() ? "••••••••••••" : "";
+function keyState() {
+  const k = getKey();
+  $("key-sum").textContent = k ? "Clé pour les accords : enregistrée ✓ (" + (k.startsWith("AIza") ? "Gemini" : "Anthropic") + ")" : "Clé pour les accords : touche ici pour l'ajouter";
+  $("settings").classList.toggle("set", !!k);
+  if (!k) $("settings").open = true;
+}
 $("key-save").onclick = () => {
   const v = $("api-key").value.trim();
   if (!/^(sk-ant-|AIza)/.test(v)) { toast("Colle une clé Gemini (AIza…) ou Anthropic (sk-ant-…)"); return; }
-  setKey(v); $("api-key").value = "••••••••••••"; toast("Clé enregistrée sur cet appareil");
+  setKey(v); $("api-key").value = "••••••••••••"; toast("Clé enregistrée sur cet appareil"); keyState(); $("settings").open = false;
   const pending = current && current.lyrics && !current.chords ? current : null;
   if (pending) addChords(pending);
 };
-$("key-clear").onclick = () => { setKey(""); $("api-key").value = ""; toast("Clé effacée"); };
+$("key-clear").onclick = () => { setKey(""); $("api-key").value = ""; toast("Clé effacée"); keyState(); };
 $("api-key").onfocus = () => { if ($("api-key").value.startsWith("•")) $("api-key").value = ""; };
 
 let sdkLoading = null;
@@ -1370,7 +1381,8 @@ else showView(["chansons", "accordeur"].includes(startView) ? startView : "chans
 if (fs !== 21) document.documentElement.style.setProperty("--fs", fs + "px");
 
 (async () => {
-  if (!window.claude?.use) { $("settings").hidden = false; return; }
+  if (!window.claude?.use) { $("settings").hidden = false; keyState(); return; }
+  $("online").hidden = false;
   try { sample = await window.claude.use("sample"); } catch {}
   if (!sample) setStatus("Recherche indisponible ici : ajoute tes chansons à la main.");
 })();
