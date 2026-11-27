@@ -274,7 +274,13 @@ function frame(now) {
   const lifted = dragging || Math.abs(target - armAngle) > 0.3 || !S.isPlaying;
   // le plateau tourne dès la lecture, on « pose » ensuite le diamant
   speed += ((S.isPlaying ? RPM_DEG : 0) - speed) * Math.min(1, dt * (S.isPlaying ? 2.2 : 1.1));
-  rot = (rot + speed * dt) % 360;
+  if (grab) {
+    // le doigt tient le disque : sans mouvement récent, il est à l'arrêt
+    if (now - grab.lastMove > 60) grab.vel *= Math.pow(0.001, dt);
+    scratchSound(grab.vel);
+  } else {
+    rot = (rot + speed * dt) % 360;
+  }
 
   ui.record.style.transform = `rotate(${rot}deg)`;
   ui.arm.setAttribute('transform', `translate(${GEO.px} ${GEO.py}) rotate(${armAngle})`);
@@ -367,6 +373,90 @@ function endDrag() {
 }
 ui.armHit.addEventListener('pointerup', endDrag);
 ui.armHit.addEventListener('pointercancel', endDrag);
+
+/* ---------- Mode scratch ---------- */
+// La musique Spotify est jouée par l'app Spotify : on ne peut pas toucher à son son.
+// Le scratch fait tourner le disque au doigt et produit un son de scratch synthétisé par-dessus.
+let scratchOn = !!store.get('scratch');
+let grab = null; // { last, lastMove, vel, id }
+let actx = null, sx = null;
+
+function setScratch(on) {
+  scratchOn = on; store.set('scratch', on);
+  document.body.classList.toggle('scratch', on);
+  $('#scratchToggle').checked = on;
+}
+
+function audioInit() {
+  if (!actx) {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch {} // se mélange avec Spotify sans le couper
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    actx = new AC();
+    const len = actx.sampleRate * 2, buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0, b = 0; i < len; i++) { b = 0.85 * b + 0.15 * (Math.random() * 2 - 1); d[i] = b * 3; } // bruit de sillon un peu feutré
+    const noise = actx.createBufferSource(); noise.buffer = buf; noise.loop = true;
+    const osc = actx.createOscillator(); osc.type = 'sawtooth';
+    const osc2 = actx.createOscillator(); osc2.type = 'square';
+    const og = actx.createGain(); og.gain.value = 0.45;
+    const og2 = actx.createGain(); og2.gain.value = 0.18;
+    const ng = actx.createGain(); ng.gain.value = 0.5;
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 3;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4000;
+    const vca = actx.createGain(); vca.gain.value = 0;
+    noise.connect(ng).connect(bp); osc.connect(og).connect(bp); osc2.connect(og2).connect(bp);
+    bp.connect(lp).connect(vca).connect(actx.destination);
+    noise.start(); osc.start(); osc2.start();
+    sx = { osc, osc2, bp, vca };
+  }
+  if (actx.state !== 'running') actx.resume().catch(() => {});
+}
+
+function scratchSound(vel) {
+  if (!sx) return;
+  const t = actx.currentTime;
+  const n = clamp(Math.abs(vel) / RPM_DEG, 0, 5); // 1 = vitesse normale du disque
+  const dir = vel >= 0 ? 1 : 0.82; // à l'envers, le son est un peu plus grave
+  const g = n < 0.04 ? 0 : clamp(0.12 + n * 0.32, 0, 0.9);
+  sx.vca.gain.setTargetAtTime(g, t, 0.012);
+  sx.osc.frequency.setTargetAtTime((70 + n * 190) * dir, t, 0.01);
+  sx.osc2.frequency.setTargetAtTime((140 + n * 330) * dir, t, 0.01);
+  sx.bp.frequency.setTargetAtTime((350 + n * 900) * dir, t, 0.01);
+}
+
+function recordAngle(e) {
+  const r = ui.record.getBoundingClientRect();
+  return (Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180) / Math.PI;
+}
+ui.record.addEventListener('pointerdown', (e) => {
+  if (!scratchOn || dragging) return;
+  e.preventDefault();
+  audioInit();
+  grab = { id: e.pointerId, last: recordAngle(e), lastMove: performance.now(), vel: 0 };
+  ui.record.setPointerCapture(e.pointerId);
+  ui.record.classList.add('grabbed');
+});
+ui.record.addEventListener('pointermove', (e) => {
+  if (!grab || e.pointerId !== grab.id) return;
+  const now = performance.now(), a = recordAngle(e);
+  let delta = a - grab.last;
+  if (delta > 180) delta -= 360; else if (delta < -180) delta += 360;
+  const dt = Math.max(8, now - grab.lastMove) / 1000;
+  grab.vel = grab.vel * 0.4 + (delta / dt) * 0.6;
+  grab.last = a; grab.lastMove = now;
+  rot = (rot + delta) % 360;
+});
+function releaseRecord(e) {
+  if (!grab || e.pointerId !== grab.id) return;
+  speed = clamp(grab.vel, -1500, 1500); // le disque repart avec l'élan donné puis reprend sa vitesse
+  grab = null;
+  ui.record.classList.remove('grabbed');
+  scratchSound(0);
+}
+ui.record.addEventListener('pointerup', releaseRecord);
+ui.record.addEventListener('pointercancel', releaseRecord);
+$('#scratchToggle').addEventListener('change', (e) => { setScratch(e.target.checked); if (e.target.checked) audioInit(); });
+setScratch(scratchOn);
 
 /* ---------- Synchronisation ---------- */
 let pollTimer;
