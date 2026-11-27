@@ -333,7 +333,6 @@ function frame(now) {
     const v = S.duration ? (p / S.duration) * 1000 : 0;
     ui.seek.value = v; ui.seek.style.setProperty('--p', v / 10 + '%');
   }
-  if (S.isPlaying && S.duration && progressOf(S) >= S.duration) schedule(300);
   requestAnimationFrame(frame);
 }
 
@@ -515,7 +514,14 @@ async function poll() {
   try {
     if (!dragging && !seekingUI) { S = await player.refresh(); renderMeta(); }
   } catch (e) { handleError(e); return; }
-  schedule(player.kind === 'demo' ? 500 : 2500);
+  schedule(nextPollDelay());
+}
+// Interroge Spotify juste après la fin prévue du morceau, puis souvent tant que le suivant n'est pas arrivé
+function nextPollDelay() {
+  if (player.kind === 'demo') return 500;
+  if (!S.isPlaying || !S.duration) return 2500;
+  const remaining = S.duration - progressOf(S);
+  return remaining < 2500 ? Math.max(400, remaining + 350) : 2500;
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { schedule(50); keepAwake(); } });
 
