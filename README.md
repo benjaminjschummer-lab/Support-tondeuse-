@@ -6,7 +6,8 @@ Une platine vinyle épurée pour iPhone et iPad qui pilote Spotify.
 - Bras fonctionnel : il se pose sur le disque à la lecture, avance avec le morceau et revient sur son support à la pause. On peut le **déplacer au doigt** : le poser sur le disque lance la lecture à cet endroit, le ramener sur son support met en pause.
 - Précédent / −15 s / lecture-pause / +15 s / suivant, barre de progression
 - La pochette sert d'étiquette du vinyle, et l'arrière-plan prend sa couleur
-- Thème clair / sombre automatique, iPhone en portrait, iPad en paysage
+- Fond au choix (réglages) : Auto, Clair, Sombre, ou Pochette (couleurs tirées de la pochette de chaque morceau)
+- iPhone en portrait, iPad en paysage
 - Mode scratch (réglages) : attrape le disque au doigt pour scratcher, avec un son de scratch synthétisé
 - Mode démo sans compte
 

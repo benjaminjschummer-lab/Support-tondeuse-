@@ -236,21 +236,62 @@ function renderMeta() {
 }
 
 const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-function setTint([r, g, b]) { document.documentElement.style.setProperty('--tint-rgb', `${r}, ${g}, ${b}`); }
-function tintFrom(img) {
-  try {
-    const c = document.createElement('canvas'); c.width = c.height = 16;
-    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, 16, 16);
-    const d = x.getImageData(0, 0, 16, 16).data;
-    let r = 0, g = 0, b = 0, n = 0;
-    for (let i = 0; i < d.length; i += 4) {
-      const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
-      const w = 1 + (mx - mn) / 32; // privilégie les couleurs saturées
-      r += d[i] * w; g += d[i + 1] * w; b += d[i + 2] * w; n += w;
-    }
-    setTint([r / n, g / n, b / n].map(Math.round));
-  } catch { /* image non lisible (CORS) : on garde la teinte */ }
+const mix = (c, d, t) => c.map((v, i) => Math.round(v + (d[i] - v) * t));
+const lum = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+const rgbStr = (c) => `rgb(${c.join(',')})`;
+
+/* ---------- Fond : auto / clair / sombre / pochette ---------- */
+let palette = null; // { main, second } tirées de la pochette (ou de l'étiquette en démo)
+
+function paletteFrom(img) {
+  const N = 24, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, N, N);
+  const d = x.getImageData(0, 0, N, N).data; // lève une erreur si l'image n'est pas lisible (CORS)
+  const buckets = new Map();
+  for (let i = 0; i < d.length; i += 4) {
+    const k = ((d[i] >> 5) << 6) | ((d[i + 1] >> 5) << 3) | (d[i + 2] >> 5);
+    const o = buckets.get(k) || { r: 0, g: 0, b: 0, n: 0 };
+    o.r += d[i]; o.g += d[i + 1]; o.b += d[i + 2]; o.n++; buckets.set(k, o);
+  }
+  const list = [...buckets.values()].map((o) => {
+    const col = [o.r / o.n, o.g / o.n, o.b / o.n].map(Math.round);
+    const sat = (Math.max(...col) - Math.min(...col)) / 255;
+    return { col, score: o.n * (1 + sat * 3) };
+  }).sort((p, q) => q.score - p.score);
+  const main = list[0].col;
+  const far = list.find((p) => Math.hypot(...p.col.map((v, i) => v - main[i])) > 90);
+  return { main, second: far ? far.col : mix(main, lum(main) > 0.5 ? [0, 0, 0] : [255, 255, 255], 0.35) };
 }
+
+function applyTheme() {
+  const mode = store.get('theme') || 'auto';
+  const root = document.documentElement;
+  root.classList.toggle('album', mode === 'album');
+  root.style.removeProperty('--bg');
+  if (mode === 'light' || mode === 'dark') root.dataset.theme = mode;
+  else if (mode === 'album' && palette) {
+    const light = lum(palette.main) > 0.58;
+    root.dataset.theme = light ? 'light' : 'dark';
+    root.style.setProperty('--bg', rgbStr(light ? mix(palette.main, [255, 255, 255], 0.55) : mix(palette.main, [0, 0, 0], 0.55)));
+  } else delete root.dataset.theme;
+  let tint = palette ? palette.main : [242, 240, 235];
+  if (mode === 'album' && palette) {
+    // sur fond sombre, la 2e couleur de la pochette brille ; sur fond clair, on reste dans la couleur principale
+    tint = root.dataset.theme === 'dark' ? palette.second : mix(mix(palette.main, palette.second, 0.2), [0, 0, 0], 0.1);
+  }
+  root.style.setProperty('--tint-rgb', tint.join(', '));
+  const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', bg));
+  document.querySelectorAll('#themeSeg button').forEach((btn) => {
+    btn.classList.toggle('on', btn.dataset.v === mode);
+    btn.setAttribute('aria-checked', btn.dataset.v === mode);
+  });
+}
+
+function tintFrom(img) {
+  try { palette = paletteFrom(img); applyTheme(); } catch { /* image non lisible : on garde le fond actuel */ }
+}
+function setTint(rgb) { palette = { main: rgb, second: mix(rgb, [255, 255, 255], 0.4) }; applyTheme(); }
 
 /* ---------- Animation : disque + bras ---------- */
 const RPM_DEG = 200; // 33⅓ tours/min = 200°/s
@@ -457,6 +498,11 @@ ui.record.addEventListener('pointerup', releaseRecord);
 ui.record.addEventListener('pointercancel', releaseRecord);
 $('#scratchToggle').addEventListener('change', (e) => { setScratch(e.target.checked); if (e.target.checked) audioInit(); });
 setScratch(scratchOn);
+
+document.querySelectorAll('#themeSeg button').forEach((btn) =>
+  btn.addEventListener('click', () => { store.set('theme', btn.dataset.v); applyTheme(); }));
+applyTheme();
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyTheme);
 
 /* ---------- Synchronisation ---------- */
 let pollTimer;
