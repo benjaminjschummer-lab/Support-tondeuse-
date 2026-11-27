@@ -20,7 +20,6 @@
   <div class="tint" id="tint" aria-hidden="true"></div>
 
   <header class="top">
-    <span class="brand">Platine</span>
     <button class="icon-btn" id="settingsBtn" aria-label="Réglages">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>
     </button>
@@ -82,35 +81,22 @@
     </section>
 
     <section class="panel">
-      <div class="meta">
-        <h1 id="title">—</h1>
-        <p id="artist">&nbsp;</p>
+      <div class="bar">
+        <p class="meta"><span id="title">—</span> <span id="artist"></span></p>
+        <div class="controls">
+          <button class="ctl" id="prevBtn" aria-label="Morceau précédent">
+            <svg viewBox="0 0 24 24"><path d="M6 5v14" class="s"/><path d="M19 5.5v13L9 12z"/></svg>
+          </button>
+          <button class="ctl play" id="playBtn" aria-label="Lecture">
+            <svg viewBox="0 0 24 24" class="i-play"><path d="M8 5.2v13.6L19 12z"/></svg>
+            <svg viewBox="0 0 24 24" class="i-pause"><rect x="6.5" y="5" width="3.8" height="14" rx="1"/><rect x="13.7" y="5" width="3.8" height="14" rx="1"/></svg>
+          </button>
+          <button class="ctl" id="nextBtn" aria-label="Morceau suivant">
+            <svg viewBox="0 0 24 24"><path d="M18 5v14" class="s"/><path d="M5 5.5v13L15 12z"/></svg>
+          </button>
+        </div>
       </div>
-
-      <div class="progress">
-        <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position">
-        <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
-      </div>
-
-      <div class="controls">
-        <button class="ctl" id="prevBtn" aria-label="Morceau précédent">
-          <svg viewBox="0 0 24 24"><path d="M6 5v14" class="s"/><path d="M19 5.5v13L9 12z"/></svg>
-        </button>
-        <button class="ctl small" id="backBtn" aria-label="Reculer de 15 secondes">
-          <svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" class="s"/><path d="M4 3.5v4.2h4.2" class="s"/><text x="12.2" y="15.2">15</text></svg>
-        </button>
-        <button class="ctl play" id="playBtn" aria-label="Lecture">
-          <svg viewBox="0 0 24 24" class="i-play"><path d="M8 5.2v13.6L19 12z"/></svg>
-          <svg viewBox="0 0 24 24" class="i-pause"><rect x="6.5" y="5" width="3.8" height="14" rx="1"/><rect x="13.7" y="5" width="3.8" height="14" rx="1"/></svg>
-        </button>
-        <button class="ctl small" id="fwdBtn" aria-label="Avancer de 15 secondes">
-          <svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" class="s"/><path d="M20 3.5v4.2h-4.2" class="s"/><text x="11.8" y="15.2">15</text></svg>
-        </button>
-        <button class="ctl" id="nextBtn" aria-label="Morceau suivant">
-          <svg viewBox="0 0 24 24"><path d="M18 5v14" class="s"/><path d="M5 5.5v13L15 12z"/></svg>
-        </button>
-      </div>
-
+      <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position">
       <p class="status" id="status"></p>
     </section>
   </main>

@@ -190,7 +190,7 @@ let S = player.state || { isPlaying: false, progress: 0, duration: 0, at: perfor
 
 const ui = {
   record: $('#record'), arm: $('#arm'), armShadow: $('#armShadow'), armLayer: $('#armLayer'), armHit: $('#armHit'),
-  title: $('#title'), artist: $('#artist'), seek: $('#seek'), cur: $('#cur'), dur: $('#dur'),
+  title: $('#title'), artist: $('#artist'), seek: $('#seek'), deck: $('#deck'),
   play: $('#playBtn'), led: $('#led'), status: $('#status'),
   labelArt: $('#labelArt'), labelText: $('#labelText'), labelTitle: $('#labelTitle'), label: $('#label'),
   tint: document.documentElement,
@@ -205,7 +205,7 @@ function setStatus(html, sticky = false) {
 function baseStatus() {
   if (player.kind === 'demo') return setStatus('Mode démo · <a href="#" data-open-settings>connecter Spotify</a>', true);
   if (!S.track) return setStatus('Aucune lecture en cours · <a href="spotify:">ouvrir Spotify</a>', true);
-  setStatus(S.device ? `Sur ${escapeHtml(S.device.name)}` : '', true);
+  setStatus('', true);
 }
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -216,12 +216,11 @@ function renderMeta() {
   ui.play.classList.toggle('playing', S.isPlaying);
   ui.play.setAttribute('aria-label', S.isPlaying ? 'Pause' : 'Lecture');
   ui.led.classList.toggle('on', S.isPlaying);
-  ui.dur.textContent = fmt(S.duration);
   const id = t ? t.id : null;
   if (id === lastTrackId) return;
   lastTrackId = id;
   ui.title.textContent = t ? t.title : 'Rien à l’écoute';
-  ui.artist.innerHTML = t ? escapeHtml(t.artist) : '&nbsp;';
+  ui.artist.textContent = t ? t.artist : '';
   ui.labelTitle.textContent = t ? t.title : 'Platine';
   if (t && t.art) {
     ui.labelArt.style.opacity = 0;
@@ -255,7 +254,8 @@ function tintFrom(img) {
 
 /* ---------- Animation : disque + bras ---------- */
 const RPM_DEG = 200; // 33⅓ tours/min = 200°/s
-let rot = 0, speed = 0, armAngle = A_REST, dragging = false, dragAngle = A_REST, seekingUI = false, lastFrame = performance.now(), lastSec = -1;
+let rot = 0, speed = 0, armAngle = A_REST, dragging = false, dragAngle = A_REST, seekingUI = false, lastFrame = performance.now();
+const showTime = (ms) => setStatus(`${fmt(ms)} / ${fmt(S.duration)}`, true);
 
 function armTarget() {
   if (dragging) return dragAngle;
@@ -283,8 +283,6 @@ function frame(now) {
 
   if (!seekingUI) {
     const p = progressOf(S);
-    const sec = Math.floor(p / 1000);
-    if (sec !== lastSec) { lastSec = sec; ui.cur.textContent = fmt(p); }
     const v = S.duration ? (p / S.duration) * 1000 : 0;
     ui.seek.value = v; ui.seek.style.setProperty('--p', v / 10 + '%');
   }
@@ -316,19 +314,23 @@ ui.play.addEventListener('click', toggle);
 $('#startBtn').addEventListener('click', toggle);
 $('#nextBtn').addEventListener('click', doNext);
 $('#prevBtn').addEventListener('click', doPrev);
-$('#fwdBtn').addEventListener('click', () => doSeek(progressOf(S) + 15000));
-$('#backBtn').addEventListener('click', () => doSeek(progressOf(S) - 15000));
 
 ui.seek.addEventListener('input', () => {
   seekingUI = true;
   ui.seek.style.setProperty('--p', ui.seek.value / 10 + '%');
-  ui.cur.textContent = fmt((ui.seek.value / 1000) * S.duration);
+  showTime((ui.seek.value / 1000) * S.duration);
 });
-ui.seek.addEventListener('change', () => { seekingUI = false; lastSec = -1; doSeek((ui.seek.value / 1000) * S.duration); });
+ui.seek.addEventListener('change', () => { seekingUI = false; baseStatus(); doSeek((ui.seek.value / 1000) * S.duration); });
 
 /* ---------- Bras manipulable ---------- */
 function pointerAngle(e) {
-  const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(ui.armLayer.getScreenCTM().inverse());
+  // la platine peut être pivotée de 90° (iPhone/iPad en portrait) : on ramène le point dans son repère
+  const r = ui.deck.getBoundingClientRect();
+  const turned = r.height > r.width;
+  const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  const ux = turned ? dy : dx, uy = turned ? -dx : dy;
+  const W = turned ? r.height : r.width, H = turned ? r.width : r.height;
+  const pt = { x: (ux / W + 0.5) * 125, y: (uy / H + 0.5) * 100 };
   const deg = (Math.atan2(-(pt.x - GEO.px), pt.y - GEO.py) * 180) / Math.PI;
   return clamp(deg, A_REST - 4, A_INNER);
 }
@@ -343,13 +345,13 @@ ui.armHit.addEventListener('pointermove', (e) => {
   dragAngle = pointerAngle(e);
   if (S.duration && dragAngle >= A_OUTER) {
     const p = clamp((dragAngle - A_OUTER) / (A_INNER - A_OUTER), 0, 1);
-    ui.cur.textContent = fmt(p * S.duration);
+    showTime(p * S.duration);
     seekingUI = true;
   }
 });
 function endDrag() {
   if (!dragging) return;
-  dragging = false; seekingUI = false; lastSec = -1;
+  dragging = false; seekingUI = false; baseStatus();
   ui.armLayer.classList.remove('dragging');
   if (dragAngle >= A_EDGE && S.duration) {
     // diamant posé sur le disque : on se place à cet endroit et on joue

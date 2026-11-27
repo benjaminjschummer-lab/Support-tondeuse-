@@ -1,5 +1,5 @@
 // Cache de l'interface pour un démarrage instantané (les appels Spotify ne sont jamais mis en cache).
-const CACHE = 'platine-v1';
+const CACHE = 'platine-v2';
 const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS))); self.skipWaiting(); });
