@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Le Carnet Infini</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+/* VOICE occasion : un jeu d'aventure dessiné à l'encre dans le carnet d'une naturaliste
+   IDEA le carnet de terrain d'Élise : papier ligné, encre qui tremble, aquarelle qui déborde
+   PICTURE le monde entier, dessiné en direct et infini, qui occupe tout l'écran
+   COLOUR papier #f4ecd8, encre #2a2018, aquarelles par région (miel, rouille, mousse, ocre, vase, lilas)
+   TYPE Caveat (titres manuscrits) + Patrick Hand (texte)
+   LAYOUT plein écran ; HUD en coins, dialogue en bas, panneaux en feuille de carnet ; mobile : boutons tactiles en bas */
+:root{color-scheme:light;--paper:#f4ecd8;--paper2:#fbf6ea;--ink:#2a2018;--ink2:#5b4a3a;--rule:#9fb8d6;--red:#c8432f;--gold:#d9a13b;--green:#3f7f5a;--blue:#3d6fa8}
+:root[data-theme=dark]{color-scheme:light}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--paper);color:var(--ink);font:17px/1.4 'Patrick Hand',cursive,system-ui;-webkit-user-select:none;user-select:none;touch-action:none}
+canvas#c{position:fixed;inset:0;display:block}
+.hand{font-family:'Caveat',cursive}
+button{font:inherit;color:var(--ink);cursor:pointer}
+#hud{position:fixed;left:0;top:0;right:0;pointer-events:none;padding:calc(10px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+#stats{background:color-mix(in srgb,var(--paper2) 88%,transparent);border:2px solid var(--ink);border-radius:14px 10px 16px 9px;padding:8px 12px;box-shadow:3px 3px 0 rgba(42,32,24,.18);pointer-events:auto;max-width:min(360px,62vw)}
+#hearts,#inks{display:flex;gap:2px;align-items:center;flex-wrap:wrap}
+#hearts svg,#inks svg{width:20px;height:20px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+#seeds{font-size:18px;white-space:nowrap}
+#track{margin-top:6px;font-size:15px;line-height:1.25;border-top:1.5px dashed var(--ink2);padding-top:5px;color:var(--ink2)}
+#track b{color:var(--ink);font-family:'Caveat',cursive;font-size:20px;font-weight:700;display:block}
+#btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;pointer-events:auto;max-width:50vw}
+.ib{background:var(--paper2);border:2px solid var(--ink);border-radius:12px 9px 13px 8px;min-width:46px;height:46px;padding:0 10px;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:2px 2px 0 rgba(42,32,24,.2);font-size:16px}
+.ib:hover{background:#fff}.ib:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(42,32,24,.2)}
+.ib kbd{font:13px 'Patrick Hand';border:1px solid var(--ink2);border-radius:4px;padding:0 4px;color:var(--ink2)}
+.ib svg{width:22px;height:22px}
+#regionTitle{position:fixed;left:0;right:0;top:22%;text-align:center;font-family:'Caveat',cursive;font-size:clamp(40px,8vw,78px);font-weight:700;color:var(--ink);opacity:0;transition:opacity .8s;pointer-events:none;text-shadow:0 0 18px var(--paper),0 0 6px var(--paper);line-height:1}
+#regionTitle small{display:block;font-size:.38em;font-weight:500;color:var(--ink2)}
+#prompt{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 14px;border-radius:12px;font-size:17px;pointer-events:none;white-space:nowrap}
+#toasts{position:fixed;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px;pointer-events:none;max-width:min(420px,70vw);z-index:5}
+.toast{background:var(--paper2);border:2px solid var(--ink);border-radius:10px 14px 9px 13px;padding:6px 12px;font-size:16px;box-shadow:2px 2px 0 rgba(42,32,24,.2);animation:tin .35s ease-out}
+.toast.q{background:#fff4d6;border-color:var(--gold)}
+@keyframes tin{from{transform:translateX(-20px);opacity:0}}
+#dlg{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(760px,calc(100vw - 24px));background:var(--paper2);border:2.5px solid var(--ink);border-radius:18px 12px 20px 14px;padding:14px 16px;display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;box-shadow:4px 5px 0 rgba(42,32,24,.22);z-index:8;background-image:repeating-linear-gradient(transparent 0 29px,rgba(159,184,214,.45) 29px 30px)}
+#dlg canvas{width:96px;height:96px;border:2px solid var(--ink);border-radius:50% 46% 52% 48%;background:var(--paper)}
+#dlgName{font-family:'Caveat',cursive;font-weight:700;font-size:26px;line-height:1}
+#dlgText{font-size:18px;line-height:1.4;margin:4px 0 8px;min-height:3em}
+#dlgCh{display:flex;flex-direction:column;gap:6px}
+.ch{text-align:left;background:transparent;border:2px solid var(--ink);border-radius:10px 8px 11px 7px;padding:6px 12px;font-size:17px;min-height:40px}
+.ch:hover,.ch:focus-visible{background:#fff3cf;outline:none}
+.ch .n{color:var(--ink2);margin-right:6px}
+#panel{position:fixed;inset:calc(10px + env(safe-area-inset-top,0px)) max(10px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));margin:auto;max-width:880px;max-height:760px;background:var(--paper2);border:2.5px solid var(--ink);border-radius:16px 12px 18px 14px;z-index:9;display:flex;flex-direction:column;box-shadow:5px 6px 0 rgba(42,32,24,.25);background-image:linear-gradient(90deg,transparent 52px,rgba(200,67,47,.45) 52px 54px,transparent 54px),repeating-linear-gradient(transparent 0 31px,rgba(159,184,214,.5) 31px 32px)}
+#tabs{display:flex;gap:4px;padding:10px 12px 0 64px;flex-wrap:wrap;align-items:flex-end}
+.tab{background:transparent;border:2px solid var(--ink);border-bottom:none;border-radius:10px 10px 0 0;padding:4px 14px;font-family:'Caveat',cursive;font-size:22px;font-weight:700;color:var(--ink2)}
+.tab.on{background:#fff;color:var(--ink)}
+#pclose{margin-left:auto;margin-bottom:6px}
+#pbody{flex:1;overflow:auto;padding:14px 18px 18px 66px;border-top:2px solid var(--ink)}
+#pbody h2{font-family:'Caveat',cursive;font-size:34px;margin:0 0 6px;line-height:1}
+#pbody h3{font-family:'Caveat',cursive;font-size:25px;margin:14px 0 2px;line-height:1.05}
+.q{margin:0 0 14px}
+.q .st{margin:2px 0;font-size:16px}
+.q .st.done{color:#8a7d6e;text-decoration:line-through}
+.q .st.now{font-size:17px}
+.q .st.now::before{content:'➜ ';color:var(--red)}
+.qbtn{font-size:14px;border:1.5px solid var(--ink);border-radius:8px;background:#fff;padding:1px 8px;margin-left:8px;vertical-align:middle}
+.qbtn.on{background:var(--gold)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.card{border:2px solid var(--ink);border-radius:10px 13px 9px 12px;background:#fff;padding:8px;text-align:center;font-size:15px;line-height:1.25}
+.card canvas{width:96px;height:72px;display:block;margin:0 auto 4px}
+.card b{display:block;font-family:'Caveat',cursive;font-size:21px;line-height:1}
+.card.unk{background:#efe7d4;color:#9a8c7a}
+.card.sel{outline:3px solid var(--gold)}
+.qty{font-size:14px;color:var(--ink2)}
+#itemInfo{margin-top:12px;border:2px dashed var(--ink2);border-radius:10px;padding:10px;min-height:60px;background:#fff8}
+.btn{background:var(--ink);color:var(--paper);border:none;border-radius:9px;padding:6px 14px;font-size:16px;margin-top:6px;min-height:40px}
+#mapc{width:100%;height:min(560px,62vh);display:block;border:2px solid var(--ink);border-radius:10px;background:#f7efd9}
+.pagetxt{font-family:'Caveat',cursive;font-size:22px;line-height:1.2;border-left:3px solid var(--rule);padding-left:10px;margin:8px 0}
+#touch{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));display:none;gap:10px;z-index:4}
+#touch button{width:70px;height:70px;border-radius:50%;border:2.5px solid var(--ink);background:var(--paper2);font-size:15px;box-shadow:3px 3px 0 rgba(42,32,24,.2);line-height:1.05}
+.touchy #touch{display:flex}
+.touchy #toasts{bottom:calc(100px + env(safe-area-inset-bottom,0px));max-width:min(420px,calc(100vw - 24px))}
+#title{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px;background:radial-gradient(ellipse at center,rgba(244,236,216,.55),rgba(244,236,216,.92) 70%)}
+#tcard{max-width:620px;width:100%;text-align:center}
+#tcard h1{font-family:'Caveat',cursive;font-size:clamp(56px,12vw,104px);line-height:.9;margin:0;letter-spacing:-.01em}
+#tcard .sub{font-family:'Caveat',cursive;font-size:clamp(22px,4.5vw,30px);color:var(--ink2);margin:6px 0 18px}
+#tcard p{font-size:17px;margin:8px auto;max-width:520px}
+#tcard .btn{font-size:20px;padding:10px 22px;margin:6px}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 14px;text-align:left;max-width:520px;margin:14px auto 0;font-size:15px;color:var(--ink2)}
+.keys kbd{font:14px 'Patrick Hand';border:1.5px solid var(--ink2);border-radius:5px;padding:0 5px;color:var(--ink);background:#fff}
+#fade{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .6s;z-index:15}
+#credits{position:fixed;inset:0;z-index:18;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(251,246,234,.94);text-align:center}
+#credits h1{font-family:'Caveat',cursive;font-size:clamp(48px,10vw,88px);margin:0;line-height:.95}
+@media (max-width:600px){#dlg{grid-template-columns:64px minmax(0,1fr);gap:10px;padding:10px 12px}#dlg canvas{width:64px;height:64px}#dlgText{font-size:16.5px}.ib{min-width:42px;height:42px;padding:0 8px}.ib kbd{display:none}.ib span{display:none}#pbody{padding:12px 12px 16px 60px}#prompt{bottom:calc(110px + env(safe-area-inset-bottom,0px))}#track{font-size:14px}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="stats">
+    <div class="row"><div id="hearts"></div><div id="seeds"></div></div>
+    <div id="inks" title="Encre"></div>
+    <div id="track"></div>
+  </div>
+  <div id="btns">
+    <button class="ib" id="bJ" title="Journal des quêtes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 3h11l3 3v15H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span>Journal</span><kbd>J</kbd></button>
+    <button class="ib" id="bI" title="Sac"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9h14l-1 12H6z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg><span>Sac</span><kbd>I</kbd></button>
+    <button class="ib" id="bB" title="Carnet du naturaliste"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="13" rx="5" ry="7"/><path d="M12 6V3M9 4l3 2 3-2M7 10l-4-2M17 10l4-2M7 15H3M17 15h4M12 6v14"/></svg><span>Carnet</span><kbd>B</kbd></button>
+    <button class="ib" id="bM" title="Carte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span>Carte</span><kbd>M</kbd></button>
+    <button class="ib" id="bT" title="Laisser passer le temps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z"/></svg><span id="bTl">Attendre</span><kbd>T</kbd></button>
+    <button class="ib" id="bS" title="Son"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="sndw" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button>
+  </div>
+</div>
+<div id="regionTitle"></div>
+<div id="prompt" hidden></div>
+<div id="toasts"></div>
+<div id="touch"><button id="tAct">Parler<br>(E)</button><button id="tInk">Plume<br>(Espace)</button></div>
+<div id="dlg" hidden><canvas id="dlgPic" width="192" height="192"></canvas><div><div id="dlgName"></div><div id="dlgText"></div><div id="dlgCh"></div></div></div>
+<div id="panel" hidden><div id="tabs"><button class="tab" data-t="journal">Journal</button><button class="tab" data-t="sac">Sac</button><button class="tab" data-t="carnet">Carnet</button><button class="tab" data-t="carte">Carte</button><button class="ib" id="pclose" title="Fermer (Échap)">✕</button></div><div id="pbody"></div></div>
+<div id="fade"></div>
+<div id="title">
+  <div id="tcard">
+    <h1>Le Carnet Infini</h1>
+    <div class="sub">Écailles, élytres et encre originelle</div>
+    <p>Le monde est un carnet de naturaliste. Ses bords s'effacent. Tu es Pépin, jeune gecko, et tu tiens la vieille plume d'Élise.</p>
+    <div><button class="btn" id="bNew">Nouvelle partie</button><button class="btn" id="bCont" hidden>Continuer</button></div>
+    <div class="keys">
+      <div><kbd>ZQSD</kbd> / <kbd>WASD</kbd> / flèches : marcher</div>
+      <div>Clic ou toucher : aller là</div>
+      <div><kbd>E</kbd> : parler, examiner</div>
+      <div><kbd>Espace</kbd> : projeter l'encre</div>
+      <div><kbd>J</kbd> <kbd>I</kbd> <kbd>B</kbd> <kbd>M</kbd> : journal, sac, carnet, carte</div>
+      <div>Molette : zoom · <kbd>T</kbd> : attendre</div>
+    </div>
+  </div>
+</div>
+<div id="credits" hidden><div id="credBody"></div></div>
+<script>
+{
+'use strict';
+const $=id=>document.getElementById(id);
+const cv=$('c'), g0=cv.getContext('2d');
+let g=g0;
+let W=0,H=0,DPR=1;
+const INK='#2a2018';
+function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*DPR|0;cv.height=H*DPR|0;cv.style.width=W+'px';cv.style.height=H+'px';nc.width=cv.width;nc.height=cv.height;}
+const nc=document.createElement('canvas'), ng=nc.getContext('2d');
+
+/* ---------- aléatoire & bruit ---------- */
+function R(n){const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);}
+function H2(a,b){return R(a*157.31+b*913.17+R(a*.71+b*.37)*17.3);}
+let boil=0;
+function J(s,a){return (R(s*1.731+boil*97.13)-.5)*2*a;}
+function vnoise(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,s=t=>t*t*(3-2*t);const a=H2(xi,yi),b=H2(xi+1,yi),c=H2(xi,yi+1),d=H2(xi+1,yi+1),u=s(xf),v=s(yf);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;}
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const dist=(ax,ay,bx,by)=>Math.hypot(ax-bx,ay-by);
+
+/* ---------- traits tremblés ---------- */
+function pathPts(p,close){g.beginPath();const n=p.length;if(close){const a0=p[n-1],a1=p[0];g.moveTo((a0[0]+a1[0])/2,(a0[1]+a1[1])/2);for(let i=0;i<n;i++){const a=p[i],b=p[(i+1)%n];g.quadraticCurveTo(a[0],a[1],(a[0]+b[0])/2,(a[1]+b[1])/2);}g.closePath();}else{g.moveTo(p[0][0],p[0][1]);for(let i=1;i<n-1;i++){const a=p[i],b=p[i+1];g.quadraticCurveTo(a[0],a[1],(a[0]+b[0])/2,(a[1]+b[1])/2);}if(n>1)g.lineTo(p[n-1][0],p[n-1][1]);}}
+function ell(x,y,rx,ry,rot,sd,amt){const n=Math.max(8,Math.min(24,(rx+ry)/2.5|0)),c=Math.cos(rot),s=Math.sin(rot),p=[];for(let i=0;i<n;i++){const a=i/n*6.2832,k=1+J(sd+i,amt);const px=Math.cos(a)*rx*k,py=Math.sin(a)*ry*k;p.push([x+px*c-py*s,y+px*s+py*c]);}pathPts(p,true);}
+function blob(x,y,rx,ry,col,sd,o){o=o||{};const rot=o.rot||0,amt=o.amt??.06;if(col){g.globalAlpha=o.alpha??.92;g.fillStyle=col;const of=o.off??1.4;ell(x+of,y+of*.6,rx,ry,rot,sd+50,amt);g.fill();g.globalAlpha=1;}if(o.stroke!==false){g.strokeStyle=o.ink||INK;g.lineWidth=o.lw||1.5;ell(x,y,rx,ry,rot,sd,amt*.8);g.stroke();}}
+function ln(x1,y1,x2,y2,sd,lw,amt,col){const d=Math.hypot(x2-x1,y2-y1)||1,n=Math.max(2,Math.min(7,d/14|0)),nx=-(y2-y1)/d,ny=(x2-x1)/d,a=amt??Math.min(1.8,d*.05),p=[];for(let i=0;i<=n;i++){const t=i/n,j=J(sd+i*1.37,(i==0||i==n)?a*.4:a);p.push([x1+(x2-x1)*t+nx*j,y1+(y2-y1)*t+ny*j]);}g.strokeStyle=col||INK;g.lineWidth=lw||1.4;g.lineCap='round';pathPts(p,false);g.stroke();}
+function curve(pts,sd,lw,amt,col){const p=pts.map((q,i)=>[q[0]+J(sd+i,amt),q[1]+J(sd+i+.5,amt)]);g.strokeStyle=col||INK;g.lineWidth=lw||1.4;g.lineCap='round';pathPts(p,false);g.stroke();}
+function dot(x,y,r,col){g.fillStyle=col||INK;g.beginPath();g.arc(x,y,r,0,6.2832);g.fill();}
+function eyes(x,y,r,sd){for(const s of[-1,1]){dot(x+J(sd+s,.3),s*y,r);dot(x+r*.35,s*y-r*.35,r*.38,'#fff');}}
+function tube(pts,w0,w1,col,sd){const p=pts.map((q,i)=>[q[0]+J(sd+i,.6),q[1]+J(sd+i+.3,.6)]);g.lineCap='round';g.lineJoin='round';for(let pass=0;pass<2;pass++){for(let i=0;i<p.length-1;i++){const w=w0+(w1-w0)*(i/(p.length-1));g.strokeStyle=pass?col:INK;g.lineWidth=pass?w:w+2.6;g.beginPath();g.moveTo(p[i][0],p[i][1]);g.lineTo(p[i+1][0],p[i+1][1]);g.stroke();}}}
+function hand(txt,x,y,size,col,align,rot){g.save();g.translate(x,y);if(rot)g.rotate(rot);g.font=`700 ${size}px Caveat, cursive`;g.textAlign=align||'center';g.textBaseline='middle';g.fillStyle=col||INK;g.fillText(txt,0,0);g.restore();}
+
+/* ---------- espèces ---------- */
+const SP={
+ gecko:{n:'Gecko',p:'lizard',c:'#5fb39a',b:['hub','pre'],d:"Marche au plafond grâce à des millions de poils minuscules. Toi, par exemple."},
+ fourmi:{n:'Fourmi rousse',p:'ant',c:'#b5502c',b:['fourmi','pre','hub'],d:"Ouvrière infatigable. Porte cinquante fois son poids, et autant de rancunes."},
+ puceron:{n:'Puceron',p:'aphid',c:'#9fd06a',b:['fourmi'],d:"Petit, vert, rond. Les fourmis le traient comme une vache minuscule."},
+ coccinelle:{n:'Coccinelle à sept points',p:'lady',c:'#d63a2f',b:['pre','hub'],d:"Compte ses points chaque matin. Toujours sept. Soulagement."},
+ abeille:{n:'Abeille',p:'bee',c:'#e8b923',b:['pre','hub','cime'],d:"Danse pour indiquer le chemin des fleurs. Très mauvaise en valse."},
+ grillon:{n:'Grillon des champs',p:'cricket',c:'#6a4f2a',b:['pre','hub'],d:"Chante avec ses ailes, écoute avec ses genoux."},
+ scarabee:{n:'Scarabée émeraude',p:'beetle',c:'#2f7d5f',b:['bois','pre'],d:"Sa carapace reflète les feuilles. Se prend parfois pour l'une d'elles."},
+ lucane:{n:'Lucane cerf-volant',p:'stag',c:'#6b3a1f',b:['bois'],d:"Les mâles croisent leurs mandibules comme des épées. Pour rire, surtout."},
+ bousier:{n:'Bousier',p:'beetle',c:'#33333d',b:['bois','dunes'],d:"Roule sa boule en suivant la Voie lactée. Ne se perd jamais. Sa boule, si."},
+ luciole:{n:'Luciole',p:'firefly',c:'#5a4a2e',b:['bois','marais'],night:1,d:"Écrit des lettres de lumière dans le noir. Personne ne sait encore les lire."},
+ araignee:{n:'Épeire des bois',p:'spider',c:'#4a3550',b:['bois'],d:"Tisse une toile neuve chaque nuit et la mange au matin. Rien ne se perd."},
+ chenille:{n:'Chenille',p:'cater',c:'#8fcf4a',b:['bois','cime'],d:"Mange, dort, mange. Rêve en couleurs de ce qu'elle sera."},
+ phasme:{n:'Phasme',p:'stick',c:'#8a7a4a',b:['bois'],d:"L'art de ne pas être vu, porté jusqu'à la perfection."},
+ cigale:{n:'Cigale',p:'cicada',c:'#7a6a3a',b:['dunes'],d:"Passe sept ans sous terre pour chanter un seul été."},
+ scorpion:{n:'Scorpion des sables',p:'scorp',c:'#c9a04a',b:['dunes'],d:"Brille d'un bleu fantôme sous la lune. Il préfère qu'on n'en parle pas."},
+ lezard:{n:'Lézard des sables',p:'lizard',c:'#c9a24a',b:['dunes','pre'],d:"Lève les pattes une à une pour ne pas se brûler. Une danse de nécessité."},
+ vipere:{n:'Vipère aspic',p:'snake',c:'#a0784a',b:['dunes'],d:"Goûte le monde avec sa langue. Le monde a un goût de poussière chaude."},
+ iguane:{n:'Iguane',p:'iguana',c:'#6a9a4a',b:['dunes'],d:"Un troisième œil sur le crâne pour surveiller le ciel. Et les impertinents."},
+ libellule:{n:'Libellule',p:'dragon',c:'#3fb5b0',b:['marais'],d:"Peut voler à reculons. Le fait surtout pour narguer les moustiques."},
+ moustique:{n:'Moustique',p:'mosq',c:'#777777',b:['marais'],d:"Bzzz. Personne ne l'aime. Il le sait, et il insiste."},
+ couleuvre:{n:'Couleuvre à collier',p:'snake',c:'#4f6b55',b:['marais'],d:"Nage la tête hors de l'eau, comme un petit périscope."},
+ tortue:{n:'Cistude des marais',p:'turtle',c:'#5f6f4a',b:['marais'],d:"Tortue d'eau qui prend le soleil en piles de trois."},
+ crocodile:{n:'Crocodile nain',p:'croc',c:'#5a7a4a',b:['marais'],d:"Sourire permanent. Ce n'est pas forcément de la gentillesse."},
+ cameleon:{n:'Caméléon',p:'chame',c:'#8ac060',b:['marais'],d:"Ses yeux regardent deux choses à la fois. Souvent deux soucis."},
+ mante:{n:'Mante religieuse',p:'mantis',c:'#7cbf4a',b:['cime'],d:"On dit qu'elle prie. Elle attend, surtout."},
+ papillon:{n:'Machaon',p:'butter',c:'#f0b030',c2:'#2a2018',b:['cime','pre'],d:"Ses ailes portent de faux yeux, pour effrayer les oiseaux."},
+ azur:{n:'Azuré du serpolet',p:'butter',c:'#6aa8e8',c2:'#ffffff',b:['cime'],d:"Bleu comme un ciel d'août, petit comme un ongle."},
+ sphinx:{n:'Sphinx colibri',p:'moth',c:'#b09070',b:['cime'],d:"Butine en vol stationnaire. On le prend souvent pour un oiseau."},
+ gribouille:{n:'Gribouille',p:'doodle',c:'#8a8a8a',b:['esquisse'],d:"Né d'un trait distrait au bord d'une page. Cherche encore à quoi il ressemble."},
+ croquis:{n:'Croquis-lézard',p:'sketchliz',c:'#9a9a9a',b:['esquisse'],d:"Un lézard qu'Élise n'a jamais terminé. Il lui manque une patte, il s'en moque."},
+};
+const SPIDS=Object.keys(SP);
+
+function legs(xs,len,ph,sd,lw){for(let i=0;i<xs.length;i++)for(const s of[-1,1]){const sw=Math.sin(ph+i*2.1+(s>0?3.14:0))*len*.28,kx=xs[i]+sw*.5+(i-1)*len*.15,ky=s*len*.55,fx=xs[i]+sw+(i-1)*len*.45,fy=s*len;ln(xs[i],0,kx,ky,sd+i*7+s,lw||1.3,.5);ln(kx,ky,fx,fy,sd+i*9+s*3,lw||1.3,.5);}}
+function ants(x,len,sd,spr){spr=spr??.55;for(const s of[-1,1]){ln(x,s*1.5,x+len*.55,s*len*spr*.5,sd+s,1.1,.4);ln(x+len*.55,s*len*spr*.5,x+len,s*len*spr,sd+s*2,1.1,.4);}}
+function wings(x,y,rx,ry,col,t,sd,n){const f=.6+.4*Math.abs(Math.sin(t*22));for(const s of[-1,1]){blob(x,s*(y+ry*f*.6),rx,ry*f,col,sd+s*5,{alpha:.45,lw:1,rot:s*.25});if(n==4)blob(x-rx*.8,s*(y+ry*f*.5),rx*.8,ry*f*.8,col,sd+s*9,{alpha:.4,lw:1,rot:s*.45});}}
+const PLAN={
+ ant(o){const c=o.c;legs([-1,1,3],9,o.ph,o.sd);ants(9,10,o.sd+40);blob(-9,0,7.5,5.2,c,o.sd);blob(0,0,4.2,3,c,o.sd+1);blob(7.5,0,4.6,4,c,o.sd+2);eyes(9,2,1,o.sd);if(o.crown){g.fillStyle='#e7b739';g.strokeStyle=INK;g.lineWidth=1.2;g.beginPath();g.moveTo(5,-4);g.lineTo(6,-8);g.lineTo(7.5,-5);g.lineTo(9,-8.5);g.lineTo(10,-4.5);g.closePath();g.fill();g.stroke();}if(o.wing)wings(-4,4,10,4,'#e6e2ff',0,o.sd);},
+ aphid(o){legs([-1,1,3],5,o.ph,o.sd,1);blob(-1,0,6.5,5,o.c,o.sd);blob(6,0,3,2.8,o.c,o.sd+1);eyes(7,1.4,.8,o.sd);ln(-6,2,-9,3,o.sd+5,1);ln(-6,-2,-9,-3,o.sd+6,1);},
+ lady(o){legs([-3,0,3],7,o.ph,o.sd);blob(7,0,3.6,4.5,INK,o.sd+1);blob(-1,0,8.5,7.5,o.c,o.sd);ln(-9,0,6,0,o.sd+3,1.2);for(const[a,b]of[[-4,3.5],[-4,-3.5],[1,4.5],[1,-4.5],[-7,2],[-7,-2],[3,0]])dot(a,b,1.4);dot(7.5,2.5,.9,'#fff');dot(7.5,-2.5,.9,'#fff');},
+ bee(o){legs([-1,1,3],7,o.ph,o.sd,1.1);blob(-6,0,8,6,o.c,o.sd);for(const x of[-9,-5.5,-2])ln(x,-5.4,x+.5,5.4,o.sd+x,2.2);blob(2.5,0,4.5,4.2,'#6b4b2a',o.sd+1);blob(8.5,0,3.8,3.8,'#3a2a1a',o.sd+2);eyes(9.5,1.8,1,o.sd);ants(11,6,o.sd+30,.5);wings(1,3,7,4,'#ffffff',o.t,o.sd+60);},
+ firefly(o){legs([-1,1,3],6,o.ph,o.sd,1);const gl=o.glow??(isNight()?1:.15);if(gl>.3){g.globalAlpha=.35*gl;dot(-7,0,13,'#fff59a');g.globalAlpha=1;}blob(-6,0,6.5,4.5,gl>.3?'#fff27a':'#d8d08a',o.sd);blob(2,0,5,4,o.c,o.sd+1);blob(7.5,0,3,3,'#c8553a',o.sd+2);eyes(8.5,1.4,.8,o.sd);ants(10,6,o.sd+30);},
+ cricket(o){const ph=o.ph;for(const s of[-1,1]){const k=Math.sin(ph+(s>0?3:0))*2;ln(-4,s*3,-10+k,s*10,o.sd+s,1.8);ln(-10+k,s*10,-16+k,s*7,o.sd+s*2,1.4);}legs([2,6],7,ph,o.sd+9,1.1);blob(-3,0,10,4.5,o.c,o.sd);blob(7,0,4,4,o.c,o.sd+1);eyes(9,2,1,o.sd);curve([[10,1],[18,6],[26,12]],o.sd+21,1);curve([[10,-1],[18,-6],[26,-12]],o.sd+22,1);ln(-12,1.5,-17,2.5,o.sd+31,1);ln(-12,-1.5,-17,-2.5,o.sd+32,1);},
+ cicada(o){legs([-1,2,4],7,o.ph,o.sd);for(const s of[-1,1])blob(-6,s*4.5,11,4,'#eaf4f0',o.sd+s,{alpha:.55,rot:s*.12,lw:1});blob(0,0,9,6,o.c,o.sd);blob(8,0,3.6,6,o.c,o.sd+2);dot(9,4.5,1.6);dot(9,-4.5,1.6);},
+ beetle(o){legs([-3,0,3],9,o.ph,o.sd);blob(9,0,4,4.5,o.c,o.sd+2);blob(-1,0,10,8,o.c,o.sd);ln(-11,0,6,0,o.sd+5,1.2);g.globalAlpha=.4;blob(-4,-3,3,1.5,'#fff',o.sd+7,{stroke:false});g.globalAlpha=1;eyes(10.5,2.6,1,o.sd);ants(12,5,o.sd+30,.7);},
+ stag(o){legs([-3,0,3],10,o.ph,o.sd,1.6);blob(-2,0,11,8,o.c,o.sd);ln(-13,0,5,0,o.sd+5,1.2);blob(9,0,4.5,5.5,'#3a2010',o.sd+2);for(const s of[-1,1]){curve([[12,s*3],[18,s*7],[23,s*3],[24,s*1]],o.sd+s*11,3.2,.4);ln(18,s*6.5,19,s*9,o.sd+s*12,1.6);}eyes(11,4,1.1,o.sd);},
+ spider(o){for(let i=0;i<4;i++)for(const s of[-1,1]){const sw=Math.sin(o.ph+i*1.6+(s>0?3:0))*2,a=(-.9+i*.6)*1,kx=2+Math.cos(a)*8,ky=s*(4+Math.sin(Math.abs(a))*3+6),fx=2+Math.cos(a)*15+sw,fy=s*(14+i%2*2);ln(2,s*1.5,kx,ky,o.sd+i*3+s,1.3);ln(kx,ky,fx,fy,o.sd+i*5+s*7,1.2);}blob(-7,0,9,8,o.c,o.sd);blob(4,0,5,4.5,o.c,o.sd+1);eyes(8,1.6,.9,o.sd);for(const p of[[-10,0],[-6,3],[-6,-3]])dot(p[0],p[1],1.3,'#e8d27a');},
+ scorp(o){legs([-4,-1,2,4],8,o.ph,o.sd,1.2);for(const s of[-1,1]){ln(6,s*3,14,s*8,o.sd+s,2);blob(18,s*9,4.5,3,o.c,o.sd+s*3);ln(20,s*9,24,s*7,o.sd+s*4,1.6);ln(20,s*10,24,s*11.5,o.sd+s*5,1.6);}blob(0,0,9,5.5,o.c,o.sd);const sw=Math.sin(o.t*3)*2;tube([[-8,0],[-14,sw],[-19,sw*1.5],[-21,-5],[-17,-10],[-11,-11]],4.5,3,o.c,o.sd+20);ln(-11,-11,-8,-8,o.sd+30,2);eyes(6.5,1.5,.9,o.sd);},
+ lizard(o){const c=o.c,sw=Math.sin(o.ph);const tp=[];for(let i=0;i<=7;i++){const t=i/7;tp.push([-7-t*26,Math.sin(o.t*2.5+t*3)*2.5*t+sw*5*t*t]);}tube(tp,6,1.2,c,o.sd+70);for(const[lx,f]of[[6,1],[-6,-1]])for(const s of[-1,1]){const k=Math.sin(o.ph+(s*f>0?3.14:0))*3;ln(lx,s*3.5,lx+k+2*f,s*8,o.sd+lx+s,2.2);ln(lx+k+2*f,s*8,lx+k+5*f,s*11,o.sd+lx+s*4,1.8);if(o.pads){dot(lx+k+5*f,s*11,1.6);}}blob(0,0,11,5.8,c,o.sd);blob(12,0,6.2,4.8,c,o.sd+3);eyes(13.5,2.9,1.4,o.sd);if(o.spots)for(const p of[[-4,-1],[0,2],[4,-2],[-7,1.5]])dot(p[0],p[1],1.1,'rgba(42,32,24,.55)');if(o.bag){blob(-2,4,4,3,'#a86a3a',o.sd+90);ln(-5,2,4,-3,o.sd+91,1.2);}if(o.quill){ln(4,-4,-4,-14,o.sd+92,1.6);curve([[-4,-14],[-1,-11],[2,-8]],o.sd+93,1);blob(-3,-12,2.5,1.2,'#f4f0e0',o.sd+94,{rot:-.9,lw:1});}if(o.hat){blob(13,0,5,5,'#d8452f',o.sd+95,{lw:1.2});dot(15,0,1,'#fff');}},
+ iguana(o){PLAN.lizard(Object.assign({},o,{spots:0}));for(let i=0;i<7;i++){const x=12-i*3.5;g.fillStyle=INK;g.beginPath();g.moveTo(x-1.4,0);g.lineTo(x+J(o.sd+i,.4),-3.8-(i<3?1:0));g.lineTo(x+1.4,0);g.fill();}blob(14,3.8,2.6,2,'#d9b04a',o.sd+44,{lw:1});},
+ chame(o){const c=o.c,sw=Math.sin(o.ph);tube([[-8,0],[-16,1],[-22,4],[-24,9],[-21,12],[-17,10],[-18,7]],5.5,1.6,c,o.sd+70);for(const[lx,f]of[[6,1],[-5,-1]])for(const s of[-1,1]){const k=Math.sin(o.ph+(s*f>0?3:0))*2.5;ln(lx,s*4,lx+k+f,s*8,o.sd+lx+s,2.2);ln(lx+k+f,s*8,lx+k+3*f,s*10.5,o.sd+lx+s*3,1.8);}blob(0,0,11,7,c,o.sd);blob(12,0,6.5,5.2,c,o.sd+3);g.fillStyle=c;g.strokeStyle=INK;g.lineWidth=1.3;g.beginPath();g.moveTo(8,-3);g.lineTo(13,-9);g.lineTo(16,-3);g.closePath();g.fill();g.stroke();for(const s of[-1,1]){blob(13.5,s*4,2.6,2.6,c,o.sd+s*8);dot(14+Math.sin(o.t*1.3+s)*.9,s*4,1.1);}for(let i=-6;i<8;i+=4)ln(i,-6,i+1,6,o.sd+i,.8,.5,'rgba(42,32,24,.35)');},
+ snake(o){const c=o.c,n=12,p=[];for(let i=0;i<=n;i++){const t=i/n;p.push([14-t*44,Math.sin(o.t*3-t*6+o.ph*.2)*6*(0.3+t*.7)]);}tube(p,7.5,1.5,c,o.sd);blob(16,p[0][1]*.6,6.5,5,c,o.sd+3);eyes(18,2.4,1.1,o.sd);if(Math.sin(o.t*4)>.4){ln(22,0,27,0,o.sd+9,1,.3,'#c8432f');ln(27,0,29,1.5,o.sd+10,.9,.2,'#c8432f');ln(27,0,29,-1.5,o.sd+11,.9,.2,'#c8432f');}if(o.collar){g.strokeStyle='#e8d36a';g.lineWidth=2;g.beginPath();g.moveTo(11,-4);g.lineTo(11,4);g.stroke();}for(let i=2;i<n;i+=2)dot(p[i][0],p[i][1],1.3,'rgba(42,32,24,.5)');},
+ turtle(o){for(const[x,y]of[[8,8],[8,-8],[-8,8],[-8,-8]]){const k=Math.sin(o.ph+(x*y>0?0:3))*1.5;blob(x+k,y,3.5,2.6,o.c2||'#a9a06a',o.sd+x+y);}blob(15,0,4.5,4,o.c2||'#a9a06a',o.sd+4);eyes(17,2,1,o.sd);ln(-13,0,-17,1,o.sd+5,2);blob(0,0,14,12,o.c,o.sd);g.globalAlpha=.7;for(const[x,y,r]of[[0,0,4.5],[-7,-4,3],[-7,4,3],[7,-4,3],[7,4,3]])blob(x,y,r,r,null,o.sd+x*3+y,{lw:1.1});g.globalAlpha=1;},
+ croc(o){const c=o.c;const tp=[];for(let i=0;i<=7;i++){const t=i/7;tp.push([-14-t*30,Math.sin(o.t*1.6+t*3)*3*t]);}tube(tp,10,2,c,o.sd+70);for(const[lx,f]of[[8,1],[-10,-1]])for(const s of[-1,1]){const k=Math.sin(o.ph+(s*f>0?3:0))*2;ln(lx,s*7,lx+k+3*f,s*12,o.sd+lx+s,3);}blob(0,0,18,8.5,c,o.sd);blob(23,0,12,5,c,o.sd+3);ln(14,0,35,0,o.sd+8,1);for(let i=-12;i<14;i+=5){dot(i,-3,1.3,'rgba(42,32,24,.6)');dot(i,3,1.3,'rgba(42,32,24,.6)');}for(const s of[-1,1]){blob(17,s*4.5,2.4,2,'#e8d36a',o.sd+s*4,{lw:1});dot(17.5,s*4.5,.9);}for(let i=18;i<34;i+=3){ln(i,4.8,i+1,6.3,o.sd+i,.8,.2);ln(i,-4.8,i+1,-6.3,o.sd+i+1,.8,.2);}},
+ dragon(o){const f=.7+.3*Math.abs(Math.sin(o.t*25));for(const s of[-1,1]){blob(1,s*9*f,4,10*f,'#dff6f5',o.sd+s,{alpha:.45,lw:1,rot:s*-.15});blob(-4,s*8*f,3.4,9*f,'#dff6f5',o.sd+s*3,{alpha:.4,lw:1,rot:s*.25});}tube([[0,0],[-8,0],[-16,.5],[-24,1]],3.4,2,o.c,o.sd+20);blob(1,0,4.5,3.5,o.c,o.sd+1);blob(6.5,0,3.5,4.5,o.c,o.sd+2);dot(7.5,2.5,2);dot(7.5,-2.5,2);},
+ mosq(o){for(let i=0;i<3;i++)for(const s of[-1,1]){ln(0,0,(i-1)*7+s,s*9,o.sd+i+s,.8);ln((i-1)*7+s,s*9,(i-1)*11,s*14,o.sd+i*3+s,.8);}wings(0,2,6,2.5,'#f0f0f0',o.t,o.sd+40);tube([[0,0],[-6,0],[-11,0]],2.4,1.4,o.c,o.sd);blob(2.5,0,2.4,2,o.c,o.sd+1);ln(4,0,9,0,o.sd+5,.8);},
+ mantis(o){legs([-6,-3],9,o.ph,o.sd,1.1);tube([[-2,0],[-10,0],[-18,0]],6,3,o.c,o.sd+5);tube([[-2,0],[4,0],[10,0]],3,2.5,o.c,o.sd+6);g.fillStyle=o.c;g.strokeStyle=INK;g.lineWidth=1.4;g.beginPath();g.moveTo(11,-4.5);g.lineTo(17,0);g.lineTo(11,4.5);g.closePath();g.fill();g.stroke();dot(12,3.5,1.5);dot(12,-3.5,1.5);for(const s of[-1,1]){ln(8,s*2,13,s*5,o.sd+s,1.6);ln(13,s*5,10,s*7,o.sd+s*2,1.4);}ants(16,7,o.sd+30,.4);if(o.veil){g.globalAlpha=.6;blob(6,0,9,7,'#f4f0ff',o.sd+70,{lw:1});g.globalAlpha=1;}},
+ stick(o){tube([[14,0],[0,0],[-14,0],[-22,0]],2.4,2,o.c,o.sd);for(const x of[8,0,-8])for(const s of[-1,1]){const k=Math.sin(o.ph+x+(s>0?3:0))*1.5;ln(x,0,x+3+k,s*7,o.sd+x+s,.9);ln(x+3+k,s*7,x+8+k,s*12,o.sd+x+s*3,.9);}ants(14,10,o.sd+30,.2);dot(13,1,.8);dot(13,-1,.8);},
+ cater(o){for(let i=6;i>=0;i--){const x=8-i*4.5,y=Math.sin(o.t*4-i*.8)*1.8;blob(x,y,3.4+(i==0?.6:0),3.4,o.c,o.sd+i);if(i%2==0)dot(x,y,1,'#2a2018');}eyes(9,1.5,.8,o.sd);ln(10,1.5,13,3,o.sd+3,.9);ln(10,-1.5,13,-3,o.sd+4,.9);},
+ butter(o){const f=.45+.55*Math.abs(Math.sin(o.t*(o.slow?4:9)));for(const s of[-1,1]){blob(2,s*12*f,8,11*f,o.c,o.sd+s,{rot:s*.3,lw:1.3});blob(-6,s*8*f,6,7*f,o.c,o.sd+s*3,{rot:-s*.3,lw:1.2});dot(3,s*13*f,2.2*f+.5,o.c2||INK);if(o.aurora){blob(-6,s*8*f,3,3.5*f,'#ff9ac0',o.sd+s*8,{stroke:false,alpha:.8});dot(4,s*9*f,1.6,'#fff');}}tube([[7,0],[0,0],[-9,0]],3,2,'#3a2a1a',o.sd+20);ants(8,7,o.sd+30,.6);},
+ moth(o){const f=.7+.3*Math.abs(Math.sin(o.t*30));for(const s of[-1,1]){blob(0,s*8*f,7,8*f,'#c8b090',o.sd+s,{rot:s*.5,lw:1,alpha:.7});blob(-5,s*6*f,4,5*f,'#e08a3a',o.sd+s*3,{rot:-s*.3,lw:1});}blob(-3,0,8,4.5,o.c,o.sd);blob(6,0,3.4,3.4,o.c,o.sd+1);ln(8,0,15,1,o.sd+5,.9);dot(7,2,1);dot(7,-2,1);},
+ doodle(o){g.strokeStyle='#777';g.lineWidth=1.2;g.beginPath();for(let i=0;i<14;i++){const a=i*1.9,r=6+R(o.sd+i)*4+J(o.sd+i,1);i?g.lineTo(Math.cos(a)*r,Math.sin(a)*r):g.moveTo(Math.cos(a)*r,Math.sin(a)*r);}g.stroke();legs([-3,0,3],10,o.ph,o.sd,1);eyes(5,2.5,1.4,o.sd);},
+ sketchliz(o){g.setLineDash([4,3]);PLAN.lizard(Object.assign({},o,{c:'rgba(255,255,255,0)'}));g.setLineDash([]);},
+ gomme(o){const c=o.c||'#f2d4d0',n=6;for(let i=n-1;i>=0;i--){const x=-i*18,y=Math.sin(o.t*2-i*.7)*5;blob(x,y,17-i*.8,19-i*1.2,i%2?'#f6e6e2':c,o.sd+i,{lw:2});}blob(14,0,15,15,'#fbf0ee',o.sd+20,{lw:2});if(o.friend){dot(18,-5,2.4);dot(18,5,2.4);curve([[22,-5],[25,0],[22,5]],o.sd+30,1.6);for(const s of[-1,1])dot(14,s*9,2.5,'#f6a0b0');}else{dot(19,-5,1.8,'#777');dot(19,5,1.8,'#777');ln(24,-4,23,4,o.sd+31,1.2,.4,'#777');}},
+ tache(o){const r=o.r||15;g.fillStyle='rgba(225,222,215,.95)';g.strokeStyle='#8c8680';g.lineWidth=1.6;g.setLineDash([3,3]);ell(0,0,r,r*.85,0,o.sd,.18);g.fill();g.stroke();g.setLineDash([]);for(let i=0;i<4;i++)dot(-r*.4+R(o.sd+i)*r*.9,-r*.4+R(o.sd+i+9)*r*.8,1.4,'#bbb5ad');dot(r*.35,-3,1.8,'#555');dot(r*.35,3,1.8,'#555');},
+};
+function drawCreature(plan,x,y,ang,sc,o){g.save();g.translate(x,y);g.rotate(ang||0);g.scale(sc,sc);try{PLAN[plan](o);}catch(e){if(!window.__perr){window.__perr=String(e.stack||e);console.error(e);}}g.restore();}
+function spOpts(id,extra){const s=SP[id];return Object.assign({c:s.c,c2:s.c2,ph:0,t:0,sd:SPIDS.indexOf(id)*17+3,pads:id=='gecko',spots:id=='lezard',collar:id=='couleuvre'},extra||{});}
+
+/* ---------- objets & icônes ---------- */
+const ITEMS={
+ plume:{n:"Plume d'Élise",d:"La vieille plume de la naturaliste. Espace : projeter de l'encre (1 goutte).",s:'feather',c:'#f4f0e0'},
+ carte:{n:"Carte du Carnet",d:"Une carte pliée en huit. Touche M.",s:'map',c:'#e9dcb6'},
+ miel:{n:"Pot de miel",d:"Doré et collant. Rend 2 cœurs.",s:'jar',c:'#e8b923',use:()=>heal(2)},
+ champi:{n:"Champignon doux",d:"Ça sent la cave et la noisette. Rend 1 cœur.",s:'mush',c:'#d9734a',use:()=>heal(1)},
+ mure:{n:"Encre de mûre",d:"Jus de mûre épais. +3 encre.",s:'drop',c:'#5a2a5a',use:()=>{S.ink=Math.min(S.inkMax,S.ink+3);return true;}},
+ goutte:{n:"Goutte d'Encre Originelle",d:"Noire comme le fond d'un puits, chaude comme une main. Il en faut cinq pour réparer l'Encrier.",s:'drop',c:'#14101a'},
+ puceron:{n:"Puceron égaré",d:"Il gigote dans ta poche. La Reine Ostra l'attend.",s:'bug',c:'#9fd06a'},
+ rosee:{n:"Rosée Royale",d:"Une perle de rosée récoltée à l'aube par les fourmis. Précieuse.",s:'gem',c:'#bfe6ff'},
+ petale:{n:"Pétale de Nuit",d:"Il luit faiblement. Ne s'ouvre qu'à la lune.",s:'leaf',c:'#9a7ad8'},
+ lanterne:{n:"Lanterne-luciole",d:"Une coque de gland où brille la lumière de Lumi. Perce le brouillard du Marais.",s:'lantern',c:'#fff27a'},
+ ombrelle:{n:"Ombrelle de feuille",d:"Une grande feuille de figuier, cousue par Lucane. Protège du soleil des Dunes.",s:'leaf',c:'#5f9a4a'},
+ mue:{n:"Écaille de mue",d:"Une peau de serpent fine comme du papier calque, et solide comme le cuir.",s:'scroll',c:'#e8dcc0'},
+ pince:{n:"Pince de Lucane",d:"Forgée dans une mandibule et une écaille. Tranche les ronces.",s:'claw',c:'#6b3a1f'},
+ soleil:{n:"Pierre-Soleil",d:"Elle a gardé la chaleur de mille midis.",s:'stone',c:'#f0a030'},
+ soie:{n:"Fil de soie",d:"Une bobine de fil d'araignée, doux comme une promesse.",s:'thread',c:'#f4f4f4'},
+ coquillage:{n:"Coquillage",d:"Petit coquillage d'eau douce. Margot les collectionne.",s:'shell',c:'#f0d8c0'},
+ miroir:{n:"Miroir de nacre",d:"L'intérieur d'une coquille, poli par Kaméo. On s'y voit en couleurs.",s:'shell',c:'#dfe8f4'},
+ ambre:{n:"Ambre ancien",d:"Une goutte de résine fossile. Un moustique y dort depuis toujours.",s:'gem',c:'#e0952a'},
+ boule:{n:"Bérénice",d:"La boule de Roulo. Parfaitement ronde. Il ne faut pas demander de quoi.",s:'ball',c:'#7a5a3a'},
+ note:{n:"Note de musique",d:"Une note échappée de la partition de Vivaldo. Elle vibre encore.",s:'note',c:'#3d6fa8'},
+ lettre:{n:"Lettre parfumée",d:"Scellée d'une goutte de miel. Pour Brindille, de la part de Sœur Prieuse.",s:'scroll',c:'#f8e0e8'},
+ reponse:{n:"Réponse de Brindille",d:"Une feuille pliée en forme de cœur, un peu de travers.",s:'scroll',c:'#e0f0d0'},
+ loupe:{n:"Loupe d'Élise",d:"Les choses cachées scintillent de plus loin.",s:'loupe',c:'#bfe6ff'},
+};
+function icon(s,c,sd){switch(s){
+ case'drop':g.fillStyle=c;g.strokeStyle=INK;g.lineWidth=1.6;g.beginPath();g.moveTo(0,-11);g.quadraticCurveTo(9,1,6,6);g.arc(0,5,6,0,3.14);g.quadraticCurveTo(-9,1,0,-11);g.fill();g.stroke();dot(-2,3,1.6,'rgba(255,255,255,.7)');break;
+ case'jar':blob(0,3,8,7,c,sd);blob(0,-5,6,2.5,'#c8a070',sd+1);ln(-5,-1,5,-1,sd+2,1);break;
+ case'mush':blob(0,4,3,5,'#f4ecd8',sd);blob(0,-2,9,5,c,sd+1);dot(-3,-3,1.4,'#fff');dot(3,-1,1.2,'#fff');break;
+ case'bug':PLAN.aphid({c,ph:0,t:0,sd});break;
+ case'gem':blob(0,0,7,8,c,sd,{amt:.1});dot(-2,-3,2,'rgba(255,255,255,.8)');break;
+ case'leaf':blob(0,0,11,5,c,sd,{rot:-.6});ln(-9,7,8,-6,sd+3,1.1);break;
+ case'lantern':g.globalAlpha=.4;dot(0,2,12,'#fff59a');g.globalAlpha=1;blob(0,3,6,7,c,sd);blob(0,-5,7,3,'#8a5a2a',sd+1);ln(0,-8,0,-11,sd+2,1.2);break;
+ case'scroll':blob(0,0,10,7,c,sd,{amt:.03});ln(-6,-2,6,-2,sd+1,.9);ln(-6,1,5,1,sd+2,.9);ln(-6,4,3,4,sd+3,.9);break;
+ case'claw':curve([[-8,6],[0,-2],[6,-9],[9,-4]],sd,4);curve([[-8,6],[2,2],[9,1]],sd+1,3);break;
+ case'stone':g.globalAlpha=.35;dot(0,0,12,'#ffd27a');g.globalAlpha=1;blob(0,0,8,7,c,sd);break;
+ case'thread':blob(0,0,7,7,c,sd);for(let i=-4;i<=4;i+=2.5)ln(i,-6,i+2,6,sd+i,.8);curve([[6,3],[11,6],[13,11]],sd+9,1);break;
+ case'shell':blob(0,0,9,7,c,sd);for(let i=-2;i<=2;i++)ln(0,6,i*3.5,-6,sd+i,.9);break;
+ case'ball':blob(0,0,8,8,c,sd);dot(-3,-2,1.2,'#5a3a2a');dot(2,3,1.2,'#5a3a2a');break;
+ case'note':ln(4,5,4,-9,sd,1.8,.3,c);ln(4,-9,9,-6,sd+1,2.4,.3,c);blob(1,6,4,3,c,sd+2,{rot:-.4});break;
+ case'feather':curve([[-9,9],[0,0],[8,-10]],sd,1.6);blob(2,-2,4,11,c,sd+1,{rot:.7});break;
+ case'map':blob(0,0,10,8,c,sd,{amt:.03});ln(-3,-7,-3,7,sd+1,1);ln(3,-7,3,7,sd+2,1);curve([[-7,3],[-2,-2],[4,2],[8,-3]],sd+3,1,.5,'#c8432f');break;
+ case'loupe':blob(-2,-2,7,7,c,sd);ln(3,3,10,10,sd+1,3);break;
+ case'page':blob(0,0,8,10,'#fffdf5',sd,{amt:.04});for(let i=-5;i<=5;i+=3.3)ln(-5,i,5,i,sd+i,.7,.3,'#8aa');break;
+ case'seed':blob(0,0,4,2.8,c,sd,{rot:.5});break;
+ default:blob(0,0,7,7,c,sd);}}
+function drawIconTo(ctx,id,w,h){const it=ITEMS[id]||{s:'page',c:'#fff'};const old=g;g=ctx;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.translate(w/2,h/2);ctx.scale(h/34,h/34);icon(it.s,it.c,id.length*13);ctx.setTransform(1,0,0,1,0,0);g=old;}
+
+/* ---------- état ---------- */
+const SAVEKEY='carnetInfini.v1';
+function freshState(){return{x:40,y:30,hp:5,hpMax:5,ink:5,inkMax:10,seeds:10,inv:{},F:{},Q:{},best:{},disc:{},taken:{},pages:0,tod:.3,track:'main',muted:false,ang:-1.57};}
+let S=freshState();
+function save(){try{localStorage.setItem(SAVEKEY,JSON.stringify(S));}catch(e){}}
+function loadSaved(){try{const s=localStorage.getItem(SAVEKEY);return s?JSON.parse(s):null;}catch(e){return null;}}
+const has=(id,n)=>(S.inv[id]||0)>=(n||1);
+function give(id,n,silent){n=n||1;S.inv[id]=(S.inv[id]||0)+n;if(!silent)toast(`+ ${ITEMS[id].n}${n>1?' ×'+n:''}`);sfx('get');onInv(id);}
+function take(id,n){n=n||1;S.inv[id]=Math.max(0,(S.inv[id]||0)-n);if(!S.inv[id])delete S.inv[id];}
+const qs=id=>S.Q[id]===undefined?-1:S.Q[id];
+function qset(id,st){const was=qs(id);S.Q[id]=st;const q=QUESTS[id];if(was<0){toast(`Nouvelle quête : ${q.title}`,'q');sfx('quest');}else if(st>=q.steps.length-1&&was<q.steps.length-1){toast(`Quête accomplie : ${q.title}`,'q');sfx('done');if(S.track==id)S.track='main';}save();}
+const qdone=id=>qs(id)>=QUESTS[id].steps.length-1;
+function addSeeds(n){S.seeds+=n;toast(`+ ${n} graines`);sfx('get');}
+function heal(n){if(S.hp>=S.hpMax){toast("Tu n'as pas faim.");return false;}S.hp=Math.min(S.hpMax,S.hp+n);return true;}
+function onInv(id){if(id=='goutte'&&S.inv.goutte>=5&&qs('main')==1)qset('main',2);if(id=='puceron'&&qs('ant')==3&&has('puceron',3))qset('ant',4);if(id=='petale'&&qs('bois')==2&&has('petale',3))qset('bois',3);if(id=='coquillage'&&qs('marais')==1&&has('coquillage',3))qset('marais',2);if(id=='note'){if(qs('notes')<0)qset('notes',0);if(has('note',3)&&qs('notes')==0)qset('notes',1);}if(id=='boule'&&qs('roulo')==0)qset('roulo',1);if(id=='mue'&&qs('pince')==0)qset('pince',1);if(id=='soleil'||id=='soie'){if(qs('cime')==1&&has('soleil')&&has('soie'))qset('cime',2);}}
+
+/* ---------- monde ---------- */
+const REG=[
+ {id:'hub',n:'Village du Caillou Chaud',sub:'là où tout commence',x:0,y:0,r:520,b:'hub'},
+ {id:'fourmi',n:'Fourmilière Rousse',sub:'royaume de la Reine Ostra',x:0,y:-1600,r:600,b:'fourmi'},
+ {id:'bois',n:'Bois Creux',sub:'forge, lucioles et toiles',x:1700,y:0,r:680,b:'bois'},
+ {id:'dunes',n:'Dunes Ocres',sub:'le sable a la mémoire longue',x:0,y:1700,r:680,b:'dunes'},
+ {id:'marais',n:'Marais Brumeux',sub:'où les couleurs se noient',x:-1700,y:0,r:680,b:'marais'},
+ {id:'cime',n:'Cime des Papillons',sub:'au-dessus des ronces',x:1500,y:-1500,r:540,b:'cime'},
+ {id:'blanche',n:'La Page Blanche',sub:'ici, Élise a trop gommé',x:-1500,y:-1600,r:420,b:'blanche'},
+];
+const REGM={};REG.forEach(r=>REGM[r.id]=r);
+function regionAt(x,y){for(const r of REG)if((x-r.x)**2+(y-r.y)**2<r.r*r.r)return r;return null;}
+function biomeAt(x,y){const r=regionAt(x,y);if(r)return r.b;const d=Math.hypot(x,y);if(d>2700+vnoise(x/600,y/600)*500)return'esquisse';return'pre';}
+const BCOL={hub:'#efbe76',pre:'#b3d184',fourmi:'#df9563',bois:'#6f9e62',dunes:'#ecca7f',marais:'#7fb0a6',cime:'#cfa8de',blanche:null,esquisse:null};
+const POND={x:-1950,y:250,ri:140,ro:330};
+const ISLE_DOCK=[-1950,345], SHORE_DOCK=[-1520,175];
+const GATES=[
+ {reg:'dunes',ok:()=>has('ombrelle'),msg:"Le sable brûle tes pattes ! Il te faudrait de l'ombre pour traverser les Dunes.",st:'heat'},
+ {reg:'marais',ok:()=>has('lanterne'),msg:"Un brouillard épais te repousse. Sans lumière, impossible de s'y retrouver.",st:'fog'},
+ {reg:'cime',ok:()=>has('pince'),msg:"Un mur de ronces géantes barre la montée. Il faudrait de quoi les tailler.",st:'bramble'},
+ {reg:'blanche',ok:()=>!!S.F.encrier,msg:"Une page blanche, aveuglante. Tes pattes refusent d'avancer. L'Encrier doit d'abord être réparé.",st:'white'},
+ {x:0,y:-1700,r:200,ok:()=>!!S.F.antPass,msg:"« Halte ! » Les gardes fourmis croisent leurs mandibules.",st:'ants'},
+];
+GATES.forEach(gt=>{if(gt.reg){const r=REGM[gt.reg];gt.x=r.x;gt.y=r.y;gt.r=r.r;}});
+
+const CH=260;const chunks=new Map();
+const BDECO={hub:['grass','flower','pebble','mush','grass','clover'],pre:['grass','flower','grass','pebble','clover','flower','bush'],fourmi:['pebble','twig','dirt','grass','pebble'],bois:['tree','fern','mush','log','leaf','fern','tree'],dunes:['dune','cactus','stone','drygrass','dune','bone'],marais:['reed','lily','puddle','reed','cattail','lily'],cime:['rock','bigflower','grass','rock','bigflower'],blanche:['scrap'],esquisse:['sk_tree','sk_q','sk_flower','sk_arrow','sk_word','sk_rock','sk_grid']};
+function genChunk(cx,cy){const k=cx+','+cy;let c=chunks.get(k);if(c)return c;c={deco:[],crit:[],picks:[],wash:[],key:k};const x0=cx*CH,y0=cy*CH;
+ for(let i=0;i<2;i++){const x=x0+H2(cx*3+i,cy*5)*CH,y=y0+H2(cx*7,cy*3+i)*CH,b=biomeAt(x,y);if(BCOL[b])c.wash.push({x,y,r:110+H2(cx+i,cy-i)*90,col:BCOL[b],sd:H2(cx,cy+i)*999});}
+ const n=6+(H2(cx,cy)*4|0);for(let i=0;i<n;i++){const x=x0+H2(cx*13+i,cy*7-i)*CH,y=y0+H2(cx*5-i,cy*11+i)*CH;if(nearLandmark(x,y))continue;const b=biomeAt(x,y);if(b=='hub'&&Math.hypot(x,y)<260)continue;const L=BDECO[b];if(!L)continue;if(b=='esquisse'&&H2(cx+i,cy+i*2)<.35)continue;if(Math.hypot(x-POND.x,y-POND.y)<POND.ro+20)continue;c.deco.push({x,y,t:L[(H2(cx+i*3,cy-i)*L.length)|0],sd:(H2(cx-i,cy+i)*9999)|0,b});}
+ for(let i=0;i<2;i++){if(H2(cx*17+i,cy*19)<.45)continue;const x=x0+H2(cx*23+i,cy*29)*CH,y=y0+H2(cx*31,cy*37+i)*CH,b=biomeAt(x,y);if(b=='blanche')continue;const pool=SPIDS.filter(s=>SP[s].b.includes(b));if(!pool.length)continue;const sp=pool[(H2(cx+i*7,cy*3)*pool.length)|0];c.crit.push({sp,hx:x,hy:y,ph:H2(cx,cy*i+3)*6,rw:30+H2(cx*i,cy)*50,f:.15+H2(cy,cx+i)*.25,sd:(H2(cx+i,cy)*999)|0});}
+ const pr=H2(cx*41,cy*43),b0=biomeAt(x0+CH/2,y0+CH/2),dd=Math.hypot(x0,y0);let pt=null;
+ if(b0=='esquisse'){if(pr<.055)pt='page';else if(pr<.25)pt='mure';else if(pr<.45)pt='seed';}else if(b0!='blanche'){if(pr<.06)pt='champi';else if(pr<.17)pt='seed';else if(pr<.2&&dd>700)pt='mure';}
+ if(pt){const x=x0+40+H2(cx*47,cy)*(CH-80),y=y0+40+H2(cx,cy*53)*(CH-80);c.picks.push({k:'c'+k,t:pt,x,y});}
+ chunks.set(k,c);if(chunks.size>900){const it=chunks.keys();for(let i=0;i<200;i++)chunks.delete(it.next().value);}return c;}
+
+/* ---------- repères fixes ---------- */
+const LM=[
+ {x:-70,y:120,t:'hotstone',r:70},{x:0,y:-205,t:'encrier',r:40},{x:255,y:40,t:'hive',r:40},{x:-250,y:-120,t:'mushhouse',r:45},{x:200,y:-260,t:'mushhouse',r:45},{x:-320,y:200,t:'mushhouse',r:45},{x:-200,y:60,t:'stump',r:30},
+ {x:0,y:-1700,t:'anthill',r:170},
+ {x:1650,y:-140,t:'forge',r:50},{x:1960,y:-260,t:'web',r:50},{x:1350,y:-60,t:'tree',r:60},{x:1820,y:380,t:'tree',r:60},{x:2120,y:-120,t:'tree',r:55},{x:1600,y:260,t:'tree',r:55},
+ {x:330,y:1990,t:'sunstone',r:45},{x:-80,y:1560,t:'dune',r:60},{x:420,y:1500,t:'cactus',r:30},{x:-400,y:1980,t:'skull',r:40},
+ {x:POND.x,y:POND.y,t:'pond',r:POND.ro},{x:SHORE_DOCK[0]+30,y:SHORE_DOCK[1],t:'dock',r:30},
+ {x:1550,y:-1700,t:'chrysalis',r:40},{x:1250,y:-1600,t:'rock',r:50},{x:1720,y:-1300,t:'bigflower',r:40},{x:1380,y:-1300,t:'bigflower',r:40},
+ {x:-1500,y:-1600,t:'void',r:0},
+];
+function nearLandmark(x,y){for(const l of LM)if(l.r&&Math.hypot(x-l.x,y-l.y)<l.r+30)return true;for(const n of NPCS)if(Math.hypot(x-n.x,y-n.y)<40)return true;return false;}
+
+/* ---------- PNJ ---------- */
+const NPCS=[];
+function npc(o){o.sc=o.sc||1.6;o.ang=o.ang??1.57;NPCS.push(o);return o;}
+const N={};
+N.bergamote=npc({id:'bergamote',name:'Grand-Mère Bergamote',sp:'tortue',plan:'turtle',c:'#8a7a4a',c2:'#b9a878',x:0,y:-110,sc:2.6,ang:1.57});
+N.mielline=npc({id:'mielline',name:'Mielline',sp:'abeille',plan:'bee',x:250,y:95});
+N.vivaldo=npc({id:'vivaldo',name:'Vivaldo',sp:'grillon',plan:'cricket',x:-220,y:110,sc:1.8});
+N.lysa=npc({id:'lysa',name:'Lysa',sp:'gecko',plan:'lizard',c:'#4fa08a',x:120,y:-200,sc:1.6,pads:1});
+N.tic=npc({id:'tic',name:'Tic',sp:'gecko',plan:'lizard',c:'#7fd0b0',x:560,y:2160,sc:1.05,pads:1});
+N.mandibule=npc({id:'mandibule',name:'Sergent Mandibule',sp:'fourmi',plan:'ant',x:0,y:-1460,sc:2.1});
+N.ostra=npc({id:'ostra',name:'Reine Ostra',sp:'fourmi',plan:'ant',c:'#9a3a1c',x:0,y:-1760,sc:3,crown:1,wing:1});
+N.lucane=npc({id:'lucane',name:'Maître Lucane',sp:'lucane',plan:'stag',x:1660,y:-70,sc:2.2});
+N.lumi=npc({id:'lumi',name:'Lumi',sp:'luciole',plan:'firefly',x:1840,y:160,sc:2});
+N.roulo=npc({id:'roulo',name:'Roulo',sp:'bousier',plan:'beetle',x:1480,y:190,sc:1.9});
+N.tisseuse=npc({id:'tisseuse',name:'La Tisseuse',sp:'araignee',plan:'spider',x:1960,y:-200,sc:2});
+N.ozy=npc({id:'ozy',name:'Ozymandias',sp:'iguane',plan:'iguana',x:0,y:1610,sc:2.4});
+N.sssylas=npc({id:'sssylas',name:'Sssylas',sp:'vipere',plan:'snake',x:-360,y:1860,sc:2});
+N.tarsk=npc({id:'tarsk',name:'Tarsk',sp:'scorpion',plan:'scorp',x:300,y:1950,sc:2.2});
+N.margot=npc({id:'margot',name:'Margot',sp:'crocodile',plan:'croc',x:-1480,y:120,sc:1.9,ang:3.14});
+N.azure=npc({id:'azure',name:'Azuré',sp:'libellule',plan:'dragon',x:-1640,y:-260,sc:1.9});
+N.kameo=npc({id:'kameo',name:'Kaméo',sp:'cameleon',plan:'chame',x:-1995,y:205,sc:2});
+N.madazur=npc({id:'madazur',name:'Madame Azur',sp:'azur',plan:'butter',x:1660,y:-1450,sc:2.2,slow:1});
+N.prieuse=npc({id:'prieuse',name:'Sœur Prieuse',sp:'mante',plan:'mantis',x:1390,y:-1360,sc:2.2,veil:1});
+N.aurore=npc({id:'aurore',name:'Aurore',sp:'papillon',plan:'butter',c:'#ffd0e0',c2:'#7a5ad8',x:1560,y:-1620,sc:2.4,aurora:1,slow:1});
+N.gommette=npc({id:'gommette',name:'Gommette',sp:null,plan:'gomme',c:'#f2d4d0',x:-1500,y:-1560,sc:1.4,friend:1});
+N.chrys=npc({id:'chrys',name:'La Grande Chrysalide',obj:1,x:1550,y:-1700,sc:1});
+N.encrier=npc({id:'encrier',name:"L'Encrier d'Élise",obj:1,x:0,y:-205,sc:1});
+N.raft=npc({id:'raft',name:'Le radeau de Margot',obj:1,x:ISLE_DOCK[0],y:ISLE_DOCK[1]+5,sc:1});
+const TWIGS=[[1990,70],[2110,210],[2060,125],[1900,290],[2190,40]];
+TWIGS.forEach((p,i)=>npc({id:'twig'+i,name:i==2?'Brindille':'Une brindille',obj:1,twig:1,x:p[0],y:p[1],sc:1,real:i==2}));
+N.tic.show=()=>!S.F.ticHome?!S.F.ticFound:true;
+N.tarsk.show=()=>!S.F.tarskGone&&!boss;
+N.aurore.show=()=>!!S.F.aurore;
+N.gommette.show=()=>S.F.ending=='ami';
+N.kameo.show=()=>true;
+N.chrys.show=()=>!S.F.aurore;
+
+/* ---------- objets posés ---------- */
+const PICKS=[
+ {k:'pu1',t:'puceron',x:-390,y:-1500},{k:'pu2',t:'puceron',x:340,y:-1860},{k:'pu3',t:'puceron',x:-260,y:-1960},
+ {k:'pe1',t:'petale',x:1440,y:-260,night:1},{k:'pe2',t:'petale',x:2160,y:-40,night:1},{k:'pe3',t:'petale',x:1760,y:430,night:1},
+ {k:'co1',t:'coquillage',x:-1400,y:-300},{k:'co2',t:'coquillage',x:-1850,y:-290},{k:'co3',t:'coquillage',x:-1580,y:430},
+ {k:'no1',t:'note',x:430,y:-1440},{k:'no2',t:'note',x:-460,y:1500},{k:'no3',t:'note',x:-1300,y:360},
+ {k:'bou',t:'boule',x:2470,y:470,cond:()=>qs('roulo')>=0},
+ {k:'h1',t:'champi',x:-140,y:-330},{k:'h2',t:'seed',x:330,y:220},{k:'h3',t:'mure',x:-380,y:-40},
+];
+
+/* ---------- quêtes ---------- */
+const dropsN=()=>S.inv.goutte||0;
+function nextGuardian(){if(!S.F.g_ant)return['fourmi',"la Reine Ostra, à la Fourmilière (nord)"];if(!S.F.g_bois)return['bois',"Maître Lucane, au Bois Creux (est)"];if(!S.F.g_dunes)return['dunes',"Ozymandias, dans les Dunes Ocres (sud)"];if(!S.F.g_marais)return['marais',"le gardien du Marais Brumeux (ouest)"];if(!S.F.g_cime)return['cime',"la Cime des Papillons (nord-est)"];return null;}
+const QUESTS={
+ main:{title:"L'Encre Originelle",main:1,steps:[
+  {t:"Parler à Grand-Mère Bergamote, au centre du Village du Caillou Chaud.",at:()=>[0,-110]},
+  {t:()=>`Rassembler les 5 Gouttes d'Encre Originelle (${dropsN()}/5). Prochain gardien : ${(nextGuardian()||['',''])[1]}.`,at:()=>{const n=nextGuardian();if(!n)return null;const r=REGM[n[0]];return[r.x,r.y];}},
+  {t:"Rapporter les 5 Gouttes à Bergamote, près de l'Encrier.",at:()=>[0,-110]},
+  {t:"Entrer dans la Page Blanche, au nord-ouest, et affronter la Gomme.",at:()=>[-1500,-1600]},
+  {t:"Le Carnet est sauvé. Le monde, lui, continue au-delà des bords…"}]},
+ ant:{title:"Le Troupeau de la Reine",steps:[
+  {t:"Se présenter à la Fourmilière Rousse, au nord du village.",at:()=>[0,-1460]},
+  {t:"Le Sergent Mandibule exige un Pot de miel pour te laisser passer. Mielline en vend au village.",at:()=>has('miel')?[0,-1460]:[250,95]},
+  {t:"Parler à la Reine Ostra, au cœur de la fourmilière.",at:()=>[0,-1760]},
+  {t:()=>`Retrouver les 3 pucerons égarés autour de la fourmilière (${Math.min(3,S.inv.puceron||0)}/3).`,at:()=>nearestPick('puceron')},
+  {t:"Ramener les pucerons à la Reine Ostra.",at:()=>[0,-1760]},
+  {t:"La Reine t'a confié la première Goutte."}]},
+ bois:{title:"La Forge Éteinte",steps:[
+  {t:"Trouver Maître Lucane dans le Bois Creux.",at:()=>[1660,-70]},
+  {t:"La forge est froide. Lumi la luciole pourrait la rallumer.",at:()=>[1840,160]},
+  {t:()=>`Lumi a perdu sa lumière. Cueillir 3 Pétales de Nuit dans le Bois Creux : ils n'éclosent que la nuit (${Math.min(3,S.inv.petale||0)}/3). Touche T pour attendre la nuit.`,at:()=>isNight()?nearestPick('petale'):null},
+  {t:"Rapporter les Pétales de Nuit à Lumi.",at:()=>[1840,160]},
+  {t:"La forge brûle à nouveau. Retourner voir Maître Lucane.",at:()=>[1660,-70]},
+  {t:"Lucane t'a remis la deuxième Goutte et une ombrelle pour les Dunes."}]},
+ dunes:{title:"Les Énigmes du Sable",steps:[
+  {t:"Parler à Ozymandias l'iguane, au cœur des Dunes Ocres.",at:()=>[0,1610]},
+  {t:"Résoudre les trois énigmes de Sssylas, le serpent de l'ouest des dunes.",at:()=>[-360,1860]},
+  {t:"La Goutte dort sous la Pierre-Soleil, où se prélasse Tarsk le scorpion. Le convaincre de bouger.",at:()=>[300,1950]},
+  {t:"La troisième Goutte est à toi."}]},
+ marais:{title:"Le Caméléon Sans Couleur",steps:[
+  {t:"Trouver qui garde la Goutte du Marais Brumeux. Azuré la libellule sait tout.",at:()=>[-1640,-260]},
+  {t:()=>`Margot le crocodile veut 3 coquillages pour te faire traverser (${Math.min(3,S.inv.coquillage||0)}/3).`,at:()=>nearestPick('coquillage')},
+  {t:"Payer Margot et traverser jusqu'à l'îlot.",at:()=>[-1480,120]},
+  {t:"Sur l'îlot, trouver Kaméo. Il est invisible : cherche un scintillement.",at:()=>[-1960,240]},
+  {t:"Redessiner Kaméo avec ta plume (3 encres).",at:()=>[-1995,205]},
+  {t:"Kaméo t'a donné la quatrième Goutte."}]},
+ cime:{title:"Le Réveil d'Aurore",steps:[
+  {t:"Parler à Madame Azur, gardienne de la Grande Chrysalide.",at:()=>[1660,-1450]},
+  {t:()=>`La Chrysalide a froid. Il lui faut une Pierre-Soleil${has('soleil')?' ✓':''} et un Fil de soie${has('soie')?' ✓':''} (la Tisseuse, au Bois Creux).`,at:()=>!has('soie')?[1960,-200]:!has('soleil')?[300,1950]:[1550,-1700]},
+  {t:"Envelopper la Chrysalide de soie et de chaleur.",at:()=>[1550,-1700]},
+  {t:"Aurore est née et t'a confié la cinquième Goutte."}]},
+ pince:{title:"Des Pinces pour les Ronces",steps:[
+  {t:"Lucane peut forger une pince pour tailler les ronces de la Cime, s'il a une Écaille de mue. Les serpents des Dunes muent…",at:()=>S.F.g_dunes?[-360,1860]:null},
+  {t:"Apporter l'Écaille de mue à Maître Lucane.",at:()=>[1660,-70]},
+  {t:"Tu as la Pince de Lucane. Les ronces de la Cime n'ont qu'à bien se tenir."}]},
+ roulo:{title:"Bérénice a Roulé",steps:[
+  {t:"Roulo a perdu Bérénice, sa boule. Elle a roulé vers l'est, au-delà des arbres.",at:()=>[2470,470]},
+  {t:"Rapporter Bérénice à Roulo.",at:()=>[1480,190]},
+  {t:"Roulo et Bérénice sont réunis. Ne pose pas de questions."}]},
+ notes:{title:"Trois Notes Perdues",steps:[
+  {t:()=>`Vivaldo le grillon a perdu trois notes, emportées par le vent vers la Fourmilière, les Dunes et le Marais (${Math.min(3,S.inv.note||0)}/3).`,at:()=>nearestPick('note')},
+  {t:"Rapporter les trois notes à Vivaldo, au village.",at:()=>[-220,110]},
+  {t:"Le concert a eu lieu. Les étoiles ont applaudi."}]},
+ tic:{title:"Le Petit Tic",steps:[
+  {t:"Lysa a perdu son fils Tic. Il voulait voir les Dunes.",at:()=>S.F.g_bois||has('ombrelle')?[560,2160]:null},
+  {t:"Tic est rentré. Retourner voir Lysa au village.",at:()=>[140,-215]},
+  {t:"Lysa t'a offert son écaille porte-bonheur."}]},
+ lettre:{title:"Une Lettre pour Brindille",steps:[
+  {t:"Porter la lettre de Sœur Prieuse à Brindille le phasme, caché parmi les brindilles du Bois Creux.",at:()=>[2040,140]},
+  {t:"Rapporter la réponse de Brindille à Sœur Prieuse.",at:()=>[1390,-1360]},
+  {t:"Deux cœurs timides s'écrivent désormais chaque semaine."}]},
+ carnet:{title:"Le Carnet du Naturaliste",steps:[
+  {t:()=>`Observer 20 espèces différentes en t'approchant d'elles (${Object.keys(S.best).length}/20). Puis en parler à Bergamote.`},
+  {t:"Montrer ton carnet à Bergamote.",at:()=>[0,-110]},
+  {t:"Bergamote t'a offert la Loupe d'Élise."}]},
+ pages:{title:"Les Pages d'Élise",steps:[
+  {t:()=>`Retrouver les 7 pages perdues dans les Terres Esquissées, au-delà des bords du monde (${S.pages}/7).`},
+  {t:"Tu as lu tout le journal d'Élise. Elle t'a laissé un dernier cadeau."}]},
+};
+function nearestPick(t){let best=null,bd=1e9;for(const p of PICKS)if(p.t==t&&!S.taken[p.k]&&(!p.cond||p.cond())){const d=dist(p.x,p.y,S.x,S.y);if(d<bd){bd=d;best=[p.x,p.y];}}return best;}
+const stepText=(q,i)=>{const s=q.steps[i];return typeof s.t=='function'?s.t():s.t;};
+
+/* ---------- journal d'Élise ---------- */
+const PAGES=[
+ "Été 1962. Mamie m'a offert ce carnet. J'y dessine tout ce qui vit dans son jardin : la tortue Bergamote, les fourmis du muret, les lézards qui dorment sur la grosse pierre chaude.",
+ "Si je les dessine assez bien, est-ce qu'ils vivront dedans pour toujours ? Mamie dit que oui, si j'y crois très fort. J'y crois très fort.",
+ "J'ai mélangé de l'encre, du jus de mûre et une goutte de rosée. Je l'appelle l'Encre Originelle. C'est avec elle que je dessine les cœurs. Les vrais, ceux qui battent.",
+ "Mon papillon est raté. J'ai gommé, gommé, gommé… le papier s'est troué. Je crois que la gomme a gardé un peu de ma colère. Elle me regarde bizarrement.",
+ "Je suis grande maintenant. Je n'ai plus le temps de dessiner. Le carnet dort dans un tiroir, l'encrier s'est fendu en tombant. Pardon, mes petits.",
+ "Ce matin, j'ai rouvert le carnet. Les bords ont pâli, comme si quelqu'un les effaçait. Mais au milieu… je jurerais que la tortue a bougé.",
+ "Si tu lis ceci, petit gecko, c'est que le carnet continue sans moi. Les pages blanches ne sont pas vides : elles attendent. Dessine. — É.",
+];
+
+/* ---------- UI : toasts, dialogue, panneaux ---------- */
+function toast(t,cls){const d=document.createElement('div');d.className='toast'+(cls?' '+cls:'');d.textContent=t;$('toasts').appendChild(d);setTimeout(()=>d.remove(),cls?5200:3400);const all=$('toasts').children;if(all.length>5)all[0].remove();}
+let DLG=null,typer=0;
+function who(id){const n=N[id];return n?{name:n.name,n}:{name:id};}
+function say(w,text,choices){w=typeof w=='string'?who(w):w;$('dlg').hidden=false;DLG={w,text,choices:choices&&choices.length?choices:[["(Fermer)",closeDlg]]};$('dlgName').textContent=w.name;const el=$('dlgText');let i=0;clearInterval(typer);el.textContent='';DLG.typing=true;const plain=text;typer=setInterval(()=>{i+=3;el.textContent=plain.slice(0,i);if(i>=plain.length){clearInterval(typer);DLG&&(DLG.typing=false);}},16);sfx('talk');const box=$('dlgCh');box.innerHTML='';DLG.choices.forEach((c,k)=>{const b=document.createElement('button');b.className='ch';b.innerHTML=`<span class="n">${k+1}.</span>`;b.appendChild(document.createTextNode(c[0]));b.onclick=e=>{e.stopPropagation();pick(k);};box.appendChild(b);});drawPortrait(w);}
+function pick(k){if(!DLG)return;if(DLG.typing){clearInterval(typer);$('dlgText').textContent=DLG.text;DLG.typing=false;return;}const c=DLG.choices[k];if(c){sfx('click');c[1]();}}
+function closeDlg(){DLG=null;$('dlg').hidden=true;clearInterval(typer);}
+function chain(w,lines,choices){let i=0;const next=()=>{const l=lines[i++];if(i<lines.length)say(w,l,[["…",next]]);else say(w,l,choices);};next();}
+function drawPortrait(w){const pc=$('dlgPic'),ctx=pc.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,192,192);const n=w.n;const old=g;g=ctx;ctx.setTransform(2,0,0,2,0,0);if(n&&!n.obj){const s=n.plan=='croc'?1.6:n.plan=='turtle'?2:n.plan=='gomme'?1.1:n.plan=='snake'?1.7:2.6;drawCreature(n.plan,n.plan=='gomme'?58:48,48,-1.57,s,npcOpts(n));}else if(n&&n.id=='encrier'){drawEncrier(48,52,1.3);}else if(n&&n.twig){drawCreature('stick',48,48,-1.2,2.2,{c:'#8a7a4a',ph:0,t:0,sd:5});}else if(n&&n.id=='chrys'){drawChrys(48,48,1.2);}else if(n&&n.id=='raft'){drawRaft(48,48,1.6);}else if(w.name=='La Gomme'){drawCreature('gomme',60,48,-1.57,1.1,{t:now,sd:9});}else{drawCreature('lizard',48,52,-1.57,2.2,{c:'#5fb39a',ph:0,t:now,sd:1,pads:1,bag:1});}ctx.setTransform(1,0,0,1,0,0);g=old;}
+
+let panelTab=null,selItem=null;
+function openPanel(t){panelTab=t;$('panel').hidden=false;closeDlg();document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t==t));renderPanel();sfx('page');}
+function closePanel(){panelTab=null;$('panel').hidden=true;}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function renderPanel(){const b=$('pbody');const t=panelTab;
+ if(t=='journal'){const ids=Object.keys(QUESTS).filter(id=>qs(id)>=0);const act=ids.filter(id=>!qdone(id)),done=ids.filter(id=>qdone(id));act.sort((a,b)=>(QUESTS[b].main?1:0)-(QUESTS[a].main?1:0));
+  let h=`<h2>Journal des quêtes</h2>`;if(!ids.length)h+=`<p>Aucune quête pour l'instant. Va parler à Grand-Mère Bergamote, la vieille tortue au centre du village.</p>`;
+  for(const id of act){const q=QUESTS[id],st=qs(id);h+=`<div class="q"><h3>${q.main?'★ ':''}${esc(q.title)}<button class="qbtn${S.track==id?' on':''}" data-tr="${id}">${S.track==id?'suivie':'suivre'}</button></h3>`;for(let i=Math.max(0,st-2);i<=st;i++)h+=`<div class="st ${i<st?'done':'now'}">${esc(stepText(q,i))}</div>`;h+=`</div>`;}
+  if(done.length){h+=`<h3>Accomplies</h3>`;for(const id of done)h+=`<div class="q"><div class="st"><b>${esc(QUESTS[id].title)}</b> — ${esc(stepText(QUESTS[id],QUESTS[id].steps.length-1))}</div></div>`;}
+  b.innerHTML=h;b.querySelectorAll('[data-tr]').forEach(x=>x.onclick=()=>{S.track=x.dataset.tr;renderPanel();updHUD();});}
+ else if(t=='sac'){const ids=Object.keys(S.inv);let h=`<h2>Sac</h2><div class="grid">`;if(!ids.length)h+=`<p>Ton sac est vide.</p>`;for(const id of ids)h+=`<div class="card${selItem==id?' sel':''}" data-it="${id}"><canvas width="192" height="144" data-ic="${id}"></canvas><b>${esc(ITEMS[id].n)}</b><span class="qty">×${S.inv[id]}</span></div>`;h+=`</div><div id="itemInfo">${selItem&&S.inv[selItem]?`<b>${esc(ITEMS[selItem].n)}</b><br>${esc(ITEMS[selItem].d)}${ITEMS[selItem].use?'<br><button class="btn" id="useIt">Utiliser</button>':''}`:'Touche un objet pour lire sa description.'}</div><p class="qty">${S.seeds} graines · ${S.ink}/${S.inkMax} encre · ${S.hp}/${S.hpMax} cœurs</p>`;b.innerHTML=h;
+  b.querySelectorAll('canvas[data-ic]').forEach(c=>drawIconTo(c.getContext('2d'),c.dataset.ic,192,144));b.querySelectorAll('[data-it]').forEach(x=>x.onclick=()=>{selItem=x.dataset.it;renderPanel();});const u=$('useIt');if(u)u.onclick=()=>{if(ITEMS[selItem].use()!==false){take(selItem);toast(`${ITEMS[selItem].n} utilisé.`);sfx('get');}renderPanel();updHUD();};}
+ else if(t=='carnet'){const n=Object.keys(S.best).length;let h=`<h2>Carnet du naturaliste — ${n}/${SPIDS.length} espèces</h2><div class="grid">`;for(const id of SPIDS){const k=S.best[id];h+=`<div class="card${k?'':' unk'}"><canvas width="192" height="144" data-sp="${id}"></canvas><b>${k?esc(SP[id].n):'???'}</b>${k?esc(SP[id].d):'Pas encore observé.'}</div>`;}h+=`</div><h3>Pages d'Élise (${S.pages}/7)</h3>`;if(!S.pages)h+=`<p>Des pages arrachées errent dans les Terres Esquissées, au-delà des bords du monde.</p>`;for(let i=0;i<S.pages;i++)h+=`<div class="pagetxt">${i+1}. ${esc(PAGES[i])}</div>`;b.innerHTML=h;
+  b.querySelectorAll('canvas[data-sp]').forEach(c=>{const ctx=c.getContext('2d'),id=c.dataset.sp,old=g;g=ctx;ctx.setTransform(2,0,0,2,0,0);const p=SP[id].p,sc=['croc','snake'].includes(p)?1.1:['turtle','lizard','iguana','chame','sketchliz'].includes(p)?1.4:2;if(S.best[id])drawCreature(p,p=='lizard'||p=='iguana'||p=='croc'||p=='chame'||p=='sketchliz'?58:48,36,0,sc,spOpts(id,{t:1}));else{ctx.globalAlpha=.25;drawCreature(p,48,36,0,sc,spOpts(id,{c:'#888',c2:'#888',t:1}));ctx.globalAlpha=1;}ctx.setTransform(1,0,0,1,0,0);g=old;});}
+ else if(t=='carte'){b.innerHTML=`<h2>Carte du Carnet</h2><canvas id="mapc"></canvas><p class="qty">L'étoile rouge marque l'objectif de la quête suivie. Les régions inconnues restent en pointillés.</p>`;drawMap();}}
+function drawMap(){const c=$('mapc');if(!c)return;const w=c.clientWidth,h=c.clientHeight;c.width=w*DPR;c.height=h*DPR;const ctx=c.getContext('2d'),old=g;g=ctx;ctx.setTransform(DPR,0,0,DPR,0,0);const sc=Math.min(w,h)/2/3300;const tx=x=>w/2+x*sc,ty=y=>h/2+y*sc;
+ ctx.strokeStyle='rgba(159,184,214,.6)';ctx.lineWidth=1;for(let y=0;y<h;y+=22){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+ g.setLineDash([5,5]);blob(w/2,h/2,2800*sc,2800*sc,null,7,{lw:1.2,ink:'#9a8c7a'});g.setLineDash([]);hand('Terres Esquissées',w/2,ty(-3000),15,'#9a8c7a');
+ for(const r of REG){const known=S.disc[r.id];if(r.id=='blanche'&&!S.F.encrier&&!known)continue;if(known)blob(tx(r.x),ty(r.y),r.r*sc,r.r*sc,BCOL[r.b]||'#fff',r.x+r.y,{alpha:.7});else{g.setLineDash([3,4]);blob(tx(r.x),ty(r.y),r.r*sc,r.r*sc,null,r.x,{lw:1.2});g.setLineDash([]);}hand(known?r.n:'?',tx(r.x),ty(r.y),known?17:24,INK);}
+ const tg=trackTarget();if(tg){star(tx(tg[0]),ty(tg[1]),9,'#c8432f');}
+ dot(tx(S.x),ty(S.y),6,'#5fb39a');g.strokeStyle=INK;g.lineWidth=1.5;g.beginPath();g.arc(tx(S.x),ty(S.y),6,0,7);g.stroke();hand('toi',tx(S.x)+14,ty(S.y)-10,15,INK,'left');ctx.setTransform(1,0,0,1,0,0);g=old;}
+function star(x,y,r,col){g.fillStyle=col;g.strokeStyle=INK;g.lineWidth=1.3;g.beginPath();for(let i=0;i<10;i++){const a=i*Math.PI/5-1.57,rr=i%2?r*.45:r;g.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr);}g.closePath();g.fill();g.stroke();}
+
+/* ---------- HUD ---------- */
+const heartSVG=f=>`<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="${f?'#c8432f':'none'}" stroke="#2a2018" stroke-width="2"/></svg>`;
+const inkSVG=f=>`<svg viewBox="0 0 24 24"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z" fill="${f?'#2a2018':'none'}" stroke="#2a2018" stroke-width="1.8"/></svg>`;
+let lastHUD='';
+function updHUD(){const q=QUESTS[S.track]&&qs(S.track)>=0&&!qdone(S.track)?S.track:'main';const tq=QUESTS[q];const tt=qs(q)>=0?stepText(tq,qs(q)):"Parler à Grand-Mère Bergamote, la tortue au centre du village.";const key=[S.hp,S.hpMax,S.ink,S.inkMax,S.seeds,tt,q,isNight()].join('|');if(key==lastHUD)return;lastHUD=key;
+ $('hearts').innerHTML=Array.from({length:S.hpMax},(_,i)=>heartSVG(i<S.hp)).join('');$('inks').innerHTML=has('plume')?Array.from({length:S.inkMax},(_,i)=>inkSVG(i<S.ink)).join(''):'';$('seeds').textContent=`${S.seeds} graines`;$('track').innerHTML=`<b>${esc(tq.title)}</b>${esc(tt)}`;$('bTl').textContent=isNight()?'Attendre le jour':'Attendre la nuit';}
+
+/* ---------- son ---------- */
+let AC=null;
+function audio(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}if(AC&&AC.state=='suspended')AC.resume();}
+function tone(f,d,type,vol,when){if(!AC||S.muted)return;try{const t=AC.currentTime+(when||0),o=AC.createOscillator(),gn=AC.createGain();o.type=type||'triangle';o.frequency.value=f;gn.gain.setValueAtTime(0,t);gn.gain.linearRampToValueAtTime(vol||.08,t+.01);gn.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(gn).connect(AC.destination);o.start(t);o.stop(t+d+.05);}catch(e){}}
+function sfx(k){if(!AC)return;({get:()=>{tone(660,.12);tone(990,.18,'triangle',.06,.07);},quest:()=>{[523,659,784].forEach((f,i)=>tone(f,.3,'triangle',.07,i*.09));},done:()=>{[523,659,784,1046].forEach((f,i)=>tone(f,.45,'triangle',.08,i*.11));},talk:()=>tone(420+Math.random()*120,.05,'square',.02),click:()=>tone(520,.04,'triangle',.04),page:()=>tone(300,.08,'sawtooth',.02),splash:()=>{tone(180,.18,'sawtooth',.05);tone(90,.25,'sine',.08);},hurt:()=>{tone(200,.2,'square',.06);tone(140,.25,'square',.05,.08);},hit:()=>tone(300,.12,'square',.05)}[k]||(()=>{}))();}
+function concert(){const m=[392,440,494,523,494,440,392,330,349,392,440,392,349,330,294,262];m.forEach((f,i)=>{tone(f,.35,'triangle',.07,i*.26);tone(f/2,.35,'sine',.04,i*.26);});}
+
+/* ---------- jeu : entités dynamiques ---------- */
+let lastPrompt=null,foes=[],parts=[],boss=null,inv=0,spawnT=0,inkRegen=0,now=0,cam={x:0,y:140,z:1},zoomT=1,keys={},target=null,pendingTalk=null,curRegion=null,gateMsgT=0,started=false,fastT=0,saveT=0,hurtFlash=0;
+const isNight=()=>{const l=dayLight();return l<.35;};
+function dayLight(){return .5+.5*Math.cos((S.tod-.3)*6.2832);}
+function npcOpts(n){return{c:n.c||(n.sp&&SP[n.sp]?SP[n.sp].c:'#888'),c2:n.c2||(n.sp&&SP[n.sp]?SP[n.sp].c2:null),ph:Math.sin(now*1.5+n.x)*.4,t:now+n.x*.01,sd:n.id.length*31+(n.x|0)%97,pads:n.pads,crown:n.crown,wing:n.wing,veil:n.veil,aurora:n.aurora,slow:n.slow,friend:n.friend,glow:n.id=='lumi'?(S.F.lumiLit?1:.1):undefined,hat:n.id=='tic'};}
+function visibleNpc(n){if(n.show&&!n.show())return false;return true;}
+function npcPos(n){if(n.id=='tic'&&S.F.ticHome)return[175,-180];if(n.id=='gommette'){return[-1500+Math.cos(now*.3)*120,-1600+Math.sin(now*.3)*90];}return[n.x,n.y];}
+
+function spawnSplash(x,y){for(let i=0;i<26;i++){const a=Math.random()*6.28,s=80+Math.random()*260;parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.5+Math.random()*.4,r:2+Math.random()*4,col:INK});}}
+function splash(){if(!started||DLG||panelTab)return;if(!has('plume')){toast("Tu n'as pas encore de plume.");return;}if(S.ink<1){toast("Plus d'encre ! Ramasse des gouttes de mûre ou attends un peu.");return;}S.ink--;sfx('splash');const px=S.x+Math.cos(S.ang)*30,py=S.y+Math.sin(S.ang)*30;spawnSplash(px,py);
+ for(const f of foes)if(dist(f.x,f.y,px,py)<130){f.dead=true;for(let i=0;i<10;i++)parts.push({x:f.x,y:f.y,vx:(Math.random()-.5)*200,vy:(Math.random()-.5)*200,life:.5,r:3,col:'#d8d2c8'});const r=Math.random();if(r<.35)dropLoot(f.x,f.y,'mure');else if(r<.8)dropLoot(f.x,f.y,'seed');}
+ if(boss&&dist(boss.x,boss.y,px,py)<boss.r+120&&boss.inv<=0){boss.hp--;boss.inv=.45;sfx('hit');const a=Math.atan2(boss.y-S.y,boss.x-S.x);boss.vx=Math.cos(a)*420;boss.vy=Math.sin(a)*420;if(boss.hp<=0)bossDown();}
+ updHUD();}
+const loose=[];
+function dropLoot(x,y,t){loose.push({x:x+(Math.random()-.5)*20,y:y+(Math.random()-.5)*20,t,life:25});}
+function hurt(from){if(inv>0)return;S.hp--;inv=1.3;hurtFlash=.35;sfx('hurt');const a=Math.atan2(S.y-from.y,S.x-from.x);S.x+=Math.cos(a)*40;S.y+=Math.sin(a)*40;target=null;if(S.hp<=0)faint();updHUD();}
+function faint(){foes=[];if(boss){boss=null;}S.hp=S.hpMax;const lost=Math.min(5,S.seeds);S.seeds-=lost;fadeTo(()=>{S.x=0;S.y=40;cam.x=0;cam.y=40;say('bergamote',`Hmm… te voilà de retour, tout chiffonné. Les taches d'effacement t'ont eu. Repose-toi. Tu as perdu ${lost} graines en route.`,[["Merci, Bergamote.",closeDlg]]);});}
+function fadeTo(fn){const f=$('fade');f.style.opacity=1;setTimeout(()=>{fn();f.style.opacity=0;},650);}
+
+/* ---------- interactions ---------- */
+function nearestInteract(){let best=null,bd=1e9;for(const n of NPCS){if(!visibleNpc(n))continue;if(n.id=='kameo'&&!S.F.kameoDrawn&&qs('marais')<3)continue;const [x,y]=npcPos(n);const d=dist(x,y,S.x,S.y);const lim=n.id=='kameo'&&!S.F.kameoDrawn?60:n.sc>2.5?95:75;if(d<lim&&d<bd){bd=d;best=n;}}return best;}
+function interact(){if(!started||panelTab)return;if(DLG){pick(0);return;}const n=nearestInteract();if(n)talk(n);}
+function talk(n){target=null;pendingTalk=null;if(n.sp)discover(n.sp,true);const f=T[n.id]||(n.twig?()=>twig(n):null);if(f)f(n);}
+function discover(sp,silent){if(!sp||S.best[sp])return;S.best[sp]=1;if(!silent||true)toast(`Carnet : ${SP[sp].n} (${Object.keys(S.best).length}/${SPIDS.length})`);sfx('page');if(Object.keys(S.best).length>=20&&qs('carnet')==0)qset('carnet',1);}
+
+/* ---------- dialogues ---------- */
+const T={};
+T.bergamote=()=>{const w='bergamote';const st=qs('main');
+ if(st<0){chain(w,["Ah… un petit gecko. Approche, approche… hmm. Je suis Bergamote. Trois cents printemps que je somnole sur ce caillou chaud.","Tu as remarqué ? Au bord du monde, les traits pâlissent. L'herbe devient esquisse, puis… plus rien. Du papier blanc.","Ce monde est un carnet, petit. Une naturaliste, Élise, l'a dessiné il y a longtemps : chaque fourmi, chaque écaille, chaque grain de sable.","Son Encrier, là, derrière moi, s'est fendu. L'Encre Originelle s'est échappée en cinq gouttes. Et depuis, quelque chose ronge les pages. Nous l'appelons la Gomme.","Chaque goutte s'est trouvé un gardien : la Reine des fourmis au nord, le forgeron du Bois Creux à l'est, le vieil iguane des Dunes au sud, quelqu'un dans le Marais à l'ouest, et tout là-haut, la Cime des Papillons.","Prends cette plume. C'était la sienne. Elle crache encore de l'encre : Espace pour la projeter sur les taches d'effacement. Et voici sa carte : touche M."],[["Je rapporterai les cinq gouttes.",()=>{give('plume',1);give('carte',1);qset('main',1);qset('ant',0);qset('carnet',0);updHUD();say(w,"Commence par la Fourmilière, au nord. Le Sergent Mandibule est… strict. Mais les fourmis ne résistent pas au miel, et Mielline en vend, juste à côté. Hmm. Ouvre l'œil aussi : chaque bestiole que tu croises mérite une ligne dans ton carnet.",[["J'y vais.",closeDlg]]);}],["Pourquoi moi ?",()=>say(w,"Parce que tu es le seul à avoir remarqué. Les autres trouvent normal que le monde rétrécisse. On s'habitue à tout, même au blanc. Hmm.",[["…D'accord. Je pars.",()=>T.bergamote()]])]]);return;}
+ if(st==2){chain(w,["Les cinq gouttes… Je les sens d'ici, elles bourdonnent comme des abeilles dans une boîte.","Verse-les dans l'Encrier. Doucement. Hmm…","(L'encre tourbillonne, la fêlure se referme. Un trait noir file du goulot et court jusqu'au nord-ouest, vers la Page Blanche.)","Voilà. L'Encrier est réparé, et le chemin de la Gomme est ouvert. Elle vit dans la Page Blanche, au nord-ouest. Elle n'aime pas qu'on dessine chez elle.","Prends de l'encre plein ta plume. Et… écoute-la avant de frapper. Même les trous ont une histoire."],[["J'y vais.",()=>{take('goutte',5);S.F.encrier=1;S.ink=S.inkMax;qset('main',3);updHUD();closeDlg();}]]);return;}
+ const ch=[];
+ if(qs('carnet')==1)ch.push(["Montrer mon carnet (20 espèces).",()=>{qset('carnet',2);give('loupe');S.inkMax+=2;say(w,"Vingt espèces ! Élise aurait pleuré de joie. Prends sa loupe. Les choses cachées scintilleront pour toi de plus loin… et ta plume gagne deux gouttes de réserve. Hmm.",[["Merci !",closeDlg]]);}]);
+ ch.push(["Où dois-je aller ?",()=>{const n=nextGuardian();let t;if(st>=4)t="Le Carnet est sauvé, petit. Mais il est infini, et ses bords restent à dessiner. Va voir les Terres Esquissées : Élise y a semé ses pages.";else if(st==3)t="La Page Blanche, au nord-ouest. La Gomme t'attend.";else if(!n)t="Tu as les cinq ! Reviens me voir.";else t=`Ta prochaine goutte : ${n[1]}. ${hintFor(n[0])}`;say(w,t,[["Merci.",closeDlg]]);}]);
+ ch.push(["Parle-moi d'Élise.",()=>chain(w,["Une petite fille aux genoux écorchés, qui dessinait dans le jardin de sa grand-mère. Elle m'a dessinée en premier. Je n'étais qu'un rond avec quatre pattes, au début.","Puis elle a grandi. Les grands oublient leurs carnets. Ce n'est la faute de personne, hmm… mais le papier, lui, n'oublie pas qu'on l'a oublié."],[["(Fermer)",closeDlg]])]);
+ ch.push([isNight()?"Attendre le jour.":"Attendre la nuit.",()=>{closeDlg();skipTime();}]);
+ ch.push(["À plus tard.",closeDlg]);
+ say(w,st>=4?"Le monde a retrouvé ses couleurs. Hmm. Je crois que je vais faire une sieste de cent ans.":"Hmm ? Tu as besoin de quelque chose, petit ?",ch);};
+function hintFor(r){return{fourmi:"Pense au miel de Mielline pour le Sergent Mandibule.",bois:"Lucane forge des merveilles, quand sa forge brûle.",dunes:"La chaleur est terrible là-bas : il te faudra de l'ombre. Lucane coud de belles ombrelles.",marais:"Le brouillard ne cède qu'à la lumière. Les lucioles du Bois Creux en ont à revendre.",cime:"Les ronces de la Cime ne craignent qu'une bonne pince. Lucane encore, hmm."}[r]||'';}
+T.encrier=()=>{say('encrier',S.F.encrier?"L'Encrier d'Élise. L'encre y tourne doucement, comme un ciel d'orage apprivoisé.":`Un grand encrier de verre fendu. Au fond, une ombre d'encre sèche. ${dropsN()}/5 gouttes rassemblées.`);};
+T.mielline=()=>{const w='mielline';const shop=()=>say(w,`Bzz ! Qu'est-ce qui te ferait plaisir ? Tu as ${S.seeds} graines.`,[["Pot de miel — 8 graines",()=>buy('miel',8)],["Encre de mûre — 6 graines",()=>buy('mure',6)],["Champignon doux — 3 graines",()=>buy('champi',3)],["Rien, merci.",closeDlg]]);
+ const buy=(id,p)=>{if(S.seeds<p){say(w,"Bzz… pas assez de graines, mon chou. On en trouve partout dans l'herbe, et les taches d'effacement en lâchent quand on les éclabousse.",[["D'accord.",shop]]);return;}S.seeds-=p;give(id);updHUD();say(w,"Bzz-merci ! Un plaisir de faire affaire avec un gecko poli.",[["Autre chose…",shop],["Au revoir.",closeDlg]]);};
+ if(!S.F.mielMet){S.F.mielMet=1;chain(w,["Bzz-bonjour ! Mielline, butineuse diplômée, marchande occasionnelle, danseuse catastrophique.","Je vends du miel, de l'encre de mûre et des champignons. Tout est fait maison. Enfin, fait ruche."],[["Voyons ça.",shop],["Plus tard.",closeDlg]]);return;}shop();};
+T.vivaldo=()=>{const w='vivaldo',st=qs('notes');
+ if(st<0){chain(w,["Ah ! Un public ! Enfin ! Je suis Vivaldo, compositeur, soliste et, ce soir, désespéré.","Le vent a arraché trois notes de ma partition. Un do, un mi, un sol ! Sans elles, ma Sérénade des Herbes Hautes n'est qu'un… qu'un bruit de pattes.","Je les ai vues filer vers la Fourmilière, les Dunes et le Marais. Si tu les croises, rapporte-les-moi, je t'en supplie à genoux. Avec mes genoux qui entendent, c'est très émouvant."],[["Je chercherai tes notes.",()=>{qset('notes',has('note',3)?1:0);closeDlg();}]]);return;}
+ if(st<=1&&has('note',3)){take('note',3);qset('notes',2);S.F.concert=1;give('ambre');concert();chain(w,["Do ! Mi ! Sol ! Elles sont là, elles vibrent encore !","(Vivaldo frotte ses ailes. La sérénade monte au-dessus du village ; même Bergamote ouvre un œil.)","Pour toi, ce morceau d'ambre. Mon grand-père y voyait un moustique endormi. Moi j'y vois une note de musique figée. Garde-le, il porte chance."],[["Bravo, Vivaldo !",closeDlg]]);return;}
+ if(qdone('notes')){say(w,"Reviens le soir : je répète. Les étoiles sont un public exigeant.",[["Joue encore !",()=>{concert();closeDlg();}],["À plus tard.",closeDlg]]);return;}
+ say(w,`Mes notes… ${S.inv.note||0} sur 3. Do vers la Fourmilière, mi vers les Dunes, sol vers le Marais. Courage, mon ami !`);};
+T.lysa=()=>{const w='lysa',st=qs('tic');
+ if(st<0){chain(w,["Oh, un gecko ! Tu n'aurais pas vu mon fils ? Tic. Petit, vert clair, un bonnet rouge. Il n'écoute jamais rien.","Il parlait sans arrêt des Dunes Ocres, des iguanes géants, de la Pierre-Soleil… Je crois qu'il y est parti tout seul. Il va cuire, là-bas !"],[["Je vais le retrouver.",()=>{qset('tic',0);closeDlg();}],["Je ne peux rien promettre…",()=>{qset('tic',0);say(w,"Si tu passes par les Dunes… je t'en prie.",[["D'accord.",closeDlg]]);}]]);return;}
+ if(st==1){qset('tic',2);S.hpMax++;S.hp=S.hpMax;updHUD();chain(w,["Tic ! Il est arrivé en courant, couvert de sable, en racontant qu'un gecko héroïque l'avait abrité sous une feuille !","Prends ceci : mon écaille porte-bonheur, celle de ma toute première mue. Elle te donnera du cœur à l'ouvrage. (+1 cœur)"],[["Prends soin de lui.",closeDlg]]);return;}
+ if(st==2){say(w,"Tic ne parle plus que de toi. Il veut devenir explorateur. Je ne sais pas si je dois te remercier.");return;}
+ say(w,"Tic est quelque part dans les Dunes… Il me faut de l'ombre pour aller le chercher, et je n'en ai pas.");};
+T.tic=()=>{const w='tic';if(S.F.ticHome){say(w,"Quand je serai grand, j'aurai une plume comme toi et je dessinerai des iguanes. Des ÉNORMES.");return;}
+ chain(w,["J'ai… si… chaud… Je voulais voir la Pierre-Soleil, mais tout brûle, et je ne retrouve plus le chemin.","(Tu ouvres l'ombrelle de feuille au-dessus de Tic. Il revit aussitôt.)","Waouh, une ombrelle ! Merci ! Je rentre tout de suite chez Maman, promis, en passant par l'ombre des cactus !"],[["File !",()=>{S.F.ticFound=1;S.F.ticHome=1;if(qs('tic')<0)qset('tic',0);qset('tic',1);closeDlg();}]]);};
+T.mandibule=()=>{const w='mandibule';
+ if(S.F.antPass){say(w,"Repos, soldat gecko. La Reine t'attend… ou ne t'attend pas. Ce n'est pas à moi de le savoir. Circulez.");return;}
+ if(qs('ant')<0)qset('ant',0);
+ if(has('miel')){chain(w,["Halte ! Qui va là ? …Cette odeur. Est-ce que c'est… du miel de Mielline ?","Hum. Hum-hum. Le règlement interdit les pots-de-vin. Ceci n'est pas un pot-de-vin. Ceci est un pot de miel. Nuance réglementaire.","Passe. Et pas un mot au caporal."],[["Merci, Sergent.",()=>{take('miel');S.F.antPass=1;qset('ant',2);closeDlg();}]]);return;}
+ if(qs('ant')==0)qset('ant',1);
+ chain(w,["HALTE ! Nul ne pénètre dans la Fourmilière Rousse sans autorisation de la Reine, contresignée, tamponnée, mâchouillée.","…Je n'ai pas mangé depuis l'aube. La sentinelle a faim. La sentinelle rêve de miel. La sentinelle ne dit plus rien."],[["Je reviens avec du miel.",closeDlg]]);};
+T.ostra=()=>{const w='ostra',st=qs('ant');
+ if(st==2){chain(w,["Un gecko dans ma salle du trône. Les temps changent. Approche, petit écailleux.","Tu cherches la Goutte. Je le sais : elle est tombée sur notre dôme la nuit où l'Encrier s'est fendu. Mes ouvrières la gardent au fond de la chambre royale.","Mais j'ai un souci plus pressant. Cette nuit, une tache d'effacement est passée sur l'enclos de mes pucerons. L'enclos a disparu. Mes pucerons se sont dispersés.","Sans eux, plus de miellat, et sans miellat, la colonie s'affame. Ramène-moi mes trois pucerons, et la Goutte est à toi."],[["Je les retrouverai.",()=>{qset('ant',3);if(has('puceron',3))qset('ant',4);closeDlg();}]]);return;}
+ if((st==3||st==4)&&has('puceron',3)){take('puceron',3);S.F.g_ant=1;qset('ant',5);give('goutte');give('rosee');chain(w,["Mes petits ! Comptés, recomptés : trois. La colonie te doit une fière chandelle.","Voici la Goutte d'Encre Originelle. Et cette Rosée Royale, récoltée à l'aube : elle ouvre bien des portes, et quelques cœurs.","Un conseil de reine : le Bois Creux, à l'est. Le vieux Lucane garde lui aussi quelque chose de noir et de brillant."],[["Merci, Majesté.",closeDlg]]);return;}
+ if(st==3||st==4){say(w,`Mes pucerons… ${S.inv.puceron||0} sur 3. Ils ne s'éloignent jamais beaucoup du dôme.`);return;}
+ chain(w,["Le savais-tu ? Mes ancêtres ont tracé la première carte du Carnet : un réseau de galeries qui reliait toutes les régions.","La Gomme les a effacées une à une. Aujourd'hui, nous ne creusons plus. Nous attendons. Merci de ne pas attendre, toi."]);};
+T.lucane=()=>{const w='lucane',st=qs('bois');
+ if(st<0)qset('bois',0);
+ if(qs('bois')==0){chain(w,["Hm ? Un client. Pas de bol, la forge est froide. Froide comme une limace morte.","Ma flamme, c'était Lumi, la luciole, qui l'allumait chaque matin. Mais Lumi ne brille plus. Elle se cache près de la mare, là-bas.","La Goutte ? Oui, je l'ai. Je l'ai coulée dans un moule pour qu'elle ne s'échappe pas. Rallume ma forge, et je te la rends."],[["Je vais voir Lumi.",()=>{qset('bois',1);closeDlg();}]]);return;}
+ if(qs('bois')==4){S.F.g_bois=1;qset('bois',5);give('goutte');give('ombrelle');qset('pince',has('mue')?1:0);chain(w,["Ha ! Entends-moi ce feu ! Ça ronfle comme un bourdon au soleil !","Promesse tenue : voici ta Goutte, démoulée et encore tiède. Et prends cette ombrelle de feuille. Si tu vas aux Dunes, tu me remercieras.","Une dernière chose : on raconte que tu devras monter à la Cime. Les ronces y sont dures comme du fer. Rapporte-moi une Écaille de mue souple, et je te forge une pince digne de ce nom."],[["Merci, Maître Lucane.",closeDlg]]);return;}
+ if(qs('pince')==1&&has('mue')){take('mue');give('pince');qset('pince',2);chain(w,["Une mue de vipère ! Fine, solide, parfaite.","(Clang. Clang. Le métal chante, l'écaille se tord, Lucane souffle sur la lame.)","Voilà. La Pince de Lucane. Aucune ronce ne lui résiste. Va."],[["Elle est magnifique.",closeDlg]]);return;}
+ if(qs('bois')<4){say(w,"Sans Lumi, pas de feu. Sans feu, pas de goutte. C'est de la métallurgie élémentaire.");return;}
+ say(w,qdone('pince')?"Bonne route, gecko. Et si un jour tes pattes s'émoussent, repasse.":"Une Écaille de mue, gecko. Les serpents des Dunes muent quand ils sont contents. Ou vexés.");};
+T.lumi=()=>{const w='lumi',st=qs('bois');
+ if(st<=0){if(st<0)qset('bois',0);say(w,"…Ne me regarde pas. Je suis éteinte. Ce n'est pas joli, une luciole éteinte. C'est juste… un insecte.",[["Maître Lucane a besoin de toi.",()=>{qset('bois',1);T.lumi();}],["(Laisser Lumi tranquille)",closeDlg]]);return;}
+ if(st==1){chain(w,["Lucane… Sa forge… Je sais. Mais regarde-moi : plus une étincelle.","Ma lumière vient des Pétales de Nuit, des fleurs violettes qui n'éclosent qu'au clair de lune, ici, dans le Bois Creux. Je n'ose plus sortir la nuit, avec les taches qui rôdent.","Si tu m'en rapportais trois… Je pourrais briller à nouveau."],[["Je vais attendre la nuit.",()=>{qset('bois',has('petale',3)?3:2);closeDlg();}]]);return;}
+ if((st==2||st==3)&&has('petale',3)){take('petale',3);S.F.lumiLit=1;qset('bois',4);give('lanterne');chain(w,["Oh… Oh ! Je sens la chaleur qui remonte jusqu'au bout de mon abdomen !","(Lumi s'illumine d'un or si vif que toute la clairière se met à scintiller.)","Je file rallumer la forge de Lucane. Et toi, prends cette lanterne : j'y ai mis un peu de ma lumière. Elle perce n'importe quel brouillard. Même celui du Marais."],[["Tu es magnifique, Lumi.",closeDlg]]);return;}
+ if(st<4){say(w,`Trois Pétales de Nuit… tu en as ${S.inv.petale||0}. Ils n'éclosent qu'à la nuit tombée. Tu peux laisser passer le temps (touche T).`);return;}
+ say(w,"Je brille ! Je brille pour toujours ! Bon, pour ce soir, au moins. C'est déjà beaucoup, non ?");};
+T.roulo=()=>{const w='roulo',st=qs('roulo');
+ if(st<0){chain(w,["Bérénice ! BÉRÉNICE ! Oh, pardon. Je suis Roulo. J'ai perdu Bérénice.","Bérénice, c'est ma boule. Ma boule parfaite. Trois semaines de travail ! Elle a dévalé la pente et filé vers l'est, au-delà des derniers arbres.","Moi, je ne peux pas la poursuivre : je ne sais marcher qu'à reculons en poussant quelque chose."],[["Je retrouverai Bérénice.",()=>{qset('roulo',has('boule')?1:0);closeDlg();}],["…De quoi est faite Bérénice ?",()=>say(w,"Ne pose pas de questions dont tu ne veux pas la réponse, ami gecko.",[["Je retrouverai Bérénice.",()=>{qset('roulo',has('boule')?1:0);closeDlg();}]])]]);return;}
+ if(st==1&&has('boule')){take('boule');qset('roulo',2);S.seeds+=20;updHUD();chain(w,["BÉRÉNICE ! Tu es revenue ! Tu n'as pas une égratignure !","Ami gecko, voici 20 graines, toute ma fortune. Et un secret : Tarsk, le scorpion des Dunes, ne résiste à rien de ce qui brille. Ambre, nacre… Il en perd la tête."],[["Bonne route, vous deux.",closeDlg]]);return;}
+ say(w,st==2?"Bérénice et moi partons voir la Voie lactée ce soir. À reculons, évidemment.":"Bérénice est quelque part à l'est, au-delà des arbres. Elle est ronde et brune. Tu ne peux pas la rater.");};
+T.tisseuse=()=>{const w='tisseuse';
+ const trade=[];if(!has('soie')&&!S.F.soieGiven){if(has('rosee'))trade.push(["Échanger la Rosée Royale contre du fil.",()=>{take('rosee');give('soie');S.F.soieGiven=1;say(w,"Une rosée d'aube royale… Je vais en boire une goutte par lune. Voici ma plus belle bobine.",[["Merci, Tisseuse.",closeDlg]]);}]);trade.push(["Acheter du fil (12 graines).",()=>{if(S.seeds<12){say(w,"Douze graines, petit. Pas une de moins. Le fil, c'est du temps.");return;}S.seeds-=12;updHUD();give('soie');S.F.soieGiven=1;say(w,"Marché conclu. Fais-en bon usage.");}]);}
+ trade.push(["Parle-moi de la Gomme.",()=>chain(w,["La Gomme ? Je l'ai vue une fois, de loin. Pâle, molle, avec des yeux tristes comme des gouttes de pluie sur une vitre.","Elle n'est pas méchante, je crois. Elle a peur des traits ratés. Elle les efface avant qu'ils ne fassent mal. Elle confond le vide et la paix.","Moi, je tisse sur du vide toutes les nuits. Le vide est une promesse, pas une fin."],[["(Fermer)",closeDlg]])]);
+ trade.push(["Au revoir.",closeDlg]);
+ if(!S.F.tissMet){S.F.tissMet=1;chain(w,["Approche, petit… n'aie pas peur. Je ne mange que ce qui se prend dans ma toile, et tu es bien trop gros.","On m'appelle la Tisseuse. Mon fil est le plus solide du Carnet. On dit qu'il peut tenir chaud même à une chrysalide."],trade);return;}
+ say(w,"Le fil tremble. Quelqu'un tire dessus ?",trade);};
+function twig(n){const w={name:n.name,n};if(!n.real){say(w,["C'est une brindille. Une vraie. Elle ne dit rien.","Une brindille sèche. Elle sent la pluie d'hier.","Rien. Juste du bois. Mais tu as l'impression d'être observé."][TWIGS.findIndex(p=>p[0]==n.x)%3]);return;}
+ discover('phasme');
+ if(qs('lettre')==0&&has('lettre')){take('lettre');give('reponse');qset('lettre',1);chain(w,["…Tu m'as trouvé ? Personne ne me trouve. Même moi, parfois, je me perds.","Une lettre… pour moi ? De Sœur Prieuse ? (Brindille devient d'un vert très, très foncé.)","Attends. Ne bouge pas. … … … Voilà. Ma réponse. Ne la lis pas. Enfin, si tu la lis, ne me le dis pas."],[["Je la porterai.",closeDlg]]);return;}
+ say(w,qs('lettre')>=1?"Tu crois qu'elle a aimé ma lettre ? Ne réponds pas. Si. Réponds. Non.":"…Chut. Je suis une brindille. Tu n'as rien vu.");}
+T.ozy=()=>{const w='ozy',st=qs('dunes');
+ if(st<0)qset('dunes',0);
+ if(qs('dunes')==0){chain(w,["Qui ose troubler la sieste d'Ozymandias, Roi des Dunes, Seigneur des Siestes, Contemplateur du Ciel par le Troisième Œil ?","Un gecko. Évidemment. Les geckos ne respectent rien. Ils marchent même au plafond.","La Goutte ? Oui, elle est tombée ici. Elle s'est enfoncée sous la Pierre-Soleil, et le sable l'a avalée. Où exactement… seul Sssylas le sait, à l'ouest. Le serpent sait tout, et ne dit rien gratuitement."],[["J'irai voir Sssylas.",()=>{qset('dunes',1);closeDlg();}]]);return;}
+ if(qs('dunes')==2){say(w,"Tarsk. Ce bandit de scorpion se vautre sur la Pierre-Soleil depuis des lunes. Il aime trois choses : ce qui brille, les graines et la bagarre. Choisis bien.");return;}
+ if(qdone('dunes')){say(w,"Tu as délogé Tarsk ? Ha ! Je savais, depuis le début, que tu étais digne. Mon troisième œil ne se trompe jamais.");return;}
+ say(w,"Sssylas, à l'ouest des dunes. Ses énigmes ont rendu fous trois lézards et un scarabée.");};
+const RIDDLES=[
+ ["Je porte ma maison sans jamais la quitter, et je suis plus vieille que les pierres de ce désert. Qui suis-je ?",["Une tortue","Un escargot","Une dune"],0],
+ ["Le matin je rampe, à midi je dors dans un cercueil de soie, le soir je vole. Qui suis-je ?",["Une libellule","Un papillon","Une chauve-souris"],1],
+ ["Plus on m'enlève de quoi que ce soit, plus je grandis. Qui suis-je ?",["Une ombre","Une dune","Un trou"],2],
+];
+T.sssylas=()=>{const w='sssylas',st=qs('dunes');
+ if(st==1){const ask=i=>{if(i>=3){S.F.riddles=1;qset('dunes',2);if(!has('mue')&&!has('pince'))give('mue');chain(w,["Sssssplendide. Trois sssur trois. Tu as l'essprit vif, pour un mangeur de mouches.","Un trou, oui… Comme ceux que fait la Gomme dans le monde. Plus elle efface, plus le trou grandit. Retiens-le.","La Goutte dort sssous la Pierre-Soleil, à l'est. Mais Tarsk le scorpion y fait sa sieste. Bonne chance.","Et prends ceci : ma vieille peau. J'ai mué ce matin. Elle te sera plus utile qu'à moi."],[["Merci, Sssylas.",closeDlg]]);return;}const r=RIDDLES[i];say(w,`Énigme ${i+1}. ${r[0]}`,r[1].map((a,k)=>[a,()=>k==r[2]?ask(i+1):say(w,"Sssss… non. Tout est à recommencer. Le désert est patient. Moi aussi.",[["Recommencer.",()=>ask(0)],["Plus tard.",closeDlg]])]));};say(w,"Ssssalut, petit gecko. Tu veux sssavoir où est la Goutte ? Réponds à mes trois énigmes. Une erreur, et tout recommence.",[["J'écoute.",()=>ask(0)],["Plus tard.",closeDlg]]);return;}
+ if(st<1){say(w,"Sss… Va d'abord présssenter tes respects à Ozymandias. Il adore qu'on lui présente des resssspects.");return;}
+ if(qs('pince')==0&&!has('mue')&&!has('pince')){give('mue');say(w,"Encore toi ? Tiens, une autre mue. J'en fais une par sssemaine, quand je ssuis vexé.");return;}
+ say(w,"Le sssable se souvient de tout. Même de ce qu'Élise a oublié.");};
+T.tarsk=()=>{const w='tarsk',st=qs('dunes');
+ if(st<2){say(w,"Dégage, l'écailleux. Cette pierre est chaude, elle est à moi, et je ne partage pas.");return;}
+ const won=how=>{S.F.tarskGone=1;S.F.g_dunes=1;qset('dunes',3);give('goutte');give('soleil');if(qs('pince')<0)qset('pince',has('mue')?1:0);chain(w,[how,"(Tarsk s'écarte. Sous la Pierre-Soleil, le sable est noir et luisant. Tu y plonges la patte : la Goutte d'Encre Originelle, et un éclat de la pierre, chaud comme un cœur.)"],[["Merci… je crois.",closeDlg]]);};
+ const ch=[];if(has('ambre'))ch.push(["Lui offrir l'Ambre ancien.",()=>{take('ambre');won("De l'ambre ! Avec un moustique dedans ! C'est la plus belle chose que j'aie jamais vue. Prends la pierre, prends tout !");}]);if(has('miroir'))ch.push(["Lui offrir le Miroir de nacre.",()=>{take('miroir');won("Oh. Oh ! C'est moi, là-dedans ? Que je suis beau ! Garde ta pierre, j'ai trouvé mieux à regarder.");}]);
+ ch.push(["Payer 25 graines.",()=>{if(S.seeds<25){say(w,"Tu sais compter jusqu'à 25 ? Moi oui. Reviens quand tes poches seront pleines.");return;}S.seeds-=25;updHUD();won("Vingt-cinq graines, bien comptées. Un plaisir de faire affaire. La pierre est à toi.");}]);
+ ch.push(["Le défier en duel !",()=>{closeDlg();startBoss('tarsk');}]);ch.push(["Partir.",closeDlg]);
+ say(w,"Encore toi. Tu veux ma pierre ? Rien n'est gratuit, sous le soleil. Qu'est-ce que tu m'offres ?",ch);};
+T.margot=()=>{const w='margot',st=qs('marais');
+ if(st<0)qset('marais',0);
+ if(S.F.ferryPaid){say(w,"On traverse ? Monte, et ne bouge pas trop. Mes écailles sont sensibles.",[["Traverser vers l'îlot.",()=>{closeDlg();ferry(true);}],["Pas maintenant.",closeDlg]]);return;}
+ if(has('coquillage',3)){chain(w,["Trois coquillages ! Petits, nacrés, avec la petite spirale… Parfaits.","Le marché, c'est le marché. Monte sur mon dos. Et si tu entends mon ventre gargouiller, ce n'est pas ce que tu crois."],[["Traverser.",()=>{take('coquillage',3);S.F.ferryPaid=1;if(qs('marais')<3)qset('marais',3);closeDlg();ferry(true);}]]);return;}
+ if(qs('marais')<1)qset('marais',1);
+ chain(w,["Grrmf. Encore un voyageur. Je suis Margot. Je fais traverser la mare, jusqu'à l'îlot.","Mon tarif : trois coquillages. Pas de graines, pas de promesses. Des coquillages. Il y en a sur les rives, si tu as de bons yeux."],[["Je vais en chercher.",closeDlg]]);};
+function ferry(toIsle){fadeTo(()=>{const p=toIsle?ISLE_DOCK:SHORE_DOCK;S.x=p[0];S.y=p[1];cam.x=S.x;cam.y=S.y;target=null;});}
+T.raft=()=>say({name:'Le radeau de Margot',n:N.raft},"Margot somnole contre le ponton, un œil ouvert. « On rentre ? »",[["Retourner sur la rive.",()=>{closeDlg();ferry(false);}],["Rester sur l'îlot.",closeDlg]]);
+T.azure=()=>{const w='azure';if(qs('marais')<0)qset('marais',0);
+ if(qs('marais')==0){chain(w,["Salut-salut ! Azuré, éclaireuse, je vole dans tous les sens, même à reculons ! Tu cherches la Goutte ? Tout le marais en parle !","C'est Kaméo qui l'a, le caméléon de l'îlot, au milieu de la mare. Sauf que Kaméo, personne ne le voit plus : il a changé de couleur si souvent qu'il a oublié la sienne. Il est devenu transparent !","Pour l'îlot, il faut Margot, le crocodile du ponton, à l'est de la mare. Elle prend des coquillages. Il y en a sur les rives. Allez, zou !"],[["Merci, Azuré !",()=>{qset('marais',has('coquillage',3)?2:1);closeDlg();}]]);return;}
+ say(w,qdone('marais')?"Kaméo est tout rouge, ou tout vert, enfin il a une couleur ! Le marais ne parle que de ça !":"Des coquillages sur les rives, Margot au ponton, Kaméo sur l'îlot ! Je répète parce que je parle vite !");};
+T.kameo=()=>{const w='kameo',st=qs('marais');
+ if(S.F.kameoDrawn){say(w,`Je suis ${S.F.kameoCol||'vert'} ! Enfin, aujourd'hui. Demain, on verra. Mais au moins, je sais revenir.`);return;}
+ if(st<3){say(w,"(Il y a un léger scintillement dans l'air, comme de la chaleur au-dessus d'une pierre. Puis plus rien.)");return;}
+ if(st==3)qset('marais',4);
+ const draw=col=>()=>{if(S.ink<3){say(w,"…Ta plume est presque sèche. Il te faut au moins trois gouttes d'encre.",[["Je reviendrai.",closeDlg]]);return;}S.ink-=3;updHUD();S.F.kameoDrawn=1;S.F.kameoCol=col;S.F.g_marais=1;qset('marais',5);give('goutte');give('miroir');spawnSplash(N.kameo.x,N.kameo.y);chain(w,["(Ta plume trace un œil, une crête, une queue enroulée. L'encre se gorge de couleur.)",`Je… je me vois ! Je suis ${col} ! C'est moi, ça ? C'est MOI !`,"Merci, merci ! La Goutte, je la cachais dans ma bouche, c'était très inconfortable. Tiens. Et ce miroir de nacre : c'est grâce à lui que je cherchais ma couleur. Je n'en ai plus besoin."],[["Ravi de te voir, Kaméo.",closeDlg]]);};
+ chain(w,["…Tu… tu me vois ? Personne ne me voit plus.","J'ai changé de couleur pour chaque feuille, chaque caillou, chaque humeur. Un jour, j'ai voulu redevenir moi-même et… je ne me souvenais plus de quelle couleur j'étais.","Tu as une plume ? Dessine-moi. N'importe quelle couleur. Je veux juste être quelque chose."],[["Le dessiner en vert feuille.",draw('vert')],["Le dessiner en rouge braise.",draw('rouge')],["Le dessiner en bleu nuit.",draw('bleu')],["Pas maintenant.",closeDlg]]);};
+T.madazur=()=>{const w='madazur',st=qs('cime');if(st<0)qset('cime',0);
+ if(qs('cime')==0){chain(w,["Doucement, petit. On parle bas, ici. Une enfant dort.","Je suis Madame Azur. Je veille sur la Grande Chrysalide, là-haut. Le jour où l'Encrier s'est fendu, une Goutte est tombée sur elle, et elle l'a enveloppée.","Mais le froid de la Page Blanche descend jusqu'ici. La chrysalide n'éclôt pas. Il lui faudrait de la chaleur, une Pierre-Soleil, et du fil de soie pour la garder."],[["Je trouverai les deux.",()=>{qset('cime',has('soleil')&&has('soie')?2:1);closeDlg();}]]);return;}
+ if(S.F.aurore){say(w,"Elle est née… ma petite Aurore. Merci, gecko. Le ciel de la Cime n'a jamais été aussi rose.");return;}
+ say(w,"Une Pierre-Soleil, des Dunes. Du fil de soie, de la Tisseuse du Bois Creux. Pose-les près de la chrysalide.");};
+T.chrys=()=>{const w={name:'La Grande Chrysalide',n:N.chrys};
+ if(qs('cime')>=1&&has('soleil')&&has('soie')){take('soleil');take('soie');S.F.aurore=1;S.F.g_cime=1;qset('cime',3);give('goutte');for(let i=0;i<40;i++){const a=Math.random()*6.28,s=60+Math.random()*200;parts.push({x:N.chrys.x,y:N.chrys.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1.2,r:3,col:['#ff9ac0','#ffd27a','#c9a0ff'][i%3]});}chain({name:'Aurore',n:N.aurore},["(Tu poses la Pierre-Soleil contre la soie. La chrysalide tremble, se fend…)","…Oh. La lumière. C'est ça, la lumière ?","Je m'appelle Aurore. J'ai entendu ta voix à travers la soie, tous ces jours. Tiens, la goutte noire : je l'ai serrée contre moi pendant tout mon sommeil.","Va. La Page Blanche a froid elle aussi, je crois. Peut-être qu'elle a juste besoin de quelqu'un qui la réchauffe."],[["Bienvenue au monde, Aurore.",closeDlg]]);return;}
+ say(w,"Une grande chrysalide, suspendue entre deux rochers. Elle est froide au toucher. Quelque chose bouge doucement à l'intérieur.");};
+T.aurore=()=>say('aurore',"Je vole ! Je vole mal, mais je vole ! Madame Azur dit que c'est normal, la première semaine.");
+T.prieuse=()=>{const w='prieuse',st=qs('lettre');
+ if(st<0){chain(w,["Paix sur toi, voyageur. Je suis Sœur Prieuse. Je médite ici depuis trois mues.","…Puis-je te confier quelque chose ? En bas, au Bois Creux, vit un phasme. Brindille. Il est si discret que personne ne le voit. Moi, je le vois.","Voudrais-tu lui porter cette lettre ? Je ne peux pas descendre : la méditation, tu comprends. Et la timidité."],[["Je la porterai.",()=>{give('lettre');qset('lettre',0);closeDlg();}],["Pas le temps.",closeDlg]]);return;}
+ if(st==1&&has('reponse')){take('reponse');qset('lettre',2);S.hpMax++;S.hp=S.hpMax;updHUD();chain(w,["Une réponse ! Pliée en cœur… de travers. C'est bien lui.","(Elle lit, cache sa tête derrière ses pattes ravisseuses, relit.)","Que la paix t'accompagne, messager. Reçois ma bénédiction : ton cœur sera plus fort. (+1 cœur)"],[["Tout le plaisir était pour moi.",closeDlg]]);return;}
+ say(w,st==2?"Brindille m'a écrit encore. Il dit que je suis « la plus belle des feuilles ». Je médite là-dessus.":"Brindille est parmi les brindilles, au Bois Creux, à l'est de la mare de Lumi. Cherche celle qui respire.");};
+T.gommette=()=>say({name:'Gommette',n:N.gommette},["Je ne gomme plus que les taches et les traits qui dépassent. Élise appelait ça « faire propre ».","Tu as vu ? J'ai des yeux maintenant. Le monde est si plein. C'est fatigant, et c'est merveilleux.","Les Terres Esquissées sont à toi. Je garde la page. Va dessiner."][(now/8|0)%3]);
+
+/* ---------- boss ---------- */
+function startBoss(kind){if(kind=='tarsk'){boss={kind,x:N.tarsk.x,y:N.tarsk.y,hp:4,max:4,r:28,inv:0,vx:0,vy:0,t:0,plan:'scorp',c:'#c9a04a',sc:2.2};toast("Duel ! Projette ton encre sur Tarsk (Espace).",'q');}
+ else{boss={kind,x:-1500,y:-1720,hp:8,max:8,r:55,inv:0,vx:0,vy:0,t:0,spawn:2};toast("La Gomme ! Éclabousse-la d'encre (Espace) et évite les taches.",'q');}}
+function bossDown(){const k=boss.kind;boss=null;foes=foes.filter(f=>!f.boss);
+ if(k=='tarsk'){S.F.tarskGone=1;S.F.g_dunes=1;qset('dunes',3);give('goutte');give('soleil');if(qs('pince')<0)qset('pince',has('mue')?1:0);chain('tarsk',["Ouille ! Ouille-ouille ! D'accord, d'accord, je me rends ! Tu as de l'encre dans les veines, gecko.","(Tarsk s'écarte en boitant. Sous la Pierre-Soleil, le sable est noir et luisant : la Goutte d'Encre Originelle, et un éclat de pierre encore chaud.)"],[["Sans rancune, Tarsk.",closeDlg]]);return;}
+ const g2={name:'La Gomme'};chain(g2,["…Pourquoi… pourquoi tu continues à dessiner ?","Avant, il n'y avait que du blanc. Rien ne mordait. Rien n'avait froid. Rien ne se perdait.","Chaque trait est une promesse qu'on ne tient pas. Les fleurs fanent, les mues se déchirent, les petites filles grandissent et oublient leur carnet.","Moi, j'efface. Et quand c'est effacé, plus rien n'a mal."],[["Effacer la Gomme, une bonne fois pour toutes.",()=>ending('efface')],["Lui dessiner des yeux, pour qu'elle voie le monde.",()=>ending('ami')]]);}
+function ending(k){S.F.ending=k;qset('main',4);S.F.gommeDone=1;closeDlg();
+ const txt=k=='ami'?["(Tu trempes la plume. Deux points noirs, un trait courbe. La Gomme cligne. Elle voit.)","…Oh. C'est… c'est plein de choses. Des fourmis. Une tortue. Toi. C'est fatigant, de voir. Mais c'est beau.","Je ne veux plus tout effacer. Peut-être juste… les traits qui dépassent ? Tu me donnerais un nom ?","(Tu l'appelles Gommette. Autour de vous, la Page Blanche se couvre de fleurs.)"]:["(Tu projettes toute ton encre. La Gomme ne se défend pas. Elle s'effrite en miettes roses que le vent emporte.)","…Merci… c'est calme, maintenant…","(La Page Blanche reste blanche. Mais elle ne s'étend plus. Quelque part, une tortue soupire.)"];
+ chain(k=='ami'?{name:'La Gomme'}:{name:'La Page Blanche'},txt,[["(Fin)",()=>{closeDlg();showCredits(k);}]]);}
+function showCredits(k){const n=Object.keys(S.best).length,qd=Object.keys(QUESTS).filter(id=>qdone(id)).length;$('credBody').innerHTML=`<h1>${k=='ami'?'Le Carnet Fleuri':'Le Carnet Sauvé'}</h1><p style="font-size:19px;max-width:520px;margin:12px auto">${k=='ami'?"Tu as choisi de dessiner plutôt que d'effacer. Gommette veille désormais sur la Page Blanche, qui se couvre de fleurs.":"La Gomme n'est plus. Le monde est sauf, mais une page restera blanche pour toujours."}</p><p>Espèces observées : ${n}/${SPIDS.length} · Pages d'Élise : ${S.pages}/7 · Quêtes accomplies : ${qd}/${Object.keys(QUESTS).length}</p><p style="max-width:520px;margin:10px auto">Le carnet est infini. Les Terres Esquissées, au-delà des bords, attendent toujours qu'on les explore.</p><button class="btn" id="credOk">Continuer à explorer</button>`;$('credits').hidden=false;$('credOk').onclick=()=>{$('credits').hidden=true;};save();}
+
+/* ---------- temps ---------- */
+function skipTime(){fastT=isNight()?'day':'night';toast(isNight()?"Tu attends le lever du jour…":"Tu attends la tombée de la nuit…");}
+
+/* ---------- boucle ---------- */
+let last=performance.now();
+function loop(t){const dt=Math.min(.05,(t-last)/1000);last=t;now+=dt;boil=Math.floor(now*7)%3;try{update(dt);render();}catch(e){console.error(e);}requestAnimationFrame(loop);}
+function update(dt){
+ if(fastT){S.tod=(S.tod+dt*.25)%1;if((fastT=='night'&&isNight()&&dayLight()<.12)||(fastT=='day'&&dayLight()>.85)){fastT=0;updHUD();}}
+ else if(started)S.tod=(S.tod+dt/300)%1;
+ if(!started){cam.x=Math.cos(now*.05)*260;cam.y=-120+Math.sin(now*.05)*160;return;}
+ let mx=0,my=0;const busy=DLG||panelTab||!$('credits').hidden;
+ if(!busy){if(keys.ArrowLeft||keys.KeyA||keys.KeyQ)mx-=1;if(keys.ArrowRight||keys.KeyD)mx+=1;if(keys.ArrowUp||keys.KeyW||keys.KeyZ)my-=1;if(keys.ArrowDown||keys.KeyS)my+=1;}
+ if(mx||my){target=null;pendingTalk=null;}else if(target&&!busy){const dx=target[0]-S.x,dy=target[1]-S.y,d=Math.hypot(dx,dy);if(d<6){target=null;}else{mx=dx/d;my=dy/d;}if(pendingTalk){const [px,py]=npcPos(pendingTalk);if(dist(px,py,S.x,S.y)<70){const n=pendingTalk;pendingTalk=null;target=null;mx=my=0;talk(n);}}}
+ const ml=Math.hypot(mx,my);S.moving=ml>0;
+ if(ml>0){const sp=230;const ox=S.x,oy=S.y;S.x+=mx/ml*sp*dt;S.y+=my/ml*sp*dt;S.ang=Math.atan2(my,mx);S.walk=(S.walk||0)+dt*14;collide(ox,oy);}
+ // découvertes de régions
+ const r=regionAt(S.x,S.y);const rid=r?r.id:(biomeAt(S.x,S.y)=='esquisse'?'esquisse':null);if(rid!==curRegion){curRegion=rid;if(rid){const isNew=!S.disc[rid];S.disc[rid]=1;if(rid!='esquisse'||isNew)showRegion(rid,isNew);onEnterRegion(rid);}}
+ // ramassage
+ for(const p of PICKS){if(S.taken[p.k]||(p.cond&&!p.cond())||(p.night&&!isNight()))continue;if(dist(p.x,p.y,S.x,S.y)<30)collect(p.k,p.t);}
+ const cx0=Math.floor(S.x/CH),cy0=Math.floor(S.y/CH);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const c=genChunk(cx0+i,cy0+j);for(const p of c.picks)if(!S.taken[p.k]&&dist(p.x,p.y,S.x,S.y)<30)collect(p.k,p.t);for(const cr of c.crit){const [x,y]=critPos(cr);if(!S.best[cr.sp]&&dist(x,y,S.x,S.y)<85&&(!SP[cr.sp].night||isNight()))discover(cr.sp);}}
+ for(let i=loose.length-1;i>=0;i--){const l=loose[i];l.life-=dt;if(dist(l.x,l.y,S.x,S.y)<34){loose.splice(i,1);lootGet(l.t);}else if(l.life<=0)loose.splice(i,1);}
+ // ennemis
+ const bio=biomeAt(S.x,S.y);spawnT-=dt;
+ if(spawnT<=0){spawnT=2.5;const want=bio=='esquisse'?6:(r&&r.id=='blanche'&&!S.F.gommeDone)?0:(isNight()&&!r&&Math.hypot(S.x,S.y)>900)?2:0;if(foes.filter(f=>!f.boss).length<want){const a=Math.random()*6.28,d=520+Math.random()*200,x=S.x+Math.cos(a)*d,y=S.y+Math.sin(a)*d;const b2=biomeAt(x,y);if(b2=='esquisse'||b2=='pre')foes.push({x,y,r:13+Math.random()*7,sd:Math.random()*999|0,wa:Math.random()*6});}}
+ for(const f of foes){const d=dist(f.x,f.y,S.x,S.y);if(d<330){const a=Math.atan2(S.y-f.y,S.x-f.x);f.x+=Math.cos(a)*85*dt;f.y+=Math.sin(a)*85*dt;}else{f.wa+=dt*.6;f.x+=Math.cos(f.wa)*30*dt;f.y+=Math.sin(f.wa)*30*dt;}if(d<f.r+16)hurt(f);if(d>1600)f.dead=true;}
+ foes=foes.filter(f=>!f.dead);
+ // boss
+ if(r&&r.id=='blanche'&&S.F.encrier&&!S.F.gommeDone&&!boss&&!DLG){say({name:'La Gomme'},"…Encore un trait. Encore quelqu'un qui dessine chez moi. Va-t'en. Ici, tout est enfin calme.",[["Je suis venu réparer le monde.",()=>{closeDlg();startBoss('gomme');}]]);}
+ if(boss&&!busy){boss.t+=dt;boss.inv-=dt;const d=dist(boss.x,boss.y,S.x,S.y),a=Math.atan2(S.y-boss.y,S.x-boss.x);const sp=boss.kind=='tarsk'?(Math.sin(boss.t*1.4)>.3?210:70):55;boss.x+=(Math.cos(a)*sp+boss.vx)*dt;boss.y+=(Math.sin(a)*sp+boss.vy)*dt;boss.vx*=.9;boss.vy*=.9;boss.ang=a;if(d<boss.r+16)hurt(boss);
+  if(boss.kind=='gomme'){boss.spawn-=dt;if(boss.spawn<=0){boss.spawn=2.6;foes.push({x:boss.x+(Math.random()-.5)*60,y:boss.y+(Math.random()-.5)*60,r:12,sd:Math.random()*999|0,wa:0,boss:1});}const rg=REGM.blanche;if(dist(S.x,S.y,rg.x,rg.y)>rg.r+200){boss=null;foes=foes.filter(f=>!f.boss);toast("La Gomme retourne dans sa page…");}}
+  else if(d>700){boss=null;toast("Tarsk retourne bouder sur sa pierre.");}}
+ // encre & invulnérabilité
+ inv-=dt;hurtFlash-=dt;inkRegen+=dt;const rate=boss?5:22;if(inkRegen>rate){inkRegen=0;if(has('plume')&&S.ink<S.inkMax){S.ink++;updHUD();}}
+ for(const p of parts){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.9;p.vy*=.9;p.life-=dt;}parts=parts.filter(p=>p.life>0);
+ // caméra
+ cam.z+=(zoomT-cam.z)*Math.min(1,dt*8);cam.x+=(S.x-cam.x)*Math.min(1,dt*5);cam.y+=(S.y-cam.y)*Math.min(1,dt*5);
+ // invite
+ const n=busy?null:nearestInteract();const ptxt=n?`E — ${n.obj?'Examiner':'Parler à'} ${n.id=='kameo'&&!S.F.kameoDrawn?'le scintillement':n.name}`:'';if(ptxt!==lastPrompt){lastPrompt=ptxt;const pr=$('prompt');pr.hidden=!n;pr.textContent=ptxt;$('tAct').innerHTML=n?(n.obj?'Examiner':'Parler'):'Parler<br>(E)';}
+ saveT+=dt;if(saveT>8){saveT=0;save();}
+ updHUD();}
+function collide(ox,oy){for(const gt of GATES){if(gt.ok())continue;const d=dist(S.x,S.y,gt.x,gt.y);if(d<gt.r+6){const a=Math.atan2(S.y-gt.y,S.x-gt.x);S.x=gt.x+Math.cos(a)*(gt.r+7);S.y=gt.y+Math.sin(a)*(gt.r+7);target=null;if(now-gateMsgT>3.5){gateMsgT=now;toast(gt.msg);}}}
+ const d=dist(S.x,S.y,POND.x,POND.y);if(d>POND.ri&&d<POND.ro){const od=dist(ox,oy,POND.x,POND.y);const a=Math.atan2(S.y-POND.y,S.x-POND.x);const rr=od<(POND.ri+POND.ro)/2?POND.ri-1:POND.ro+1;S.x=POND.x+Math.cos(a)*rr;S.y=POND.y+Math.sin(a)*rr;target=null;if(now-gateMsgT>4){gateMsgT=now;toast(od>POND.ro-5?"L'eau est trop profonde. Margot fait traverser, au ponton.":"L'îlot est entouré d'eau. Le radeau de Margot attend au sud.");}}}
+function collect(k,t){S.taken[k]=1;if(t=='seed'){addSeeds(2+(Math.random()*3|0));}else if(t=='page'){S.pages=Math.min(7,S.pages+1);if(qs('pages')<0)qset('pages',0);toast(`Page d'Élise ${S.pages}/7 — lis-la dans ton Carnet (B)`,'q');sfx('quest');say({name:`Page ${S.pages} du journal d'Élise`},PAGES[S.pages-1],[["(Ranger la page)",closeDlg]]);if(S.pages>=7&&qs('pages')==0){qset('pages',1);S.inkMax+=5;S.ink=S.inkMax;toast("La plume d'Élise frémit : +5 encre maximum !",'q');}}else if(t=='mure'&&!S.F.mureTip){S.F.mureTip=1;S.ink=Math.min(S.inkMax,S.ink+3);toast("Encre de mûre : +3 encre");sfx('get');}else if(t=='mure'){S.ink=Math.min(S.inkMax,S.ink+3);toast("+3 encre");sfx('get');}else give(t);updHUD();save();}
+function lootGet(t){if(t=='seed')addSeeds(1+(Math.random()*2|0));else{S.ink=Math.min(S.inkMax,S.ink+2);toast("+2 encre");sfx('get');}updHUD();}
+function onEnterRegion(id){if(id=='bois'&&qs('bois')<0)qset('bois',0);if(id=='dunes'&&qs('dunes')<0)qset('dunes',0);if(id=='marais'&&qs('marais')<0)qset('marais',0);if(id=='cime'&&qs('cime')<0)qset('cime',0);if(id=='esquisse'&&!S.F.skTip){S.F.skTip=1;toast("Les Terres Esquissées : ici, le monde n'est qu'à moitié dessiné. Méfie-toi des taches, cherche les pages d'Élise.",'q');}}
+let rtT=0;function showRegion(id,isNew){const el=$('regionTitle');const r=REGM[id];el.innerHTML=r?`${esc(r.n)}<small>${esc(r.sub)}</small>`:`Terres Esquissées<small>le carnet continue sans fin</small>`;el.style.opacity=1;clearTimeout(rtT);rtT=setTimeout(()=>el.style.opacity=0,isNew?2600:1400);}
+function critPos(c){const t=now*c.f+c.ph;return[c.hx+Math.sin(t)*c.rw,c.hy+Math.sin(t*1.7+1)*c.rw*.6];}
+function trackTarget(){const id=QUESTS[S.track]&&qs(S.track)>=0&&!qdone(S.track)?S.track:'main';if(qs(id)<0)return[0,-110];if(qdone(id))return null;const s=QUESTS[id].steps[qs(id)];return s.at?s.at():null;}
+
+/* ---------- rendu ---------- */
+function render(){g=g0;g.setTransform(DPR,0,0,DPR,0,0);g.fillStyle='#f4ecd8';g.fillRect(0,0,W,H);const z=cam.z;const vx0=cam.x-W/2/z,vy0=cam.y-H/2/z,vx1=cam.x+W/2/z,vy1=cam.y+H/2/z;
+ g.save();g.translate(W/2,H/2);g.scale(z,z);g.translate(-cam.x,-cam.y);
+ // lignes du carnet
+ g.strokeStyle='rgba(140,170,205,.35)';g.lineWidth=1/z;const ls=36;g.beginPath();for(let y=Math.floor(vy0/ls)*ls;y<vy1;y+=ls){g.moveTo(vx0,y);g.lineTo(vx1,y);}g.stroke();
+ const cx0=Math.floor(vx0/CH)-1,cx1=Math.floor(vx1/CH)+1,cy0=Math.floor(vy0/CH)-1,cy1=Math.floor(vy1/CH)+1;const vis=[];for(let cy=cy0;cy<=cy1;cy++)for(let cx=cx0;cx<=cx1;cx++)vis.push(genChunk(cx,cy));
+ // aquarelles
+ for(const c of vis)for(const w of c.wash){g.globalAlpha=.2;g.fillStyle=w.col;ell(w.x,w.y,w.r,w.r*.8,w.sd,w.sd,.12);g.fill();}g.globalAlpha=1;
+ // page blanche
+ drawBlanche();
+ // décor
+ for(const c of vis)for(const d of c.deco)drawDeco(d);
+ for(const l of LM)if(l.x>vx0-400&&l.x<vx1+400&&l.y>vy0-400&&l.y<vy1+400)drawLM(l);
+ drawGates(vx0,vy0,vx1,vy1);
+ // objets
+ for(const p of PICKS){if(S.taken[p.k]||(p.cond&&!p.cond())||(p.night&&!isNight()))continue;drawPick(p.x,p.y,p.t);}
+ for(const c of vis)for(const p of c.picks)if(!S.taken[p.k])drawPick(p.x,p.y,p.t);
+ for(const l of loose)drawPick(l.x,l.y,l.t);
+ // entités triées
+ const ents=[];for(const c of vis)for(const cr of c.crit){if(SP[cr.sp].night&&!isNight())continue;const[x,y]=critPos(cr);ents.push({y,f:()=>{const t=now*cr.f+cr.ph;const dx=Math.cos(t)*cr.rw,dy=Math.cos(t*1.7+1)*cr.rw*.6*1.7;drawCreature(SP[cr.sp].p,x,y,Math.atan2(dy,dx),SP[cr.sp].p=='croc'?.9:1,spOpts(cr.sp,{ph:now*8,t:now+cr.sd,sd:cr.sd}));}});}
+ for(const n of NPCS){if(!visibleNpc(n))continue;const [x,y]=npcPos(n);if(x<vx0-150||x>vx1+150||y<vy0-150||y>vy1+150)continue;ents.push({y,f:()=>drawNpc(n,x,y)});}
+ for(const f of foes)ents.push({y:f.y,f:()=>drawCreature('tache',f.x,f.y,0,1,{r:f.r,sd:f.sd+boil})});
+ if(boss)ents.push({y:boss.y,f:()=>drawBoss()});
+ ents.push({y:S.y,f:()=>drawPlayer()});ents.sort((a,b)=>a.y-b.y);for(const e of ents)e.f();
+ for(const p of parts){g.globalAlpha=Math.min(1,p.life*2);dot(p.x,p.y,p.r,p.col);}g.globalAlpha=1;
+ // brouillard marais
+ drawMarshFog(vx0,vy0,vx1,vy1);
+ // marqueur de quête
+ const tg=started?trackTarget():null;if(tg&&tg[0]>vx0&&tg[0]<vx1&&tg[1]>vy0&&tg[1]<vy1&&dist(tg[0],tg[1],S.x,S.y)>60){const b=Math.sin(now*4)*4;star(tg[0],tg[1]-52+b,9,'#c8432f');}
+ g.restore();
+ // nuit
+ drawNight(z,vx0,vy0);
+ // flèche vers l'objectif
+ if(tg&&!(tg[0]>vx0&&tg[0]<vx1&&tg[1]>vy0&&tg[1]<vy1)){const a=Math.atan2(tg[1]-cam.y,tg[0]-cam.x);const mxr=W/2-38,myr=H/2-38;const k=Math.min(mxr/Math.abs(Math.cos(a)||1e-6),myr/Math.abs(Math.sin(a)||1e-6));const ax=W/2+Math.cos(a)*k,ay=H/2+Math.sin(a)*k;g.save();g.translate(ax,ay);g.rotate(a);g.fillStyle='#c8432f';g.strokeStyle=INK;g.lineWidth=2;g.beginPath();g.moveTo(16,0);g.lineTo(-10,-11);g.lineTo(-4,0);g.lineTo(-10,11);g.closePath();g.fill();g.stroke();g.restore();const dd=Math.round(dist(tg[0],tg[1],S.x,S.y)/10);hand(`${dd} pas`,ax-Math.cos(a)*30,ay-Math.sin(a)*30,17,INK);}
+ if(hurtFlash>0){g.fillStyle=`rgba(200,67,47,${hurtFlash*.6})`;g.fillRect(0,0,W,H);}
+ if(boss){const bw=Math.min(360,W-40);g.fillStyle='#fbf6ea';g.strokeStyle=INK;g.lineWidth=2;g.fillRect(W/2-bw/2,H-46,bw,16);g.fillStyle=boss.kind=='tarsk'?'#c9a04a':'#e8a8b0';g.fillRect(W/2-bw/2,H-46,bw*boss.hp/boss.max,16);g.strokeRect(W/2-bw/2,H-46,bw,16);hand(boss.kind=='tarsk'?'Tarsk le scorpion':'La Gomme',W/2,H-60,22,INK);}
+}
+function drawPlayer(){const fl=inv>0&&Math.floor(now*16)%2;if(fl)g.globalAlpha=.4;drawCreature('lizard',S.x,S.y,S.ang,1.25,{c:'#5fb39a',ph:S.moving?S.walk:0,t:now,sd:1,pads:1,bag:1,quill:has('plume')});g.globalAlpha=1;}
+function drawNpc(n,x,y){if(n.obj){if(n.id=='encrier')drawEncrier(x,y,1);else if(n.twig){drawCreature('stick',x,y,-.9+(n.x%7)*.3,1.6,{c:n.real?'#8a7a4a':'#7a6a40',ph:0,t:0,sd:n.x});if(n.real&&has('loupe')&&Math.sin(now*3)>.6)star(x+12,y-18,4,'#fff27a');}else if(n.id=='chrys')drawChrys(x,y,1);else if(n.id=='raft')drawRaft(x,y,1);marker(n,x,y);return;}
+ if(n.id=='kameo'&&!S.F.kameoDrawn){const d=dist(x,y,S.x,S.y),lim=has('loupe')?260:150;if(d<lim){g.globalAlpha=(1-d/lim)*.55*(.6+.4*Math.sin(now*5));g.setLineDash([3,4]);drawCreature('chame',x,y,1.2,n.sc,Object.assign(npcOpts(n),{c:'rgba(255,255,255,.2)'}));g.setLineDash([]);g.globalAlpha=1;}return;}
+ const o=npcOpts(n);if(n.id=='kameo')o.c={vert:'#5fb04a',rouge:'#d8452f',bleu:'#3d5fa8'}[S.F.kameoCol]||o.c;
+ let ang=n.ang;if(n.plan=='butter'||n.plan=='dragon'){y+=Math.sin(now*2+n.x)*6;}
+ g.globalAlpha=.18;blob(x,y+10,18*n.sc*.6,7*n.sc*.6,INK,n.x,{stroke:false});g.globalAlpha=1;
+ drawCreature(n.plan,x,y,ang,n.sc,o);hand(n.name,x,y+18+n.sc*12,16,INK);marker(n,x,y);}
+function marker(n,x,y){const m=npcMark(n);if(!m)return;const b=Math.sin(now*4+x)*3;const yy=y-30-n.sc*12+b;g.fillStyle=m=='!'?'#d9a13b':'#3f7f5a';g.strokeStyle=INK;g.lineWidth=1.6;ell(x,yy,11,11,0,x,.08);g.fill();g.stroke();hand(m,x,yy+1,20,'#fff');}
+function npcMark(n){if(!started)return null;const i=n.id;
+ if(i=='bergamote')return qs('main')<0?'!':qs('main')==2||qs('carnet')==1?'?':null;
+ if(i=='mandibule')return !S.F.antPass&&qs('main')>=1?(has('miel')?'?':'!'):null;
+ if(i=='ostra')return qs('ant')==2?'!':qs('ant')>=3&&qs('ant')<5&&has('puceron',3)?'?':null;
+ if(i=='lucane')return qs('bois')<=0?'!':qs('bois')==4||(qs('pince')==1&&has('mue'))?'?':null;
+ if(i=='lumi')return qs('bois')==1?'!':(qs('bois')==2||qs('bois')==3)&&has('petale',3)?'?':null;
+ if(i=='roulo')return qs('roulo')<0?'!':qs('roulo')==1?'?':null;
+ if(i=='vivaldo')return qs('notes')<0?'!':qs('notes')<=1&&has('note',3)?'?':null;
+ if(i=='lysa')return qs('tic')<0?'!':qs('tic')==1?'?':null;
+ if(i=='tic')return !S.F.ticHome?'!':null;
+ if(i=='ozy')return qs('dunes')<=0?'!':null;
+ if(i=='sssylas')return qs('dunes')==1?'!':null;
+ if(i=='tarsk')return qs('dunes')==2?'!':null;
+ if(i=='azure')return qs('marais')<=0?'!':null;
+ if(i=='margot')return qs('marais')>=1&&!S.F.ferryPaid?(has('coquillage',3)?'?':'!'):null;
+ if(i=='madazur')return qs('cime')<=0?'!':null;
+ if(i=='chrys')return qs('cime')>=1&&has('soleil')&&has('soie')?'?':null;
+ if(i=='prieuse')return qs('lettre')<0?'!':qs('lettre')==1&&has('reponse')?'?':null;
+ if(i=='tisseuse')return qs('cime')>=1&&!has('soie')&&!S.F.soieGiven?'!':null;
+ if(i=='encrier')return null;
+ return null;}
+function drawBoss(){const b=boss;const fl=b.inv>0&&Math.floor(now*20)%2;if(fl)g.globalAlpha=.5;if(b.kind=='tarsk')drawCreature('scorp',b.x,b.y,b.ang,2.2,{c:'#c9a04a',ph:now*10,t:now,sd:77});else drawCreature('gomme',b.x,b.y,b.ang||0,1.5,{t:now,sd:9});g.globalAlpha=1;}
+function drawPick(x,y,t){const b=Math.sin(now*3+x)*2.5;g.globalAlpha=.18;blob(x,y+9,9,3.5,INK,x,{stroke:false});g.globalAlpha=1;g.save();g.translate(x,y-4+b);if(t=='seed')icon('seed','#b88a3a',x|0);else if(t=='page'){icon('page','#fff',x|0);if(Math.sin(now*4+x)>.3)star(10,-12,4,'#fff27a');}else if(t=='petale'){g.globalAlpha=.35;dot(0,0,14,'#d8c0ff');g.globalAlpha=1;icon('leaf','#9a7ad8',x|0);}else{const it=ITEMS[t];icon(it.s,it.c,x|0);}g.restore();}
+function drawEncrier(x,y,s){g.save();g.translate(x,y);g.scale(s,s);blob(0,4,22,14,'#3a3a5a',11,{alpha:.85});blob(0,-10,10,6,'#5a5a7a',12);blob(0,-16,7,3,'#2a2018',13);if(!S.F.encrier){ln(-12,-2,-4,10,14,1.6,.8,'#f4ecd8');ln(-4,10,2,4,15,1.4,.8,'#f4ecd8');}else{g.globalAlpha=.4+.2*Math.sin(now*2);dot(0,0,26,'#6a5aa8');g.globalAlpha=1;}g.restore();}
+function drawChrys(x,y,s){g.save();g.translate(x,y);g.scale(s,s);ln(-30,-34,0,-24,5,2);ln(30,-34,0,-24,6,2);blob(0,0,13,24,'#c8b8a0',7);for(let i=-16;i<18;i+=6)ln(-11,i,11,i+3,i,1,.6,'rgba(42,32,24,.5)');if(has('soie')||S.F.aurore)blob(0,0,15,26,null,8,{lw:.8});g.restore();}
+function drawRaft(x,y,s){g.save();g.translate(x,y);g.scale(s,s);for(let i=-2;i<=2;i++)blob(i*7,0,3.5,14,'#a87a4a',i+40);ln(-16,-6,16,-6,41,1.4);ln(-16,6,16,6,42,1.4);g.restore();}
+function drawDeco(d){const{x,y,sd}=d;switch(d.t){
+ case'grass':for(let i=0;i<4;i++)ln(x+i*3-5,y,x+i*3-5+J(sd+i,3)+(i-1.5)*2,y-9-R(sd+i)*6,sd+i,1.1,.6,'#4f7a3a');break;
+ case'drygrass':for(let i=0;i<4;i++)ln(x+i*3-5,y,x+i*4-8,y-8-R(sd+i)*5,sd+i,1,.6,'#a08a4a');break;
+ case'clover':for(let i=0;i<3;i++){const a=i*2.1;blob(x+Math.cos(a)*4,y+Math.sin(a)*4,3.6,3.6,'#6fae5a',sd+i,{lw:.9});}break;
+ case'flower':{const cols=['#e86a8a','#f2c84b','#8a7ae0','#ffffff','#e8784a'];const c=cols[sd%5];ln(x,y,x+J(sd,2),y-14,sd,1.1,.5,'#4f7a3a');for(let i=0;i<5;i++){const a=i*1.256;blob(x+Math.cos(a)*4,y-14+Math.sin(a)*4,3,3,c,sd+i,{lw:.9});}dot(x,y-14,1.8,'#d9a13b');break;}
+ case'bigflower':{const c=['#e86a8a','#c9a0ff','#f2c84b'][sd%3];for(let i=0;i<6;i++){const a=i*1.047;blob(x+Math.cos(a)*12,y+Math.sin(a)*12,8,6,c,sd+i,{rot:a});}blob(x,y,6,6,'#d9a13b',sd+9);break;}
+ case'pebble':blob(x,y,5+R(sd)*5,4+R(sd+1)*3,'#c8c0b0',sd);break;
+ case'stone':blob(x,y,8+R(sd)*6,6+R(sd+1)*4,'#d8b880',sd);break;
+ case'rock':blob(x,y,16+R(sd)*10,12+R(sd+1)*7,'#b0a8a0',sd);ln(x-6,y-3,x+4,y+2,sd+3,1);break;
+ case'bush':blob(x,y,14,11,'#6f9e52',sd);blob(x+9,y-4,9,8,'#7fae62',sd+1);break;
+ case'mush':blob(x,y+4,2.5,4,'#f4ecd8',sd);blob(x,y-1,7,4.5,'#d9734a',sd+1);dot(x-2,y-2,1.1,'#fff');break;
+ case'twig':ln(x-10,y,x+10,y-4,sd,2,1,'#7a5a3a');ln(x+2,y-2,x+7,y-8,sd+1,1.2,.5,'#7a5a3a');break;
+ case'dirt':blob(x,y,10,6,'#c88a5a',sd,{alpha:.6,lw:1});break;
+ case'tree':g.globalAlpha=.25;blob(x+8,y+10,34,26,INK,sd,{stroke:false});g.globalAlpha=1;blob(x,y,34+R(sd)*10,30+R(sd+1)*8,'#4f8a4a',sd);blob(x-8,y-8,18,14,'#6fae5a',sd+2,{lw:1});break;
+ case'fern':for(let i=-2;i<=2;i++)curve([[x,y],[x+i*5,y-8],[x+i*9,y-14]],sd+i,1.3,.6,'#3f6a3a');break;
+ case'log':blob(x,y,22,7,'#8a5a3a',sd,{rot:R(sd)*3});break;
+ case'leaf':blob(x,y,7,3.5,['#c8a04a','#a86a3a','#6f9e52'][sd%3],sd,{rot:R(sd)*6,lw:1});break;
+ case'dune':for(let i=0;i<3;i++)curve([[x-30,y+i*6],[x-10,y-6+i*6],[x+12,y-4+i*6],[x+32,y+2+i*6]],sd+i,1.2,1,'#b0884a');break;
+ case'cactus':blob(x,y,6,16,'#5f9a5a',sd);blob(x-9,y-4,3.5,7,'#5f9a5a',sd+1);blob(x+9,y-7,3.5,7,'#5f9a5a',sd+2);break;
+ case'bone':ln(x-8,y,x+8,y-2,sd,2.5,.4,'#efe6d0');dot(x-9,y,2.4,'#efe6d0');dot(x+9,y-2,2.4,'#efe6d0');break;
+ case'reed':for(let i=0;i<3;i++)ln(x+i*4,y,x+i*4+J(sd+i,3),y-22-R(sd+i)*10,sd+i,1.4,.5,'#5a7a4a');break;
+ case'cattail':ln(x,y,x,y-26,sd,1.4,.5,'#5a7a4a');blob(x,y-28,2.6,6,'#7a4a2a',sd+1,{lw:1});break;
+ case'lily':blob(x,y,12,9,'#5f9a5a',sd);ln(x,y,x+10,y-3,sd+1,1.2);if(sd%3==0)blob(x+2,y-2,4,4,'#f4b8c8',sd+2,{lw:.9});break;
+ case'puddle':blob(x,y,24,14,'#9ac0c8',sd,{alpha:.55});break;
+ case'scrap':g.globalAlpha=.4;blob(x,y,8,5,'#ffffff',sd,{lw:.8,ink:'#bbb'});g.globalAlpha=1;break;
+ case'sk_tree':g.setLineDash([4,4]);blob(x,y-20,26,22,null,sd,{ink:'#888',lw:1.2});ln(x,y,x,y-4,sd+1,1.2,.5,'#888');g.setLineDash([]);break;
+ case'sk_q':hand('?',x,y,26+(sd%10),'#999',null,J(sd,.1)+.1);break;
+ case'sk_flower':for(let i=0;i<5;i+=(sd%2?1:2)){const a=i*1.256;blob(x+Math.cos(a)*6,y+Math.sin(a)*6,4,4,null,sd+i,{ink:'#999',lw:1});}break;
+ case'sk_arrow':ln(x-14,y,x+14,y,sd,1.2,.5,'#999');ln(x+14,y,x+8,y-5,sd+1,1.2,.5,'#999');ln(x+14,y,x+8,y+5,sd+2,1.2,.5,'#999');break;
+ case'sk_word':hand(['ici un arbre ?','à finir','lézard ?','trop pâle','recommencer','plus tard','fleur ?','Mamie ♥'][sd%8],x,y,18,'#9a9a9a',null,(R(sd)-.5)*.4);break;
+ case'sk_rock':g.setLineDash([2,3]);blob(x,y,14,10,null,sd,{ink:'#999',lw:1});g.setLineDash([]);break;
+ case'sk_grid':g.strokeStyle='rgba(150,150,150,.35)';g.lineWidth=1;for(let i=0;i<4;i++){g.beginPath();g.moveTo(x-20+i*13,y-20);g.lineTo(x-20+i*13,y+20);g.moveTo(x-20,y-20+i*13);g.lineTo(x+20,y-20+i*13);g.stroke();}break;}}
+function drawLM(l){const{x,y}=l;switch(l.t){
+ case'hotstone':g.globalAlpha=.25;blob(x+10,y+14,72,40,INK,3,{stroke:false});g.globalAlpha=1;blob(x,y,72,46,'#d8a878',4,{lw:2});blob(x-18,y-12,28,14,'#ecc898',5,{lw:1});for(let i=0;i<3;i++)curve([[x-30+i*25,y-56],[x-26+i*25,y-66],[x-30+i*25,y-76]],20+i,1.2,1,'#c8432f');hand('le Caillou Chaud',x,y+60,18,INK);break;
+ case'hive':blob(x,y,20,24,'#e8b923',30,{lw:1.8});for(let i=-14;i<16;i+=7)ln(x-17,y+i,x+17,y+i,31+i,1);dot(x,y+12,4,INK);break;
+ case'mushhouse':blob(x,y+12,14,16,'#f4ecd8',l.x);blob(x,y-8,36,22,'#c8432f',l.x+1,{lw:1.8});for(let i=0;i<4;i++)dot(x-20+i*13,y-12+(i%2)*6,3,'#fff');blob(x,y+18,5,7,'#7a4a2a',l.x+2,{lw:1});break;
+ case'stump':blob(x,y,26,20,'#a87a4a',50);blob(x,y,18,13,'#d8b080',51,{lw:1});blob(x,y,9,6,null,52,{lw:.8});break;
+ case'encrier':break;
+ case'anthill':g.globalAlpha=.25;blob(x+12,y+16,180,120,INK,60,{stroke:false});g.globalAlpha=1;blob(x,y,175,125,'#c88a5a',61,{lw:2.2});blob(x,y,110,78,'#d89a6a',62,{lw:1.4});blob(x,y,45,32,'#b07040',63,{lw:1.4});for(let i=0;i<8;i++){const a=i*.785;dot(x+Math.cos(a)*140,y+Math.sin(a)*100,5,'#5a3a2a');}break;
+ case'forge':blob(x,y,40,30,'#8a8a8a',70,{lw:2});blob(x,y,24,17,S.F.lumiLit?'#ff8a3a':'#4a4a4a',71);if(S.F.lumiLit){for(let i=0;i<3;i++)curve([[x-8+i*8,y-6],[x-6+i*8+Math.sin(now*6+i)*3,y-22],[x-8+i*8,y-34]],72+i,2,1,'#f0a030');}hand('forge',x,y+44,16,INK);break;
+ case'web':g.strokeStyle='rgba(42,32,24,.45)';g.lineWidth=1;for(let i=0;i<8;i++){const a=i*.785;g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*50,y+Math.sin(a)*50);g.stroke();}for(let r=12;r<50;r+=10){g.beginPath();for(let i=0;i<=8;i++){const a=i*.785;g.lineTo(x+Math.cos(a)*r,y+Math.sin(a)*r);}g.stroke();}break;
+ case'tree':g.globalAlpha=.25;blob(x+12,y+14,62,46,INK,x,{stroke:false});g.globalAlpha=1;blob(x,y,62,52,'#3f7a3f',x,{lw:2});blob(x-14,y-14,30,24,'#5f9a52',x+1,{lw:1});blob(x+18,y+10,22,18,'#4f8a4a',x+2,{lw:1});break;
+ case'sunstone':g.globalAlpha=.3+.15*Math.sin(now*2);dot(x,y,60,'#ffd27a');g.globalAlpha=1;blob(x,y,46,34,'#e8a040',80,{lw:2});blob(x-10,y-8,16,9,'#f8c870',81,{lw:1});break;
+ case'dune':for(let i=0;i<5;i++)curve([[x-80,y+i*12],[x-30,y-14+i*12],[x+30,y-10+i*12],[x+90,y+4+i*12]],90+i,1.6,1,'#a07840');break;
+ case'cactus':blob(x,y,12,34,'#5f9a5a',95,{lw:1.8});blob(x-18,y-8,7,14,'#5f9a5a',96);blob(x+18,y-14,7,14,'#5f9a5a',97);blob(x,y-36,6,5,'#e86a8a',98,{lw:1});break;
+ case'skull':blob(x,y,30,24,'#efe6d0',100,{lw:1.8});dot(x+10,y-6,6,INK);dot(x+10,y+6,6,INK);blob(x+34,y,14,9,'#efe6d0',101);break;
+ case'pond':g.fillStyle='rgba(122,168,176,.55)';ell(x,y,POND.ro,POND.ro*.94,0,110,.04);g.fill();g.strokeStyle=INK;g.lineWidth=2;ell(x,y,POND.ro,POND.ro*.94,0,111,.03);g.stroke();for(let i=0;i<10;i++){const a=i*.63+now*.05,r=POND.ri+40+((i*37)%120);curve([[x+Math.cos(a)*r-10,y+Math.sin(a)*r],[x+Math.cos(a)*r,y+Math.sin(a)*r-3],[x+Math.cos(a)*r+10,y+Math.sin(a)*r]],112+i,1,.5,'rgba(255,255,255,.7)');}blob(x,y,POND.ri,POND.ri*.92,'#9ab86a',113,{lw:2});for(let i=0;i<6;i++){const a=i*1.05;ln(x+Math.cos(a)*100,y+Math.sin(a)*90,x+Math.cos(a)*100+2,y+Math.sin(a)*90-18,114+i,1.3,.5,'#4a6a3a');}break;
+ case'dock':for(let i=0;i<4;i++)blob(x+i*10-15,y,4,16,'#a87a4a',120+i);break;
+ case'chrysalis':ln(x-40,y-60,x+40,y-60,130,3,1,'#6a5a4a');break;
+ case'rock':blob(x,y,60,44,'#a8a0a8',140,{lw:2});blob(x-14,y-12,24,14,'#c8c0c8',141,{lw:1});break;
+ case'bigflower':{for(let i=0;i<7;i++){const a=i*.9;blob(x+Math.cos(a)*22,y+Math.sin(a)*22,16,10,'#c9a0ff',150+i,{rot:a});}blob(x,y,10,10,'#f2c84b',158);break;}
+ case'void':break;}}
+function drawBlanche(){const r=REGM.blanche;const d=dist(cam.x,cam.y,r.x,r.y);if(d>r.r+1400)return;if(S.F.ending=='ami'){g.globalAlpha=.25;g.fillStyle='#f4b8d8';ell(r.x,r.y,r.r,r.r,0,200,.05);g.fill();g.globalAlpha=1;for(let i=0;i<40;i++){const a=R(i)*6.28,rr=R(i+50)*r.r*.9;drawDeco({x:r.x+Math.cos(a)*rr,y:r.y+Math.sin(a)*rr,t:i%3?'flower':'bigflower',sd:i*7});}return;}
+ g.fillStyle='#ffffff';ell(r.x,r.y,r.r+18,r.r+12,0,201,.07);g.fill();g.strokeStyle='#c8c0b0';g.lineWidth=2;g.setLineDash([6,5]);ell(r.x,r.y,r.r+18,r.r+12,0,202,.07);g.stroke();g.setLineDash([]);for(let i=0;i<22;i++){const a=i/22*6.28;const x=r.x+Math.cos(a)*(r.r+30+R(i)*30),y=r.y+Math.sin(a)*(r.r+30+R(i)*30);g.globalAlpha=.6;blob(x,y,10+R(i+3)*10,6,'#ffffff',i+210,{ink:'#ccc',lw:.8});g.globalAlpha=1;}
+ if(!S.F.gommeDone&&!boss&&S.F.encrier){drawCreature('gomme',r.x,r.y-120,1.57,1.3,{t:now,sd:9});}}
+function drawGates(vx0,vy0,vx1,vy1){for(const gt of GATES){if(gt.ok()||gt.st=='white')continue;const d=dist(cam.x,cam.y,gt.x,gt.y);if(d>gt.r+900||d<gt.r-900)continue;const step=gt.st=='ants'?.3:30/gt.r;for(let a=0;a<6.283;a+=step){const x=gt.x+Math.cos(a)*gt.r,y=gt.y+Math.sin(a)*gt.r;if(x<vx0-60||x>vx1+60||y<vy0-60||y>vy1+60)continue;const sd=(a*100)|0;
+ if(gt.st=='bramble'){for(let k=0;k<3;k++)curve([[x-14,y+8],[x-4+k*4,y-16-k*4],[x+12,y+6]],sd+k,2.4,1.5,'#4a3a2a');for(let k=0;k<4;k++){const tx=x-10+k*7,ty=y-8+(k%2)*6;g.fillStyle=INK;g.beginPath();g.moveTo(tx,ty);g.lineTo(tx+3,ty-6);g.lineTo(tx+5,ty);g.fill();}}
+ else if(gt.st=='fog'){g.globalAlpha=.55;blob(x,y,36+R(sd)*20,26,'#f4f4f0',sd,{stroke:false});g.globalAlpha=.3;blob(x+20,y-20,30,20,'#ffffff',sd+1,{stroke:false});g.globalAlpha=1;}
+ else if(gt.st=='heat'){curve([[x-14,y],[x-7,y-6+Math.sin(now*5+a*9)*3],[x,y],[x+7,y+6],[x+14,y]],sd,1.6,.5,'rgba(220,110,40,.65)');}
+ else if(gt.st=='ants'){drawCreature('ant',x,y,a+3.14,1.5,{c:'#b5502c',ph:0,t:now,sd});}}}}
+function drawMarshFog(vx0,vy0,vx1,vy1){const r=REGM.marais;if(dist(cam.x,cam.y,r.x,r.y)>r.r+800)return;for(let i=0;i<18;i++){const a=R(i*3)*6.28,rr=R(i*5)*r.r,x=r.x+Math.cos(a)*rr+Math.sin(now*.2+i)*40,y=r.y+Math.sin(a)*rr;g.globalAlpha=.16;blob(x,y,70+R(i)*50,30,'#ffffff',i+300,{stroke:false});}g.globalAlpha=1;}
+function drawNight(z,vx0,vy0){const l=dayLight();const dark=clamp((.55-l)/.55,0,1)*.68;if(dark<.02)return;ng.setTransform(1,0,0,1,0,0);ng.globalCompositeOperation='source-over';ng.clearRect(0,0,nc.width,nc.height);ng.fillStyle=`rgba(22,26,58,${dark})`;ng.fillRect(0,0,nc.width,nc.height);ng.globalCompositeOperation='destination-out';
+ const light=(wx,wy,r,s)=>{const sx=((wx-vx0)*z)*DPR,sy=((wy-vy0)*z)*DPR,rr=r*z*DPR;if(sx<-rr||sy<-rr||sx>nc.width+rr||sy>nc.height+rr)return;const gr=ng.createRadialGradient(sx,sy,0,sx,sy,rr);gr.addColorStop(0,`rgba(0,0,0,${s})`);gr.addColorStop(1,'rgba(0,0,0,0)');ng.fillStyle=gr;ng.beginPath();ng.arc(sx,sy,rr,0,6.29);ng.fill();};
+ light(S.x,S.y,has('lanterne')?230:150,has('lanterne')?.95:.75);if(S.F.lumiLit){light(N.lumi.x,N.lumi.y,160,.9);light(1650,-140,140,.9);}light(0,-205,90,S.F.encrier?.8:.3);light(330,1990,120,.6);
+ const cx0=Math.floor(vx0/CH),cy0=Math.floor(vy0/CH);for(let i=0;i<=Math.ceil(W/z/CH)+1;i++)for(let j=0;j<=Math.ceil(H/z/CH)+1;j++){const c=chunks.get((cx0+i)+','+(cy0+j));if(!c)continue;for(const cr of c.crit)if(cr.sp=='luciole'){const[x,y]=critPos(cr);light(x,y,70,.8);}}
+ for(const p of PICKS)if(p.night&&!S.taken[p.k])light(p.x,p.y,60,.8);
+ g.setTransform(1,0,0,1,0,0);g.drawImage(nc,0,0);g.setTransform(DPR,0,0,DPR,0,0);
+ // étoiles
+ if(dark>.3){g.fillStyle=`rgba(255,250,220,${(dark-.3)*1.4})`;for(let i=0;i<40;i++){const x=(R(i)*W+cam.x*.02)%W,y=(R(i+99)*H*.5);g.fillRect(x,y,1.5,1.5);}}}
+
+/* ---------- entrées ---------- */
+addEventListener('keydown',e=>{if(e.repeat&&!/Arrow|Key[WASDZQ]/.test(e.code))return;audio();keys[e.code]=true;
+ if(!$('credits').hidden&&(e.code=='Enter'||e.code=='Escape')){$('credits').hidden=true;return;}
+ if(!started){if(e.code=='Enter'||e.code=='Space'){startGame(!$('bCont').hidden);}return;}
+ if(e.code=='Escape'){if(panelTab)closePanel();else if(DLG&&DLG.choices.length==1)pick(0);return;}
+ if(DLG){const m=e.code.match(/^(Digit|Numpad)([1-9])$/);if(m){pick(+m[2]-1);e.preventDefault();return;}if(e.code=='KeyE'||e.code=='Enter'||e.code=='Space'){pick(0);e.preventDefault();return;}}
+ const tab={KeyJ:'journal',KeyI:'sac',KeyB:'carnet',KeyM:'carte'}[e.code];if(tab){panelTab==tab?closePanel():openPanel(tab);return;}
+ if(panelTab)return;
+ if(e.code=='KeyE'||e.code=='Enter'){interact();e.preventDefault();}
+ if(e.code=='Space'){splash();e.preventDefault();}
+ if(e.code=='KeyT')skipTime();
+ if(e.code=='Equal'||e.code=='NumpadAdd')zoomT=clamp(zoomT*1.2,.5,2.2);if(e.code=='Minus'||e.code=='NumpadSubtract')zoomT=clamp(zoomT/1.2,.5,2.2);});
+addEventListener('keyup',e=>{keys[e.code]=false;});
+addEventListener('blur',()=>{keys={};});
+cv.addEventListener('wheel',e=>{e.preventDefault();zoomT=clamp(zoomT*(e.deltaY>0?.9:1.1),.5,2.2);},{passive:false});
+let ptrDown=null;
+cv.addEventListener('pointerdown',e=>{audio();if(!started||panelTab)return;if(DLG){pick(DLG.choices.length==1?0:-1);if(DLG&&DLG.typing)return;return;}if(e.pointerType=='touch')document.body.classList.add('touchy');const wx=(e.clientX-W/2)/cam.z+cam.x,wy=(e.clientY-H/2)/cam.z+cam.y;ptrDown={id:e.pointerId};let hit=null,bd=60;for(const n of NPCS){if(!visibleNpc(n))continue;const[x,y]=npcPos(n);const d=dist(x,y,wx,wy);if(d<bd){bd=d;hit=n;}}if(hit&&!(hit.id=='kameo'&&!S.F.kameoDrawn&&qs('marais')<3)){if(dist(hit.x,hit.y,S.x,S.y)<75){talk(hit);return;}pendingTalk=hit;}else pendingTalk=null;target=[wx,wy];});
+cv.addEventListener('pointermove',e=>{if(ptrDown&&ptrDown.id==e.pointerId&&!DLG&&!panelTab){target=[(e.clientX-W/2)/cam.z+cam.x,(e.clientY-H/2)/cam.z+cam.y];}});
+addEventListener('pointerup',()=>{ptrDown=null;});
+$('dlg').addEventListener('pointerdown',e=>{if(e.target.closest('.ch'))return;if(DLG&&DLG.typing)pick(0);else if(DLG&&DLG.choices.length==1)pick(0);});
+$('tAct').onclick=e=>{e.stopPropagation();audio();interact();};$('tInk').onclick=e=>{e.stopPropagation();audio();splash();};
+$('bJ').onclick=()=>panelTab=='journal'?closePanel():openPanel('journal');$('bI').onclick=()=>panelTab=='sac'?closePanel():openPanel('sac');$('bB').onclick=()=>panelTab=='carnet'?closePanel():openPanel('carnet');$('bM').onclick=()=>panelTab=='carte'?closePanel():openPanel('carte');
+$('bT').onclick=()=>{if(started)skipTime();};$('bS').onclick=()=>{audio();S.muted=!S.muted;$('sndw').style.opacity=S.muted?.15:1;};
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>openPanel(b.dataset.t));$('pclose').onclick=closePanel;
+if(matchMedia('(pointer:coarse)').matches)document.body.classList.add('touchy');
+
+/* ---------- démarrage ---------- */
+function startGame(cont){if(cont){const s=loadSaved();if(s)S=Object.assign(freshState(),s);}else{S=freshState();}started=true;$('title').hidden=true;cam.x=S.x;cam.y=S.y;$('sndw').style.opacity=S.muted?.15:1;lastHUD='';updHUD();curRegion=undefined;if(!cont){setTimeout(()=>toast("Approche-toi de Grand-Mère Bergamote, la vieille tortue, et appuie sur E (ou touche-la).",'q'),900);}save();}
+$('bNew').onclick=()=>{audio();startGame(false);};$('bCont').onclick=()=>{audio();startGame(true);};
+const hot=window.claude&&window.claude.hot;
+function boot(data){if(data&&data.S){S=Object.assign(freshState(),data.S);started=true;$('title').hidden=true;cam.x=S.x;cam.y=S.y;updHUD();}if(loadSaved())$('bCont').hidden=false;}
+try{hot&&hot.snapshot&&hot.snapshot(()=>started?{S}:{});}catch(e){}
+if(innerWidth<600){zoomT=.8;cam.z=.8;}
+resize();addEventListener('resize',()=>{resize();if(panelTab=='carte')drawMap();});
+if(hot&&hot.ready)hot.ready(boot);else boot(hot&&hot.data||{});
+updHUD();requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
