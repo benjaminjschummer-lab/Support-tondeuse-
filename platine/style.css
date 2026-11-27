@@ -20,7 +20,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0e0e10;
     --fg: #f2f1ee;
     --fg-2: #9a9893;
@@ -38,6 +38,25 @@
     --sheet: #1b1b1d;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #0e0e10;
+  --fg: #f2f1ee;
+  --fg-2: #9a9893;
+  --fg-3: #5c5a57;
+  --line: rgba(255, 255, 255, .09);
+  --deck-a: #232326;
+  --deck-b: #161618;
+  --deck-edge: rgba(255, 255, 255, .06);
+  --deck-shadow: 0 40px 80px -30px rgba(0, 0, 0, .8), 0 12px 24px -12px rgba(0, 0, 0, .6);
+  --platter: #2d2d30;
+  --metal-hi: #e9e8e5;
+  --metal-lo: #77756f;
+  --play-bg: #f2f1ee;
+  --play-fg: #0e0e10;
+  --sheet: #1b1b1d;
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -46,6 +65,7 @@ html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg);
   color: var(--fg);
+  transition: background-color 1.2s ease, color .6s ease;
   font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
@@ -289,6 +309,13 @@ input[type=range]:active::-webkit-slider-thumb { opacity: 1; transform: scale(1.
 .status:empty { display: none; }
 .status a { color: var(--fg-2); }
 
+/* Fond « Pochette » : la lueur prend plus de place */
+:root.album .tint {
+  background:
+    radial-gradient(55% 45% at 25% 20%, rgba(var(--tint-rgb), .75), transparent 72%),
+    radial-gradient(60% 50% at 80% 85%, rgba(var(--tint-rgb), .5), transparent 72%);
+}
+
 /* ---------- Scratch ---------- */
 body.scratch .record { cursor: grab; touch-action: none; }
 body.scratch .record.grabbed { cursor: grabbing; }
@@ -339,3 +366,8 @@ dialog::backdrop { background: rgba(0,0,0,.28); -webkit-backdrop-filter: blur(6p
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.25); transition: transform .2s; }
 .switch:checked { background: #30a46c; }
 .switch:checked::after { transform: translateX(20px); }
+
+.seg-row { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--bg); }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 2px; border-radius: 10px; background: var(--line); }
+.seg button { padding: 7px 0; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--fg-2); transition: background .2s, color .2s; }
+.seg button.on { background: var(--sheet); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
