@@ -1,6 +1,6 @@
 // Cache de l'interface pour un démarrage instantané (les appels Spotify ne sont jamais mis en cache).
-const CACHE = 'platine-v2';
-const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/apple-touch-icon.png'];
+const CACHE = 'platine-v3';
+const ASSETS = ['./', 'index.html', 'style.css?v=3', 'app.js?v=3', 'manifest.webmanifest', 'icons/icon.svg', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => {
@@ -11,7 +11,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   // réseau d'abord, cache en secours
-  e.respondWith(fetch(e.request).then((r) => {
+  e.respondWith(fetch(e.request, { cache: 'no-cache' }).then((r) => {
     const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return r;
-  }).catch(() => caches.match(e.request, { ignoreSearch: true })));
+  }).catch(() => caches.match(e.request)));
 });
