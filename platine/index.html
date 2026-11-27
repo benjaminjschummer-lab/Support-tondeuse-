@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Platine</title>
+  <meta name="description" content="Une platine vinyle épurée pour piloter Spotify sur iPhone et iPad.">
+  <meta name="theme-color" content="#f2f0eb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e0e10" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Platine">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="tint" id="tint" aria-hidden="true"></div>
+
+  <header class="top">
+    <span class="brand">Platine</span>
+    <button class="icon-btn" id="settingsBtn" aria-label="Réglages">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>
+    </button>
+  </header>
+
+  <main class="layout">
+    <section class="deck-wrap">
+      <div class="deck" id="deck">
+        <div class="platter"></div>
+        <div class="record" id="record">
+          <div class="label" id="label">
+            <img id="labelArt" alt="" crossorigin="anonymous" hidden>
+            <div class="label-text" id="labelText"><span id="labelTitle"></span><small id="labelSide">Face A · 33⅓</small></div>
+          </div>
+          <div class="spindle"></div>
+        </div>
+        <div class="sheen" aria-hidden="true"></div>
+
+        <svg class="arm-layer" id="armLayer" viewBox="0 0 125 100" aria-hidden="true">
+          <defs>
+            <radialGradient id="gBase" cx="40%" cy="35%" r="70%">
+              <stop offset="0" class="m-hi"/>
+              <stop offset="1" class="m-lo"/>
+            </radialGradient>
+            <linearGradient id="gTube" x1="0" x2="1">
+              <stop offset="0" class="m-lo"/>
+              <stop offset=".45" class="m-hi"/>
+              <stop offset="1" class="m-lo"/>
+            </linearGradient>
+            <filter id="fBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.1"/></filter>
+          </defs>
+          <!-- repose-bras -->
+          <rect x="105.6" y="51" width="4.8" height="6" rx="1.4" class="rest"/>
+          <!-- socle du pivot -->
+          <circle cx="108" cy="16" r="8.5" class="base-ring"/>
+          <circle cx="108" cy="16" r="6.2" fill="url(#gBase)"/>
+          <!-- ombre du bras -->
+          <g id="armShadow" class="arm-shadow" filter="url(#fBlur)">
+            <rect x="-3.2" y="-13" width="6.4" height="7.5" rx="1.6"/>
+            <rect x="-.9" y="-6" width="1.8" height="56"/>
+            <rect x="-2.4" y="49" width="4.8" height="9.5" rx=".9"/>
+          </g>
+          <!-- bras -->
+          <g id="arm">
+            <rect x="-3.2" y="-13" width="6.4" height="7.5" rx="1.6" class="weight"/>
+            <rect x="-.9" y="-6" width="1.8" height="56" fill="url(#gTube)"/>
+            <rect x="2.4" y="51.5" width="3.6" height="1.3" rx=".6" class="lift"/>
+            <rect x="-2.4" y="49" width="4.8" height="9.5" rx=".9" class="head"/>
+            <rect x="-1.4" y="55.2" width="2.8" height="2.6" rx=".4" class="cart"/>
+            <circle cx="0" cy="0" r="2.6" fill="url(#gBase)" class="cap"/>
+            <line x1="0" y1="-12" x2="0" y2="58" class="hit" id="armHit"/>
+          </g>
+        </svg>
+
+        <button class="start-btn" id="startBtn" aria-label="Start / Stop"><span>start</span></button>
+        <div class="speed" aria-hidden="true"><span class="on">33</span><span>45</span></div>
+        <div class="led" id="led" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="meta">
+        <h1 id="title">—</h1>
+        <p id="artist">&nbsp;</p>
+      </div>
+
+      <div class="progress">
+        <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position">
+        <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+      </div>
+
+      <div class="controls">
+        <button class="ctl" id="prevBtn" aria-label="Morceau précédent">
+          <svg viewBox="0 0 24 24"><path d="M6 5v14" class="s"/><path d="M19 5.5v13L9 12z"/></svg>
+        </button>
+        <button class="ctl small" id="backBtn" aria-label="Reculer de 15 secondes">
+          <svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" class="s"/><path d="M4 3.5v4.2h4.2" class="s"/><text x="12.2" y="15.2">15</text></svg>
+        </button>
+        <button class="ctl play" id="playBtn" aria-label="Lecture">
+          <svg viewBox="0 0 24 24" class="i-play"><path d="M8 5.2v13.6L19 12z"/></svg>
+          <svg viewBox="0 0 24 24" class="i-pause"><rect x="6.5" y="5" width="3.8" height="14" rx="1"/><rect x="13.7" y="5" width="3.8" height="14" rx="1"/></svg>
+        </button>
+        <button class="ctl small" id="fwdBtn" aria-label="Avancer de 15 secondes">
+          <svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" class="s"/><path d="M20 3.5v4.2h-4.2" class="s"/><text x="11.8" y="15.2">15</text></svg>
+        </button>
+        <button class="ctl" id="nextBtn" aria-label="Morceau suivant">
+          <svg viewBox="0 0 24 24"><path d="M18 5v14" class="s"/><path d="M5 5.5v13L15 12z"/></svg>
+        </button>
+      </div>
+
+      <p class="status" id="status"></p>
+    </section>
+  </main>
+
+  <dialog id="settings">
+    <form method="dialog" class="sheet">
+      <div class="sheet-head">
+        <h2>Réglages</h2>
+        <button class="close" value="close" aria-label="Fermer">OK</button>
+      </div>
+
+      <div class="group" id="connectedGroup" hidden>
+        <p class="row"><span>Connecté à Spotify</span><span class="dot ok"></span></p>
+        <div id="devices" class="devices"></div>
+        <button type="button" class="btn ghost" id="refreshDevices">Actualiser les appareils</button>
+        <button type="button" class="btn danger" id="logoutBtn">Se déconnecter</button>
+      </div>
+
+      <div class="group" id="loginGroup">
+        <label for="clientId">Client ID Spotify</label>
+        <input id="clientId" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ex. 3f9a…">
+        <label>Redirect URI à déclarer</label>
+        <div class="copy"><code id="redirectUri"></code><button type="button" class="btn ghost tiny" id="copyUri">Copier</button></div>
+        <button type="button" class="btn primary" id="loginBtn">Connecter Spotify</button>
+        <p class="hint">Crée une app sur <b>developer.spotify.com</b>, ajoute la Redirect URI ci-dessus et ton compte dans « User Management ». Un compte Spotify Premium est requis pour piloter la lecture.</p>
+      </div>
+
+      <p class="hint">La musique est jouée par l’app Spotify (iPhone, iPad, enceinte…) ; Platine la pilote via Spotify Connect.</p>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
