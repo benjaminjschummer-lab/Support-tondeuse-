@@ -7,6 +7,7 @@ Une platine vinyle épurée pour iPhone et iPad qui pilote Spotify.
 - Précédent / −15 s / lecture-pause / +15 s / suivant, barre de progression
 - La pochette sert d'étiquette du vinyle, et l'arrière-plan prend sa couleur
 - Thème clair / sombre automatique, iPhone en portrait, iPad en paysage
+- Mode scratch (réglages) : attrape le disque au doigt pour scratcher, avec un son de scratch synthétisé
 - Mode démo sans compte
 
 ## Fonctionnement
