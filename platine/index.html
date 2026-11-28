@@ -14,135 +14,182 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
-  <div class="tint" id="tint" aria-hidden="true"></div>
+  <div class="backdrop" aria-hidden="true">
+    <div class="bg-art" id="bgArt"></div>
+    <div class="tint" id="tint"></div>
+  </div>
 
-  <header class="top">
-    <button class="icon-btn" id="settingsBtn" aria-label="Réglages">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>
-    </button>
-  </header>
+  <button class="glass round settings-btn" id="settingsBtn" aria-label="Réglages">
+    <svg viewBox="0 0 24 24"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2.2"/><circle cx="9" cy="16" r="2.2"/></svg>
+  </button>
 
   <main class="layout">
     <section class="deck-wrap">
       <div class="deck" id="deck">
-        <div class="platter"></div>
+        <div class="hinge h1"></div><div class="hinge h2"></div>
+        <div class="platter"><div class="strobe"></div></div>
         <div class="record" id="record">
           <div class="label" id="label">
             <img id="labelArt" alt="" crossorigin="anonymous" hidden>
             <div class="label-text" id="labelText"><span id="labelTitle"></span><small id="labelSide">Face A · 33⅓</small></div>
           </div>
-          <div class="spindle"></div>
         </div>
         <div class="sheen" aria-hidden="true"></div>
+        <div class="label-gloss" aria-hidden="true"></div>
+        <div class="spindle" aria-hidden="true"></div>
 
         <svg class="arm-layer" id="armLayer" viewBox="0 0 125 100" aria-hidden="true">
           <defs>
-            <radialGradient id="gBase" cx="40%" cy="35%" r="70%">
-              <stop offset="0" class="m-hi"/>
-              <stop offset="1" class="m-lo"/>
-            </radialGradient>
-            <linearGradient id="gTube" x1="0" x2="1">
-              <stop offset="0" class="m-lo"/>
-              <stop offset=".45" class="m-hi"/>
-              <stop offset="1" class="m-lo"/>
+            <linearGradient id="gChrome" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stop-color="#4d4e52"/><stop offset=".16" stop-color="#f7f7f8"/><stop offset=".3" stop-color="#c9cacd"/>
+              <stop offset=".58" stop-color="#85868b"/><stop offset=".82" stop-color="#d9dadd"/><stop offset="1" stop-color="#55565a"/>
             </linearGradient>
-            <filter id="fBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.1"/></filter>
+            <linearGradient id="gAnod" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stop-color="#0d0d0f"/><stop offset=".22" stop-color="#3c3d41"/><stop offset=".4" stop-color="#1e1f22"/>
+              <stop offset=".8" stop-color="#2b2c2f"/><stop offset="1" stop-color="#0b0b0c"/>
+            </linearGradient>
+            <radialGradient id="gDome" cx="38%" cy="32%" r="75%">
+              <stop offset="0" stop-color="#ffffff"/><stop offset=".25" stop-color="#e3e4e6"/><stop offset=".7" stop-color="#8d8e93"/><stop offset="1" stop-color="#4a4b4f"/>
+            </radialGradient>
+            <radialGradient id="gBase" cx="45%" cy="40%" r="65%">
+              <stop offset="0" stop-color="#3a3b3f"/><stop offset=".85" stop-color="#1c1d20"/><stop offset="1" stop-color="#0e0e10"/>
+            </radialGradient>
+            <pattern id="pKnurl" width="1" height=".55" patternUnits="userSpaceOnUse">
+              <rect width="1" height=".28" fill="rgba(255,255,255,.07)"/>
+            </pattern>
+            <filter id="fBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1"/></filter>
           </defs>
+
+          <!-- socle du bras -->
+          <circle cx="108" cy="16" r="9.6" class="base-shadow"/>
+          <circle cx="108" cy="16" r="9" fill="url(#gBase)"/>
+          <circle cx="108" cy="16" r="9" class="base-edge"/>
+          <circle cx="108" cy="16" r="5.4" fill="url(#gDome)"/>
+          <!-- réglage anti-skating -->
+          <circle cx="98.6" cy="25.4" r="2.1" fill="url(#gDome)"/>
+          <line x1="98.6" y1="25.4" x2="99.9" y2="24.2" class="dial-tick"/>
+          <!-- lève-bras -->
+          <rect x="114.6" y="27" width="3.2" height="7" rx="1.6" fill="url(#gBase)"/>
+          <rect x="115.4" y="23.6" width="1.6" height="6.4" rx=".8" fill="url(#gChrome)"/>
           <!-- repose-bras -->
-          <rect x="105.6" y="51" width="4.8" height="6" rx="1.4" class="rest"/>
-          <!-- socle du pivot -->
-          <circle cx="108" cy="16" r="8.5" class="base-ring"/>
-          <circle cx="108" cy="16" r="6.2" fill="url(#gBase)"/>
-          <!-- ombre du bras -->
+          <rect x="105.4" y="50.2" width="5.2" height="7.4" rx="2.6" fill="url(#gBase)"/>
+          <rect x="106.4" y="52.6" width="3.2" height="2.6" rx="1.3" class="cradle"/>
+
+          <!-- ombre portée du bras -->
           <g id="armShadow" class="arm-shadow" filter="url(#fBlur)">
-            <rect x="-3.2" y="-13" width="6.4" height="7.5" rx="1.6"/>
-            <rect x="-.9" y="-6" width="1.8" height="56"/>
-            <rect x="-2.4" y="49" width="4.8" height="9.5" rx=".9"/>
+            <rect x="-3.7" y="-14.6" width="7.4" height="8.6" rx="1.4"/>
+            <rect x="-.95" y="-6" width="1.9" height="55"/>
+            <path d="M-2.6 47.4 h5.2 l.5 11.4 h-6.2z"/>
           </g>
+
           <!-- bras -->
           <g id="arm">
-            <rect x="-3.2" y="-13" width="6.4" height="7.5" rx="1.6" class="weight"/>
-            <rect x="-.9" y="-6" width="1.8" height="56" fill="url(#gTube)"/>
-            <rect x="2.4" y="51.5" width="3.6" height="1.3" rx=".6" class="lift"/>
-            <rect x="-2.4" y="49" width="4.8" height="9.5" rx=".9" class="head"/>
-            <rect x="-1.4" y="55.2" width="2.8" height="2.6" rx=".4" class="cart"/>
-            <circle cx="0" cy="0" r="2.6" fill="url(#gBase)" class="cap"/>
-            <line x1="0" y1="-12" x2="0" y2="58" class="hit" id="armHit"/>
+            <!-- contrepoids -->
+            <rect x="-3.7" y="-14.6" width="7.4" height="8.6" rx="1.4" fill="url(#gAnod)"/>
+            <rect x="-3.7" y="-14.6" width="7.4" height="8.6" rx="1.4" fill="url(#pKnurl)"/>
+            <rect x="-3.9" y="-7.4" width="7.8" height="1.4" rx=".5" fill="url(#gChrome)"/>
+            <!-- tube -->
+            <rect x="-.95" y="-6" width="1.9" height="54" rx=".5" fill="url(#gChrome)"/>
+            <!-- palier -->
+            <rect x="-2.6" y="-2.8" width="5.2" height="5.6" rx="1.1" fill="url(#gAnod)"/>
+            <circle cx="0" cy="0" r="1.9" fill="url(#gDome)"/>
+            <!-- porte-cellule -->
+            <path d="M2.4 49.4 q2.6 -.2 3.8 1.6" class="finger"/>
+            <path d="M-2.6 47.4 h5.2 l.5 11.4 h-6.2z" fill="url(#gAnod)"/>
+            <circle cx="-1.2" cy="50" r=".42" class="screw"/><circle cx="1.2" cy="50" r=".42" class="screw"/>
+            <rect x="-1.8" y="53.4" width="3.6" height="4.6" rx=".5" class="cart"/>
+            <rect x="-1.8" y="56.9" width="3.6" height="1.1" rx=".3" class="cart-tip"/>
+            <line x1="0" y1="-13" x2="0" y2="58" class="hit" id="armHit"/>
           </g>
         </svg>
 
-        <button class="start-btn" id="startBtn" aria-label="Start / Stop"><span>start</span></button>
-        <div class="speed" aria-hidden="true"><span class="on">33</span><span>45</span></div>
-        <div class="led" id="led" aria-hidden="true"></div>
+        <button class="start-btn" id="startBtn" aria-label="Start / Stop"><span>start<br>stop</span></button>
+        <div class="speed">
+          <span class="led" id="led" aria-hidden="true"></span>
+          <button class="pill" data-rpm="33" aria-label="33 tours"><span>33</span></button>
+          <button class="pill" data-rpm="45" aria-label="45 tours"><span>45</span></button>
+        </div>
       </div>
     </section>
 
     <section class="panel">
-      <div class="bar">
-        <p class="meta"><span id="title">—</span> <span id="artist"></span></p>
+      <div class="mini glass">
+        <div class="mini-art" id="miniArt"><img id="miniImg" alt="" hidden></div>
+        <p class="mini-text"><span id="title">—</span><span id="artist"></span></p>
         <div class="controls">
           <button class="ctl" id="prevBtn" aria-label="Morceau précédent">
-            <svg viewBox="0 0 24 24"><path d="M6 5v14" class="s"/><path d="M19 5.5v13L9 12z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M12.2 12 21 6.2v11.6zM3.6 12l8.6-5.8v11.6z"/></svg>
           </button>
           <button class="ctl play" id="playBtn" aria-label="Lecture">
-            <svg viewBox="0 0 24 24" class="i-play"><path d="M8 5.2v13.6L19 12z"/></svg>
-            <svg viewBox="0 0 24 24" class="i-pause"><rect x="6.5" y="5" width="3.8" height="14" rx="1"/><rect x="13.7" y="5" width="3.8" height="14" rx="1"/></svg>
+            <svg viewBox="0 0 24 24" class="i-play"><path d="M7 4.6c0-.8.9-1.3 1.6-.9l11 6.9c.6.4.6 1.4 0 1.8l-11 6.9c-.7.4-1.6-.1-1.6-.9z"/></svg>
+            <svg viewBox="0 0 24 24" class="i-pause"><rect x="5.5" y="4" width="4.4" height="16" rx="1.3"/><rect x="14.1" y="4" width="4.4" height="16" rx="1.3"/></svg>
           </button>
           <button class="ctl" id="nextBtn" aria-label="Morceau suivant">
-            <svg viewBox="0 0 24 24"><path d="M18 5v14" class="s"/><path d="M5 5.5v13L15 12z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M11.8 12 3 6.2v11.6zM20.4 12l-8.6-5.8v11.6z"/></svg>
           </button>
         </div>
+        <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position">
       </div>
-      <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position">
       <p class="status" id="status"></p>
     </section>
   </main>
 
   <dialog id="settings">
     <form method="dialog" class="sheet">
-      <div class="sheet-head">
+      <span class="grabber" aria-hidden="true"></span>
+      <header class="sheet-head">
+        <span></span>
         <h2>Réglages</h2>
-        <button class="close" value="close" aria-label="Fermer">OK</button>
-      </div>
+        <button class="close" value="close">OK</button>
+      </header>
 
-      <div class="seg-row">
-        <b>Fond</b>
-        <div class="seg" id="themeSeg" role="radiogroup" aria-label="Fond">
-          <button type="button" data-v="auto">Auto</button>
-          <button type="button" data-v="light">Clair</button>
-          <button type="button" data-v="dark">Sombre</button>
-          <button type="button" data-v="album">Pochette</button>
+      <h3 class="sec">Apparence</h3>
+      <div class="cells">
+        <div class="cell col">
+          <span>Fond</span>
+          <div class="seg" id="themeSeg" role="radiogroup" aria-label="Fond">
+            <button type="button" data-v="auto">Auto</button>
+            <button type="button" data-v="light">Clair</button>
+            <button type="button" data-v="dark">Sombre</button>
+            <button type="button" data-v="album">Pochette</button>
+          </div>
+        </div>
+        <label class="cell">
+          <span>Mode scratch</span>
+          <input type="checkbox" id="scratchToggle" class="switch">
+        </label>
+      </div>
+      <p class="foot">Avec le mode scratch, pose le doigt sur le disque et fais-le tourner dans un sens et dans l’autre.</p>
+
+      <h3 class="sec">Spotify</h3>
+      <div id="connectedGroup" hidden>
+        <div class="cells">
+          <div class="cell"><span>Compte</span><span class="value"><i class="dot ok"></i>Connecté</span></div>
+        </div>
+        <h3 class="sec">Lire sur</h3>
+        <div class="cells" id="devices"></div>
+        <div class="cells gap">
+          <button type="button" class="cell link" id="refreshDevices">Actualiser les appareils</button>
+          <button type="button" class="cell link danger" id="logoutBtn">Se déconnecter</button>
         </div>
       </div>
 
-      <label class="switch-row">
-        <span><b>Mode scratch</b><small>Pose le doigt sur le disque et fais-le tourner dans un sens et dans l'autre.</small></span>
-        <input type="checkbox" id="scratchToggle" class="switch">
-      </label>
-
-      <div class="group" id="connectedGroup" hidden>
-        <p class="row"><span>Connecté à Spotify</span><span class="dot ok"></span></p>
-        <div id="devices" class="devices"></div>
-        <button type="button" class="btn ghost" id="refreshDevices">Actualiser les appareils</button>
-        <button type="button" class="btn danger" id="logoutBtn">Se déconnecter</button>
+      <div id="loginGroup">
+        <div class="cells">
+          <label class="cell"><span>Client ID</span><input id="clientId" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="32 caractères"></label>
+          <div class="cell"><code id="redirectUri"></code><button type="button" class="mini-btn" id="copyUri">Copier</button></div>
+          <button type="button" class="cell link strong" id="loginBtn">Connecter Spotify</button>
+        </div>
+        <p class="foot">Crée une app sur developer.spotify.com, ajoute l’adresse ci-dessus comme Redirect URI et ton compte dans « User Management ». Spotify Premium requis.</p>
       </div>
 
-      <div class="group" id="loginGroup">
-        <label for="clientId">Client ID Spotify</label>
-        <input id="clientId" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ex. 3f9a…">
-        <label>Redirect URI à déclarer</label>
-        <div class="copy"><code id="redirectUri"></code><button type="button" class="btn ghost tiny" id="copyUri">Copier</button></div>
-        <button type="button" class="btn primary" id="loginBtn">Connecter Spotify</button>
-        <p class="hint">Crée une app sur <b>developer.spotify.com</b>, ajoute la Redirect URI ci-dessus et ton compte dans « User Management ». Un compte Spotify Premium est requis pour piloter la lecture.</p>
-      </div>
-
-      <p class="hint">La musique est jouée par l’app Spotify (iPhone, iPad, enceinte…) ; Platine la pilote via Spotify Connect.</p>
+      <p class="foot">La musique est jouée par l’app Spotify (iPhone, iPad, enceinte…) ; Platine la pilote via Spotify Connect.</p>
     </form>
   </dialog>
 
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
