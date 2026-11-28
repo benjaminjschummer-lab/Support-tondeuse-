@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <div class="backdrop" aria-hidden="true">
@@ -44,21 +44,19 @@
         <svg class="arm-layer" id="armLayer" viewBox="0 0 125 100" aria-hidden="true">
           <defs>
             <linearGradient id="gChrome" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0" stop-color="#4d4e52"/><stop offset=".16" stop-color="#f7f7f8"/><stop offset=".3" stop-color="#c9cacd"/>
-              <stop offset=".58" stop-color="#85868b"/><stop offset=".82" stop-color="#d9dadd"/><stop offset="1" stop-color="#55565a"/>
+              <stop offset="0" stop-color="#7d7e82"/><stop offset=".3" stop-color="#c6c7ca"/><stop offset=".7" stop-color="#a9aaae"/><stop offset="1" stop-color="#7a7b7f"/>
             </linearGradient>
             <linearGradient id="gAnod" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0" stop-color="#0d0d0f"/><stop offset=".22" stop-color="#3c3d41"/><stop offset=".4" stop-color="#1e1f22"/>
-              <stop offset=".8" stop-color="#2b2c2f"/><stop offset="1" stop-color="#0b0b0c"/>
+              <stop offset="0" stop-color="#151517"/><stop offset=".35" stop-color="#2a2b2e"/><stop offset="1" stop-color="#18181a"/>
             </linearGradient>
             <radialGradient id="gDome" cx="38%" cy="32%" r="75%">
-              <stop offset="0" stop-color="#ffffff"/><stop offset=".25" stop-color="#e3e4e6"/><stop offset=".7" stop-color="#8d8e93"/><stop offset="1" stop-color="#4a4b4f"/>
+              <stop offset="0" stop-color="#cfd0d3"/><stop offset=".6" stop-color="#a2a3a7"/><stop offset="1" stop-color="#6b6c70"/>
             </radialGradient>
             <radialGradient id="gBase" cx="45%" cy="40%" r="65%">
               <stop offset="0" stop-color="#3a3b3f"/><stop offset=".85" stop-color="#1c1d20"/><stop offset="1" stop-color="#0e0e10"/>
             </radialGradient>
             <pattern id="pKnurl" width="1" height=".55" patternUnits="userSpaceOnUse">
-              <rect width="1" height=".28" fill="rgba(255,255,255,.07)"/>
+              <rect width="1" height=".28" fill="rgba(255,255,255,.03)"/>
             </pattern>
             <filter id="fBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1"/></filter>
           </defs>
@@ -90,7 +88,7 @@
             <!-- contrepoids -->
             <rect x="-3.7" y="-14.6" width="7.4" height="8.6" rx="1.4" fill="url(#gAnod)"/>
             <rect x="-3.7" y="-14.6" width="7.4" height="8.6" rx="1.4" fill="url(#pKnurl)"/>
-            <rect x="-3.9" y="-7.4" width="7.8" height="1.4" rx=".5" fill="url(#gChrome)"/>
+            <rect x="-3.9" y="-7.4" width="7.8" height="1.4" rx=".5" fill="url(#gAnod)"/>
             <!-- tube -->
             <rect x="-.95" y="-6" width="1.9" height="54" rx=".5" fill="url(#gChrome)"/>
             <!-- palier -->
@@ -190,6 +188,6 @@
     </form>
   </dialog>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

@@ -19,7 +19,9 @@
   --alu-b: #d9dadd;
   --alu-edge: #a9aaae;
   --alu-hi: rgba(255, 255, 255, .95);
-  --brush-op: .32;
+  --brush-op: .14;
+  --plat-a: #dcdde0;
+  --plat-b: #cbccd0;
   --engrave: rgba(60, 60, 67, .55);
   --engrave-hi: rgba(255, 255, 255, .75);
 
@@ -49,7 +51,9 @@
     --alu-b: #222325;
     --alu-edge: #0d0d0e;
     --alu-hi: rgba(255, 255, 255, .16);
-    --brush-op: .22;
+    --brush-op: .1;
+    --plat-a: #333437;
+    --plat-b: #2a2b2e;
     --engrave: rgba(235, 235, 245, .45);
     --engrave-hi: rgba(0, 0, 0, .6);
     --glass: rgba(44, 44, 48, .55);
@@ -73,7 +77,9 @@
   --alu-b: #222325;
   --alu-edge: #0d0d0e;
   --alu-hi: rgba(255, 255, 255, .16);
-  --brush-op: .22;
+  --brush-op: .1;
+  --plat-a: #333437;
+  --plat-b: #2a2b2e;
   --engrave: rgba(235, 235, 245, .45);
   --engrave-hi: rgba(0, 0, 0, .6);
   --glass: rgba(44, 44, 48, .55);
@@ -199,9 +205,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   width: var(--w); aspect-ratio: 125 / 100;
   transform: translate(-50%, -50%);
   border-radius: calc(var(--w) * .042);
-  background:
-    linear-gradient(var(--light), rgba(255,255,255,.10), transparent 40%, rgba(0,0,0,.06)),
-    linear-gradient(var(--light), var(--alu-a), var(--alu-b));
+  background: linear-gradient(var(--light), var(--alu-a), var(--alu-b));
   box-shadow:
     inset 0 0 0 .5px rgba(0,0,0,.18),
     inset calc(var(--sy) * 0px - var(--sx) * 1px) calc(var(--sy) * 1px) 0 var(--alu-hi),
@@ -233,17 +237,16 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   position: absolute; left: 4%; top: 5%; width: 72%; height: 90%;
   border-radius: 50%;
   background:
-    repeating-radial-gradient(circle closest-side, rgba(255,255,255,.0) 0 1px, rgba(0,0,0,.05) 1px 2px),
-    conic-gradient(from 20deg, #f2f2f3, #9c9da1 11%, #f8f8f9 24%, #a3a4a8 37%, #e9e9eb 50%, #9a9b9f 62%, #f6f6f7 75%, #a1a2a6 88%, #f2f2f3);
+    conic-gradient(from 20deg, var(--plat-a), var(--plat-b) 25%, var(--plat-a) 50%, var(--plat-b) 75%, var(--plat-a));
   box-shadow:
-    0 0 0 .5px rgba(0,0,0,.35),
+    0 0 0 .5px rgba(0,0,0,.3),
     calc(var(--sx) * var(--w) * .004) calc(var(--sy) * var(--w) * .004) calc(var(--w) * .01) rgba(0,0,0,.35),
     calc(var(--sx) * var(--w) * .012) calc(var(--sy) * var(--w) * .012) calc(var(--w) * .03) rgba(0,0,0,.18);
 }
 /* points stroboscopiques : ils paraissent immobiles à 33⅓ tours */
 .strobe {
   position: absolute; inset: 0; border-radius: 50%;
-  background: repeating-conic-gradient(rgba(0,0,0,.42) 0 .9deg, transparent .9deg 2.4deg);
+  background: repeating-conic-gradient(rgba(0,0,0,.2) 0 .9deg, transparent .9deg 2.4deg);
   -webkit-mask-image: radial-gradient(circle closest-side, transparent 96.6%, #000 97%, #000 98.4%, transparent 98.8%);
           mask-image: radial-gradient(circle closest-side, transparent 96.6%, #000 97%, #000 98.4%, transparent 98.8%);
 }
@@ -277,8 +280,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   pointer-events: none;
   background:
     conic-gradient(from calc(var(--light) - 140deg),
-      transparent 0deg, rgba(160,180,255,.04) 10deg, rgba(255,255,255,.20) 22deg, rgba(255,235,210,.05) 34deg, transparent 46deg,
-      transparent 180deg, rgba(160,180,255,.03) 190deg, rgba(255,255,255,.13) 202deg, rgba(255,235,210,.04) 214deg, transparent 226deg, transparent 360deg),
+      transparent 0deg, rgba(160,180,255,.04) 10deg, rgba(255,255,255,.14) 22deg, rgba(255,235,210,.05) 34deg, transparent 46deg,
+      transparent 180deg, rgba(160,180,255,.03) 190deg, rgba(255,255,255,.09) 202deg, rgba(255,235,210,.04) 214deg, transparent 226deg, transparent 360deg),
     radial-gradient(circle at 32% 26%, rgba(255,255,255,.07), transparent 55%);
   -webkit-mask-image: radial-gradient(circle closest-side, transparent 35%, #000 37%, #000 97%, transparent 98%);
           mask-image: radial-gradient(circle closest-side, transparent 35%, #000 37%, #000 97%, transparent 98%);
@@ -323,7 +326,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   pointer-events: none;
   position: absolute; left: 39.1%; top: 48.9%; width: 1.76%; height: 2.2%;
   border-radius: 50%;
-  background: radial-gradient(circle at 36% 30%, #fff, #e4e4e6 22%, #8e8f94 62%, #3d3e42);
+  background: radial-gradient(circle at 38% 32%, #d4d5d8, #a3a4a8 55%, #5c5d61);
   box-shadow: 0 0 0 .5px rgba(0,0,0,.5), calc(var(--sx) * 1px) calc(var(--sy) * 1px) 2px rgba(0,0,0,.6);
 }
 
@@ -334,8 +337,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .dial-tick { stroke: #222; stroke-width: .35; stroke-linecap: round; }
 .cradle { fill: #0c0c0d; }
 .arm-shadow { fill: rgba(0,0,0,.45); }
-.finger { fill: none; stroke: url(#gChrome); stroke: #b9babe; stroke-width: .7; stroke-linecap: round; }
-.screw { fill: #c9cacd; }
+.finger { fill: none; stroke: #9fa0a4; stroke-width: .7; stroke-linecap: round; }
+.screw { fill: #8e8f93; }
 .cart { fill: #1a1a1c; }
 .cart-tip { fill: var(--accent); }
 .hit { stroke: transparent; stroke-width: 11; stroke-linecap: round; pointer-events: stroke; cursor: grab; touch-action: none; }
@@ -346,12 +349,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   position: absolute; left: 82.4%; bottom: 7%;
   width: 11.2%; aspect-ratio: 1; border-radius: 50%;
   display: grid; place-items: center;
-  background:
-    repeating-radial-gradient(circle closest-side, rgba(255,255,255,0) 0 1px, rgba(0,0,0,.05) 1px 2px),
-    conic-gradient(from 20deg, #f4f4f5, #a7a8ac 12%, #fafafa 25%, #aeafb3 38%, #ececee 50%, #a5a6aa 62%, #f7f7f8 75%, #abacb0 88%, #f4f4f5);
+  background: linear-gradient(var(--light), var(--alu-a), var(--alu-b));
   box-shadow:
-    0 0 0 calc(var(--w) * .004) rgba(0,0,0,.25),
-    0 0 0 calc(var(--w) * .007) rgba(255,255,255,.35),
+    0 0 0 .5px rgba(0,0,0,.25),
+    inset 0 1px 0 var(--alu-hi),
     calc(var(--sx) * var(--w) * .004) calc(var(--sy) * var(--w) * .006) calc(var(--w) * .01) rgba(0,0,0,.3);
   transition: transform .12s, box-shadow .12s;
 }
@@ -359,7 +360,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .start-btn span {
   display: block; text-align: center; line-height: 1.25;
   font-size: calc(var(--w) * .0125); font-weight: 600; letter-spacing: .2em; text-transform: uppercase;
-  color: rgba(40,40,45,.62); text-shadow: 0 1px 0 rgba(255,255,255,.7);
+  color: var(--engrave);
 }
 
 .speed {
