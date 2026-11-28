@@ -193,6 +193,7 @@ const ui = {
   title: $('#title'), artist: $('#artist'), seek: $('#seek'), deck: $('#deck'),
   play: $('#playBtn'), led: $('#led'), status: $('#status'),
   labelArt: $('#labelArt'), labelText: $('#labelText'), labelTitle: $('#labelTitle'), label: $('#label'),
+  miniArt: $('#miniArt'), miniImg: $('#miniImg'), bgArt: $('#bgArt'),
   tint: document.documentElement,
 };
 
@@ -223,12 +224,17 @@ function renderMeta() {
   ui.artist.textContent = t ? t.artist : '';
   ui.labelTitle.textContent = t ? t.title : 'Platine';
   if (t && t.art) {
+    ui.miniImg.src = t.art; ui.miniImg.hidden = false;
+    ui.bgArt.style.backgroundImage = `url("${t.art}")`; ui.bgArt.classList.add('has-art');
     ui.labelArt.style.opacity = 0;
     ui.labelArt.onload = () => { ui.labelArt.hidden = false; ui.labelArt.style.opacity = 1; ui.labelText.hidden = true; tintFrom(ui.labelArt); };
     ui.labelArt.src = t.art;
   } else {
     ui.labelArt.hidden = true; ui.labelText.hidden = false;
     const c = t?.color || '#ff5a36';
+    ui.miniImg.hidden = true; ui.miniArt.style.background = c;
+    ui.bgArt.style.backgroundImage = `radial-gradient(circle at 30% 30%, ${c}, transparent 60%), radial-gradient(circle at 70% 70%, ${c}aa, transparent 55%)`;
+    ui.bgArt.classList.add('has-art');
     ui.label.style.background = `radial-gradient(circle at 35% 30%, ${c}cc, ${c} 60%)`;
     setTint(hexToRgb(c));
   }
@@ -294,7 +300,8 @@ function tintFrom(img) {
 function setTint(rgb) { palette = { main: rgb, second: mix(rgb, [255, 255, 255], 0.4) }; applyTheme(); }
 
 /* ---------- Animation : disque + bras ---------- */
-const RPM_DEG = 200; // 33⅓ tours/min = 200°/s
+let RPM_DEG = store.get('rpm') === 45 ? 270 : 200; // 33⅓ tours/min = 200°/s, 45 tours = 270°/s
+let liftAmt = 1;
 let rot = 0, speed = 0, armAngle = A_REST, dragging = false, dragAngle = A_REST, seekingUI = false, lastFrame = performance.now();
 const showTime = (ms) => setStatus(`${fmt(ms)} / ${fmt(S.duration)}`, true);
 
@@ -311,8 +318,8 @@ function frame(now) {
   if (dragging) armAngle = target;
   else armAngle += Math.sign(gap) * Math.min(Math.abs(gap), Math.max(Math.abs(gap) * dt * 3, 12 * dt)); // mouvement calme et amorti
 
-  const onRecord = armAngle >= A_EDGE - 0.5;
   const lifted = dragging || Math.abs(target - armAngle) > 0.3 || !S.isPlaying;
+  liftAmt += ((lifted ? 1 : 0) - liftAmt) * Math.min(1, dt * 7); // le bras monte / descend doucement
   // le plateau tourne dès la lecture, on « pose » ensuite le diamant
   speed += ((S.isPlaying ? RPM_DEG : 0) - speed) * Math.min(1, dt * (S.isPlaying ? 2.2 : 1.1));
   if (grab) {
@@ -324,9 +331,11 @@ function frame(now) {
   }
 
   ui.record.style.transform = `rotate(${rot}deg)`;
-  ui.arm.setAttribute('transform', `translate(${GEO.px} ${GEO.py}) rotate(${armAngle})`);
-  const off = lifted && onRecord ? 3.2 : lifted ? 2.2 : 1.1;
-  ui.armShadow.setAttribute('transform', `translate(${GEO.px + off * 0.6} ${GEO.py + off}) rotate(${armAngle})`);
+  // soulevé, le bras se rapproche de l'œil (un peu plus grand) et son ombre s'éloigne
+  ui.arm.setAttribute('transform', `translate(${GEO.px} ${GEO.py}) rotate(${armAngle}) scale(${1 + liftAmt * 0.018})`);
+  const off = 0.9 + liftAmt * 2.4;
+  ui.armShadow.setAttribute('transform', `translate(${GEO.px + off * 0.55} ${GEO.py + off}) rotate(${armAngle})`);
+  ui.armShadow.setAttribute('opacity', (0.95 - liftAmt * 0.35).toFixed(3));
 
   if (!seekingUI) {
     const p = progressOf(S);
@@ -356,8 +365,21 @@ const doSeek = (ms) => { ms = clamp(ms, 0, Math.max(0, S.duration - 500)); retur
 const doNext = () => act(() => ({ progress: 0 }), () => player.next(), 800);
 const doPrev = () => act(() => ({ progress: 0 }), () => player.prev(), 800);
 
+/* Retour haptique : sur iOS 18+, basculer un interrupteur natif fait vibrer légèrement */
+const hapticEl = (() => {
+  const l = document.createElement('label'); l.className = 'haptic'; l.setAttribute('aria-hidden', 'true');
+  const i = document.createElement('input'); i.type = 'checkbox'; i.setAttribute('switch', ''); i.tabIndex = -1;
+  l.appendChild(i); document.body.appendChild(l); return l;
+})();
+function haptic() { try { if (navigator.vibrate) navigator.vibrate(8); else hapticEl.click(); } catch {} }
+
 ui.play.addEventListener('click', toggle);
-$('#startBtn').addEventListener('click', toggle);
+$('#startBtn').addEventListener('click', () => { haptic(); toggle(); });
+function renderRpm() { document.querySelectorAll('.pill').forEach((p) => p.classList.toggle('on', +p.dataset.rpm === (RPM_DEG === 270 ? 45 : 33))); }
+document.querySelectorAll('.pill').forEach((p) => p.addEventListener('click', () => {
+  RPM_DEG = p.dataset.rpm === '45' ? 270 : 200; store.set('rpm', +p.dataset.rpm); haptic(); renderRpm();
+}));
+renderRpm();
 $('#nextBtn').addEventListener('click', doNext);
 $('#prevBtn').addEventListener('click', doPrev);
 
@@ -399,6 +421,7 @@ function endDrag() {
   if (!dragging) return;
   dragging = false; seekingUI = false; baseStatus();
   ui.armLayer.classList.remove('dragging');
+  if (dragAngle >= A_EDGE) haptic(); // le diamant touche le disque
   if (dragAngle >= A_EDGE && S.duration) {
     // diamant posé sur le disque : on se place à cet endroit et on joue
     const p = clamp((dragAngle - A_OUTER) / (A_INNER - A_OUTER), 0, 1);
@@ -549,7 +572,7 @@ async function renderDevices() {
     box.innerHTML = devs.length ? '' : '<p class="hint">Aucun appareil. Ouvre Spotify sur ton iPhone ou iPad.</p>';
     for (const d of devs) {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'device' + (d.is_active ? ' active' : '');
+      b.type = 'button'; b.className = 'cell device' + (d.is_active ? ' active' : '');
       b.innerHTML = `<span>${escapeHtml(d.name)}</span><small>${escapeHtml(d.type)}</small>`;
       b.addEventListener('click', () => act(null, () => player.transfer(d.id, true), 900).then(renderDevices));
       box.appendChild(b);
@@ -559,7 +582,14 @@ async function renderDevices() {
 function openSettings() { renderSettings(); dlg.showModal(); }
 $('#settingsBtn').addEventListener('click', openSettings);
 document.addEventListener('click', (e) => { if (e.target.closest('[data-open-settings]')) { e.preventDefault(); openSettings(); } });
-dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+function closeSheet() {
+  if (!dlg.open || dlg.classList.contains('closing')) return;
+  dlg.classList.add('closing');
+  setTimeout(() => { dlg.classList.remove('closing'); dlg.close(); }, 280);
+}
+dlg.addEventListener('click', (e) => { if (e.target === dlg) closeSheet(); });
+dlg.querySelector('.close').addEventListener('click', (e) => { e.preventDefault(); closeSheet(); });
+dlg.addEventListener('cancel', (e) => { e.preventDefault(); closeSheet(); });
 $('#refreshDevices').addEventListener('click', renderDevices);
 $('#copyUri').addEventListener('click', async (e) => {
   try { await navigator.clipboard.writeText(REDIRECT_URI); e.target.textContent = 'Copié'; } catch { e.target.textContent = 'Sélectionne'; }
